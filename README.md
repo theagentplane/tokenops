@@ -1,4 +1,4 @@
-# Token Governance for AI Agents
+# Tokens As Infra
 
 An operational field guide and reference architecture for treating tokens as a first-class infrastructure resource. Built in public for **AI Engineer World's Fair 2026**.
 
