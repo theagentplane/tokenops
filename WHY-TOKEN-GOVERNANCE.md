@@ -13,6 +13,7 @@
 3. [Primitives for token governance](#2-primitives-for-token-governance)
 4. [The current space](#3-the-current-space)
 5. [The discipline](#4-the-discipline)
+6. [Whiteboard](https://excalidraw.com/#json=oJ_PoD2cSEZOSmS1Qyqg0,TEKouNgh6yY2S8b4j8tbgA)
 
 ---
 
