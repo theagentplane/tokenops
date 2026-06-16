@@ -1,10 +1,7 @@
 # TokenOps Test Bench
 
-# TokenOps Control Plane
-
 [![Type Checking](https://img.shields.io/badge/types-Mypy%20%7C%20Strict-2A2A2A?style=flat-square)](https://mypy-lang.org/)
 [![Telemetry Standard](https://img.shields.io/badge/telemetry-OpenTelemetry%20GenAI-334155?style=flat-square&logo=opentelemetry)](https://opentelemetry.io/)
-[![CI Status](https://img.shields.io/badge/build-passing-2A2A2A?style=flat-square)](https://github.com/your-repo/actions)
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 
 A two-agent research pipeline test bench. **Research** (Agent A) runs a search loop, then delegates findings to **Summarize** (Agent B) over A2A-style HTTP. Agents run as separate processes with swappable **native** or **LangChain** implementations.
