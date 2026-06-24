@@ -6,8 +6,7 @@
 |---|---|
 | **segment** | a grouping a budget/policy attaches to: the value of one dimension (run, user, agent, tenant, or a tag). One event belongs to several segments at once. |
 | **inflight(seg)** | how many calls for that segment have started but not yet returned **right now** (concurrent calls in progress). |
-| **depth(run)** | how many delegation levels deep the run is. A → B → C = depth 3. Computed as parent.depth + 1. |
-| **breadth(run)** | how many sub-agents this run has spawned directly. |
+| ~~**breadth(run)**~~ | ~~how many sub-agents this run has spawned directly.~~ *Unused — no depth/breadth policy tracks this.* |
 | **budget_left(run)** | remaining budget = `limit − spent`. |
 | **window** | the last W events of the current run (a deque); used by loop, velocity, and progress checks. |
 | **signature** | a stable hash of (tool name, args). |
@@ -18,37 +17,33 @@
 | **est_input** | estimated input tokens for the next call (prev call's input tokens, or chars/4). Avoids tokenizing on the hot path. |
 | **cum cost** | cumulative run cost stored on each window entry, so a velocity (slope) read is O(1). |
 | **lease** | a local slice of a global counter; the hot path checks locally and syncs to the shared store on refill. |
-| **D_safety** | config: the max delegation depth allowed, a runaway-recursion guard (e.g. 8). |
-| **reserve** | config: the budget floor below which no new sub-agent is spawned, e.g. `max(reserve_micros, 0.1 × budget)`. |
+| ~~**reserve**~~ | ~~config: the budget floor below which no new sub-agent is spawned, e.g. `max(reserve_micros, 0.1 × budget)`.~~ *Removed with `delegation_cap`.* |
 
 ## Key state and methods
 
-State the ledger holds (per run), and how the derived values are computed:
+**`run_id` is the index, not a field inside run state.** Store per-run counters
+under `runs[run_id]`; do not duplicate `run_id` inside `RunState`. Segment
+totals (`spent`, `inflight`) and the halt set stay at the ledger top level
+because they span runs or attach to segment keys.
+
+State the ledger holds, and how derived values are computed:
 
 ```
-state:
-  depth: dict[run_id -> int]          # delegation depth, set once at open_run
+ledger:
+  runs: dict[run_id -> RunState]
   spent[(budget, key)] -> micros      # per-segment running total
-  steps: dict[run_id -> int]
   inflight: dict[segment -> int]
-  window: dict[run_id -> deque]       # (signature, result_hash, progress, ts, cum_cost)
   halted: set[run_id]
 
-open_run(run_id, parent_run):         # depth stored once, O(1) read, never walk the chain
-    depth[run_id] = depth[parent_run] + 1  if parent_run else 0
+RunState:                             # no run_id field — the dict key is the run
+  steps: int
+  window: deque                       # (signature, result_hash, progress, ts, cum_cost)
 
-depth(run)        = depth.get(run, 0)
+open_run(run_id, parent_run):
+    runs[run_id] = RunState(steps=0, window=empty)
+
 budget_left(run)  = limit(run) - spent(run)
 velocity(run, M)  = (cum_now - cum_{M events ago}) / M     # both ends read from window, O(1)
-```
-
-Delegation gate used by `delegation_cap` (budget is the primary gate, depth is the safety net):
-
-```
-allow_spawn(parent_run):
-    return budget_left(parent_run) >= reserve
-       and depth(parent_run) + 1 <= D_safety
-    # otherwise REFUSE the spawn; the child's open_run sets its depth = depth(parent) + 1
 ```
 
 ## Prerequisite (not a policy)
@@ -61,7 +56,7 @@ The **purpose** column carries the design intent (so a static cap, a cost claim,
 
 | Policy | Purpose | Detect (formula) | Fix (mechanism, low level) |
 |---|---|---|---|
-| `delegation_cap` | **Budget-gated spawn**, not a static cap (complex tasks legitimately reuse sub-agents) | `budget_left(run) < reserve` OR `depth(run) ≥ D_safety` | **REFUSE** the spawn; return a structured "budget low / depth limit" error so the parent finalizes with what it has. The hard gate is remaining budget; depth is only a runaway-recursion safety net. |
+| ~~`delegation_cap`~~ | ~~**Budget-gated spawn**, not a static cap (complex tasks legitimately reuse sub-agents)~~ | ~~`budget_left(run) < reserve` OR `depth(run) ≥ D_safety`~~ | ~~**REFUSE** the spawn; return a structured "budget low / depth limit" error so the parent finalizes with what it has. The hard gate is remaining budget; depth is only a runaway-recursion safety net.~~ *Removed — depth-based delegation limits dropped; fan-out is handled by `concurrency_cap` and spend by `cost_budget` / `pre_call_worst_case`.* |
 | `concurrency_cap` | **Infra shield** (memory, downstream rate), **not a cost lever** | `inflight(seg) ≥ max_concurrent` | Single process: **QUEUE** in a bounded semaphore (backpressure). Serverless/distributed: **REJECT** with a retryable 429 so the caller's backoff resubmits. Never hold an open request across a scalable container; never kill admitted work (that wastes tokens for no saving). |
 | `tool_fix` | **Cheap defensive check** (catch a hallucinated tool name before the model burns an I/O round-trip) | `name ∉ registry` (O(1) hash) OR `¬valid(args, schema[name])`; track `fails(run)` | **INJECT** a synthetic tool result `{error, did_you_mean (edit-distance), available_tools}` instead of executing, so the model self-corrects. After K identical failures, **HALT**. |
 | `context_compaction` | Default; needs a prompt-assembly hook | `est_input ≥ ctx_max` OR `est_input` rising over the window (estimate, never tokenize on the hot path) | **MUTATE** the outgoing prompt: (1) move volatile values below the static prefix to restore the prompt-cache discount, (2) dedup tool outputs by hash, (3) summarize only filler, pinning system prompt, schema, constraints, state. No hook → degrade to telemetry, never HALT. Full history stays in the store. |
@@ -77,7 +72,7 @@ The **purpose** column carries the design intent (so a static cap, a cost claim,
 
 **IN telemetry the Instrument layer must supply:** attribution dims, `cost_micros`, LLM `usage`, tool `signature` and `result` (or its length), delegate `rolled_up_cost`, the streaming output chunks, and call-admit/complete signals.
 
-**OUT controls the apply layer must expose (seven):** `HALT` (stop + halted flag) · `CANCEL` (hard-break a stream) · `REFUSE` (block a spawn) · `REJECT`/`QUEUE` (429 or backpressure) · `MUTATE` (swap model, cap output, rewrite prompt) · `INJECT` (substitute a tool result, or add a message to the next input) · `RETRY` (re-issue with new params).
+**OUT controls the apply layer must expose (six active):** `HALT` (stop + halted flag) · `CANCEL` (hard-break a stream) · `REJECT`/`QUEUE` (429 or backpressure) · `MUTATE` (swap model, cap output, rewrite prompt) · `INJECT` (substitute a tool result, or add a message to the next input) · `RETRY` (re-issue with new params). ~~`REFUSE` (block a spawn)~~ *removed with `delegation_cap`.*
 
 The breaker owns `HALT` and `CANCEL`; every other policy heals or bounds.
 

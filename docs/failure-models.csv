@@ -2,4 +2,4 @@ Failure Dimension,Core Failure Mode,Root Trigger,Target Enforcement Action
 DEPTH (Linear Threads),Runaway Spend,Unbounded token loops.,[ halt ]
 ,Getting Stuck,Structural stalls & repetition.,[ unstick ] → [ halt ]
 ,Context Decay,Token accumulation & memory rot.,[ compact ]
-BREADTH (Parallel Trees),Uncontrolled Fan-Out,Recursive delegation & massive payloads.,[ cap_concurrency ] ∧ [ trim ]
+BREADTH (Parallel Trees),Uncontrolled Fan-Out,Parallel spawn explosion & massive payloads.,[ cap_concurrency ] ∧ [ trim ]
