@@ -6,7 +6,6 @@
 |---|---|
 | **segment** | a grouping a budget/policy attaches to: the value of one dimension (run, user, agent, tenant, or a tag). One event belongs to several segments at once. |
 | **inflight(seg)** | how many calls for that segment have started but not yet returned **right now** (concurrent calls in progress). |
-| ~~**breadth(run)**~~ | ~~how many sub-agents this run has spawned directly.~~ *Unused — no depth/breadth policy tracks this.* |
 | **budget_left(run)** | remaining budget = `limit − spent`. |
 | **window** | the last W events of the current run (a deque); used by loop, velocity, and progress checks. |
 | **signature** | a stable hash of (tool name, args). |
