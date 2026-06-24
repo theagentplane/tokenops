@@ -6,7 +6,7 @@
 |---|---|
 | **segment** | a grouping a budget/policy attaches to: the value of one dimension (run, user, agent, tenant, or a tag). One event belongs to several segments at once. |
 | **inflight(seg)** | how many calls for that segment have started but not yet returned **right now** (concurrent calls in progress). |
-| **budget_left(run)** | remaining budget = `limit − spent`. |
+| **budget_left(budget, segment_key)** | remaining budget for one accumulator: `limit − spent[(budget_id, segment_key, period)]`. |
 | **window** | the last W events of the current run (a deque); used by loop, velocity, and progress checks. |
 | **signature** | a stable hash of (tool name, args). |
 | **result_hash** | a hash of the tool's result, to tell if a repeated call returned the same thing. |
@@ -20,30 +20,47 @@
 
 ## Key state and methods
 
-**`run_id` is the index, not a field inside run state.** Store per-run counters
-under `runs[run_id]`; do not duplicate `run_id` inside `RunState`. Segment
-totals (`spent`, `inflight`) and the halt set stay at the ledger top level
-because they span runs or attach to segment keys.
+**`run_id` is the index, not a field inside run state.** Per-run ephemeral
+state lives under `runs[run_id]`. Spend and inflight counters live in separate
+accumulator maps because one event can match **many** budgets/segments at once.
+
+**`spent` vs `inflight`:**
+
+| Counter | Keyed by | What it means |
+|---------|----------|---------------|
+| **`spent`** | **Budget accumulator** `(budget_id, segment_key, period)` | Running total for a **budget** bound to a resolved segment (e.g. this run's LLM cap, this tenant's monthly cap). One event can increment several accumulators. |
+| **`inflight`** | **Segment key** (e.g. `run:run-abc`, `tenant:acme`) | Concurrent calls in flight for whatever dimension `concurrency_cap` scopes to — **not** per budget. Increment on admit, decrement on complete. |
+
+A **segment** is the resolved value of a budget/policy matcher (run, user,
+tenant, agent, tag combo). A **budget** attaches a limit to that matcher;
+`spent` is always budget-scoped. `inflight` is segment-scoped for concurrency
+only.
 
 State the ledger holds, and how derived values are computed:
 
 ```
 ledger:
   runs: dict[run_id -> RunState]
-  spent[(budget, key)] -> micros      # per-segment running total
-  inflight: dict[segment -> int]
-  halted: set[run_id]
+  spent: dict[(budget_id, segment_key, period) -> micros]
+  inflight: dict[segment_key -> int]
 
 RunState:                             # no run_id field — the dict key is the run
   steps: int
   window: deque                       # (signature, result_hash, progress, ts, cum_cost)
+  halted: bool
+  halt_reason: str | None
 
 open_run(run_id, parent_run):
-    runs[run_id] = RunState(steps=0, window=empty)
+    runs[run_id] = RunState(steps=0, window=empty, halted=False)
 
-budget_left(run)  = limit(run) - spent(run)
-velocity(run, M)  = (cum_now - cum_{M events ago}) / M     # both ends read from window, O(1)
+budget_left(budget_id, segment_key, period)
+    = limit(budget_id) - spent[(budget_id, segment_key, period)]
+velocity(run, M)  = (cum_now - cum_{M events ago}) / M     # from runs[run].window, O(1)
 ```
+
+In single-process mode, `runs[run_id].halted` is the kill switch. In
+distributed A2A, that field is backed by the shared store (same shape, different
+backend) so every agent's IN connector refuses further calls on a halted run.
 
 ## Prerequisite (not a policy)
 
