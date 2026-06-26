@@ -30,14 +30,15 @@ async def submit_task(research_url: str, task: str, corpus_profile: str) -> RunR
 
 
 async def delegate_summarize(
-    summarize_url: str, task: str, findings: list[Finding]
-) -> tuple[str, TokenUsage, list[StepEvent]]:
-    payload = summarize_request(task=task, findings=findings)
+    summarize_url: str, task: str, findings: list[Finding], parent_run: str | None = None
+) -> tuple[str, TokenUsage, list[StepEvent], int]:
+    payload = summarize_request(task=task, findings=findings, parent_run=parent_run)
     data = await post_task(summarize_url, payload)
     return (
         str(data.get("summary", "")),
         parse_token_usage(data.get("token_usage")),
         parse_steps(data.get("steps", [])),
+        int(data.get("cost_micros", 0)),  # child run total for parent rollup
     )
 
 
