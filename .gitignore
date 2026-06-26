@@ -1,0 +1,21 @@
+# This repo tracks only the TokenOps control-plane work:
+#   tokenops-dev/   — code + tests
+#   tokenops-lld/   — LLD / design docs
+# Everything else at the workspace root is ignored.
+/*
+!/.gitignore
+!/tokenops-dev/
+!/tokenops-lld/
+
+# Python / tooling caches anywhere in the tracked trees
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
