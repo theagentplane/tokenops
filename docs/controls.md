@@ -76,17 +76,17 @@ provider wrap (`wrap_complete` / `wrap_stream`) applies the rest. All seven are 
 | MUTATE (model / output cap) | `wrap_complete` reads `controls.call` | ✅ live |
 | MUTATE (deep prompt compaction) | `Action.compact` → `wrap` rewrites outgoing messages (dedup, pin system) | ✅ live |
 | INJECT (next-call message) | `controls.carry` prepended | ✅ live |
-| INJECT (deep tool-result swap) | `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result | ✅ live (research-native; `tool_output_cap`) |
+| INJECT (deep tool-result swap) | `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result | ✅ live (research-native; `tool_output_cap` + `tool_fix`) |
 | RETRY | bounded loop in `wrap_complete`: re-issue with tighter cap + raised penalties | ✅ live |
 | REJECT / QUEUE | `Throttled` → 429 + Retry-After at the boundary | ✅ live |
-| CANCEL | `wrap_stream` + `providers.stream_chat`: detect degeneration, `generator.close()` mid-flight | ✅ built + tested; **not in the default live path** (agent calls the non-streaming wrap — switch it to `wrap_stream` to activate) |
+| CANCEL | `wrap_stream` + `providers.stream_complete`: detect degeneration, `generator.close()` mid-flight | ✅ live behind **`TOKENOPS_STREAM=1`**; default off (offline bench is non-streaming) |
 
 Under `RaiseControls`, any unsupported corrective kind still **fails closed to HALT**.
 
 ## Remaining parity work
 
-- **CANCEL** is implemented and tested but the native agent runs non-streaming, so it only
-  fires when the server uses `wrap_stream`. Flip the model call to streaming to activate.
-- **`tool_fix`** INJECT still uses the carry (next-message) path; only `tool_output_cap`
-  does in-place tool-result substitution.
-- Deep hooks are wired into **research-native** only — not the summarize or LangChain variants.
+- **CANCEL** is live when `TOKENOPS_STREAM=1` (research server routes model calls through
+  `wrap_stream` + `stream_complete`); the default stays non-streaming for the offline bench.
+- Deep tool-result substitution now covers both **`tool_output_cap`** and **`tool_fix`**.
+- Deep hooks are wired into **research-native** only — the summarize variant has no tools
+  (it still gets prompt compaction via `wrap_complete`); LangChain variants are unchanged.

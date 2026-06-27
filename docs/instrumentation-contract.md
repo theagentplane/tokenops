@@ -71,11 +71,11 @@ at `make_on_step` and set those fields on the server's `Attribution` — done.
 | INJECT (next-call message) | ✅ via `controls.carry`, prepended on the next dispatch |
 | REJECT / QUEUE | ✅ `Throttled` → 429 + Retry-After at the boundary |
 | MUTATE (programmatic prompt compaction) | ✅ `Action.compact` → `wrap_complete` rewrites outgoing messages (dedup, pin system) |
-| INJECT (replace a tool *result*) | ✅ `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result (research-native; `tool_output_cap`) |
+| INJECT (replace a tool *result*) | ✅ `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result (research-native; `tool_output_cap` + `tool_fix`) |
 | RETRY | ✅ bounded loop in `wrap_complete` — re-issue with tighter cap + raised penalties |
-| CANCEL | ✅ built + tested via `wrap_stream` + `providers.stream_chat` (mid-stream teardown); not in the default live path until the server streams |
+| CANCEL | ✅ live behind `TOKENOPS_STREAM=1` (research server uses `wrap_stream` + `stream_complete`); default off |
 
-All seven actuators are implemented and tested. The only live-path gap is CANCEL: the native
-agent runs non-streaming, so CANCEL fires only when the server uses `wrap_stream`. Parity
-items remaining: `tool_fix` deep tool-result swap, and deep hooks for the summarize/LangChain
-variants.
+All seven actuators are implemented, tested, and reachable on the live path (CANCEL behind the
+`TOKENOPS_STREAM` flag). Deep tool-result swap covers `tool_output_cap` and `tool_fix`. The
+only parity gap left is the LangChain variants — the native summarize agent has no tools and
+already gets prompt compaction via `wrap_complete`.

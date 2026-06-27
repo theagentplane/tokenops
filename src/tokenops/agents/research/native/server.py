@@ -20,13 +20,14 @@ from tokenops.control import (
     downstream_run_scope,
     observation_from_delegate,
     wrap_complete,
+    wrap_stream,
 )
 from tokenops.control.context import RUN_ID_HEADER, current_registration, current_span, governance_scope
 from tokenops.control.engine import Throttled
 from tokenops.control.models import RunNotRegisteredError, RunRecord
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
-from tokenops.providers import complete
+from tokenops.providers import complete, stream_complete
 
 AGENT = "research"
 
@@ -70,10 +71,19 @@ def build_app():
                 token_usage.input_tokens += event.tokens.input_tokens
                 token_usage.output_tokens += event.tokens.output_tokens
 
-            governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=complete, service=AGENT,
-            )
+            # Streaming opt-in (TOKENOPS_STREAM=1) routes model calls through wrap_stream so
+            # the CANCEL actuator can tear down a degenerate stream mid-flight. Default is the
+            # non-streaming wrap (RETRY still recovers runaway output after the fact).
+            if os.environ.get("TOKENOPS_STREAM") == "1":
+                governed = wrap_stream(
+                    governor, controls, attr, provider=cfg.provider, model=cfg.model,
+                    stream_dispatch=stream_complete, service=AGENT,
+                )
+            else:
+                governed = wrap_complete(
+                    governor, controls, attr, provider=cfg.provider, model=cfg.model,
+                    dispatch=complete, service=AGENT,
+                )
 
             status, halt_reason, summary, findings = "completed", None, "", []
             span = current_span()

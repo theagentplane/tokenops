@@ -88,6 +88,7 @@ class ToolFixPolicy(Policy):
         hint = f" did_you_mean={ev['did_you_mean']}" if ev.get("did_you_mean") else ""
         return Action(
             kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            replace_tool_result=True,  # deep: substitute the synthetic error for the bad tool's result
             inject_message=(
                 f"ERROR: {ev['problem']} for tool '{ev['name']}'.{hint} "
                 f"available_tools={ev['available_tools']}"

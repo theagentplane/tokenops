@@ -19,6 +19,7 @@ from tokenops.control.policies import (
     context_compaction,
     output_runaway,
     progress_guard,
+    tool_fix,
     tool_output_cap,
 )
 from tokenops.providers.types import ModelResponse
@@ -192,6 +193,22 @@ def test_deep_tool_result_substitution():
     descriptor = controls.take_tool_result()
     assert descriptor is not None and descriptor.startswith("TOOL OUTPUT OFFLOADED")
     assert controls.take_tool_result() is None  # one-shot
+
+
+def test_deep_tool_fix_substitutes_error_result():
+    ledger = Ledger(price=toy_price)
+    controls = ApplyControls()
+    gov = Governor(ledger, controls)
+    gov.register(*tool_fix.build({"search"}, k=3))
+    attr = _attr("r6")
+    ledger.open_run("r6")
+
+    gov.observe(Observation(attr=attr, node_type="tool", boundary_id="serch", ts=1.0,
+                            input={"name": "serch", "args": {"query": "q"}}, output={"x": "y"},
+                            signature="s", result_hash="r"))
+
+    sub = controls.take_tool_result()
+    assert sub is not None and sub.startswith("ERROR:") and "did_you_mean=search" in sub
 
 
 def test_progress_guard_injects_then_halts_on_repeated_results():
