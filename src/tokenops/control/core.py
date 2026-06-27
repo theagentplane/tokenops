@@ -220,6 +220,9 @@ class Action:
     max_output_tokens: int | None = None
     # INJECT payload
     inject_message: str | None = None
+    replace_tool_result: bool = False  # deep INJECT: substitute the tool result, not the next msg
+    # MUTATE prompt: deep compaction (rewrite the outgoing messages, not just prepend a directive)
+    compact: bool = False
     # REJECT / QUEUE payload
     retry_after_s: float | None = None
 

@@ -70,6 +70,7 @@ class ToolOutputCapPolicy(Policy):
         ev = signal.evidence
         return Action(
             kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            replace_tool_result=True,  # deep: substitute the oversized payload with the descriptor
             inject_message=(
                 f"TOOL OUTPUT OFFLOADED: ~{ev['est_tokens']} tokens, count={ev['count']}, "
                 f"handle={ev['handle']}. Paginate or filter via the handle instead of "

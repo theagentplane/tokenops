@@ -89,6 +89,7 @@ class _ResolvedCall:
 
     model_override: str | None = None
     max_output_tokens: int | None = None
+    compact: bool = False  # deep MUTATE: rewrite the outgoing messages (context_compaction)
 
 
 @dataclass
@@ -106,12 +107,20 @@ class ApplyControls:
     carry: list[str] = field(default_factory=list)
     call: _ResolvedCall = field(default_factory=_ResolvedCall)
     retry: bool = False
+    tool_result_override: str | None = None  # deep INJECT: substitute the last tool result
 
     def begin_call(self) -> None:
         """Reset per-call mutation state before a pre_call pass (``carry`` persists across
         calls until consumed by the next dispatch)."""
         self.call = _ResolvedCall()
         self.retry = False
+
+    def take_tool_result(self) -> str | None:
+        """Consume a pending tool-result substitution (the agent calls this after a tool
+        crossing). One-shot — cleared on read."""
+        val = self.tool_result_override
+        self.tool_result_override = None
+        return val
 
     def apply(self, action: Action) -> None:
         kind = action.kind
@@ -126,10 +135,14 @@ class ApplyControls:
                 self.call.model_override = action.downgrade_to
             if action.max_output_tokens is not None:
                 self.call.max_output_tokens = action.max_output_tokens
-            if action.inject_message:  # e.g. compaction directive
+            if action.compact:  # deep prompt compaction (rewrite messages in the wrap)
+                self.call.compact = True
+            if action.inject_message:  # compaction directive / steer
                 self.carry.append(action.inject_message)
         elif kind is ActionKind.INJECT:
-            if action.inject_message:
+            if action.replace_tool_result and action.inject_message:  # deep tool-result swap
+                self.tool_result_override = action.inject_message
+            elif action.inject_message:
                 self.carry.append(action.inject_message)
         elif kind is ActionKind.RETRY:
             self.retry = True
