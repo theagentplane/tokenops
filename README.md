@@ -86,6 +86,7 @@ See [`docs/code-navigation.md`](docs/code-navigation.md) for code navigation dia
 ## Documentation
 
 - [Control plane status](CONTROL_PLANE.md)
+- [Customer outcomes](docs/customer-outcomes.md) — first-order metrics: cost, completion under budget, quality
 - [Run attribution](docs/run-attribution.md)
 - [Architecture](docs/architecture.md)
 - [Why Token Governance?](docs/why-token-governance.md)
