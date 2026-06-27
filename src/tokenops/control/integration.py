@@ -16,6 +16,9 @@ import itertools
 import json
 from typing import Callable
 
+from tokenops.control.context import current_span
+from tokenops.control.boundary import emit_observation, observation_from_crossing
+from tokenops.control.context import current_governance, current_registration
 from tokenops.control.core import Attribution, CallRequest, Observation, Usage
 
 
@@ -28,47 +31,93 @@ def _hash(text: object) -> str:
     return hashlib.sha256(str(text).encode()).hexdigest()[:16]
 
 
-def make_on_step(governor, attr: Attribution, *, provider: str, model: str):
-    """Return a callback for an agent's ``on_step``.
+def _span_fields(*, service: str = "") -> dict:
+    span = current_span()
+    if span is None:
+        return {"service": service, "span_id": "", "parent_span_id": None}
+    return {
+        "service": span.service or service,
+        "span_id": span.span_id,
+        "parent_span_id": span.parent_span_id,
+    }
 
-    Maps each step to an Observation by ``action``:
-      * ``model``    → llm crossing (priced from the step's token usage)
-      * ``search``/other tool → tool crossing (signature + result_hash for loop detection)
-      * ``delegate`` → delegate crossing
-    """
+
+def step_to_observation(
+    step,
+    attr: Attribution,
+    *,
+    ts: float,
+    provider: str = "",
+    model: str = "",
+    service: str = "",
+) -> Observation:
+    """Map an agent step object to an ``Observation`` with ``boundary_tags``."""
+    action = getattr(step, "action", "")
+    span = _span_fields(service=service)
+    if action == "model":
+        tu = getattr(step, "tokens", None)
+        usage = Usage(
+            input=getattr(tu, "input_tokens", 0) if tu else 0,
+            output=getattr(tu, "output_tokens", 0) if tu else 0,
+        )
+        boundary_tags = {
+            "node_type": "llm",
+            "provider": provider,
+            "model": model,
+        }
+        return Observation(
+            attr=attr,
+            node_type="llm",
+            boundary_id=f"{getattr(step, 'agent', span['service'] or 'agent')}.chat",
+            ts=ts,
+            usage=usage,
+            provider=provider,
+            model=model,
+            output={"text": getattr(step, "detail", "")},
+            boundary_tags=boundary_tags,
+            **span,
+        )
+    if action == "delegate":
+        boundary_tags = {"node_type": "delegate", "target": getattr(step, "detail", "")}
+        return Observation(
+            attr=attr,
+            node_type="delegate",
+            boundary_id="delegate",
+            ts=ts,
+            input={"target_agent": getattr(step, "detail", "")},
+            boundary_tags=boundary_tags,
+            **span,
+        )
+    query = getattr(step, "query", "")
+    args = {"query": query}
+    tool_name = action or "tool"
+    boundary_tags = {"node_type": "tool", "tool": tool_name}
+    return Observation(
+        attr=attr,
+        node_type="tool",
+        boundary_id=tool_name,
+        ts=ts,
+        input={"name": tool_name, "args": args},
+        output={
+            "completeness": getattr(step, "completeness", None),
+            "snippet": getattr(step, "detail", ""),
+        },
+        signature=tool_signature(tool_name, args),
+        result_hash=_hash(getattr(step, "detail", "")),
+        boundary_tags=boundary_tags,
+        **span,
+    )
+
+
+def make_on_step(governor, attr: Attribution, *, provider: str, model: str, service: str = ""):
+    """Return a callback for an agent's ``on_step``."""
     counter = itertools.count(1)
 
-    def on_step(ev) -> None:  # signature matches the agent's existing callback
-        i = next(counter)
-        action = getattr(ev, "action", "")
-        if action == "model":
-            tu = getattr(ev, "tokens", None)
-            usage = Usage(
-                input=getattr(tu, "input_tokens", 0) if tu else 0,
-                output=getattr(tu, "output_tokens", 0) if tu else 0,
-            )
-            obs = Observation(
-                attr=attr, node_type="llm", boundary_id=f"{getattr(ev, 'agent', 'agent')}.chat",
-                ts=float(i), provider=provider, model=model, usage=usage,
-                output={"text": getattr(ev, "detail", "")},
-            )
-        elif action == "delegate":
-            obs = Observation(
-                attr=attr, node_type="delegate", boundary_id="delegate", ts=float(i),
-                input={"target_agent": getattr(ev, "detail", "")},
-            )
-        else:  # tool (search, etc.)
-            query = getattr(ev, "query", "")
-            args = {"query": query}
-            obs = Observation(
-                attr=attr, node_type="tool", boundary_id=action or "tool", ts=float(i),
-                input={"name": action or "tool", "args": args},
-                output={"completeness": getattr(ev, "completeness", None),
-                        "snippet": getattr(ev, "detail", "")},
-                signature=tool_signature(action or "tool", args),
-                result_hash=_hash(getattr(ev, "detail", "")),
-            )
-        governor.observe(obs)  # may raise Halt, which unwinds the agent loop
+    def on_step(ev) -> None:
+        obs = step_to_observation(
+            ev, attr, ts=float(next(counter)), provider=provider, model=model, service=service,
+        )
+        governor.observe(obs)
 
     return on_step
 
@@ -78,7 +127,7 @@ DispatchFn = Callable[..., object]
 
 
 def _estimate_input_tokens(messages) -> int:
-    return max(1, len(str(messages)) // 4)  # chars/4; never tokenize on the hot path
+    return max(1, len(str(messages)) // 4)
 
 
 def wrap_complete(
@@ -90,25 +139,9 @@ def wrap_complete(
     model: str,
     dispatch: DispatchFn,
     est_input_fn: Callable[[object], int] | None = None,
+    service: str = "",
 ):
-    """Wrap a ``complete(provider, model, messages)`` entry point so the **pre_call** moment
-    runs and corrective controls actually apply.
-
-    The returned callable matches the agent's ``complete`` signature, so you swap it in with
-    ``monkeypatch.setattr(agent_module, "complete", governed)`` (or pass it directly). Per
-    call it:
-
-      1. resets per-call mutation state, estimates input tokens, builds a ``CallRequest``;
-      2. runs ``governor.pre_call`` — HALT raises, REJECT/QUEUE raise ``Throttled``, MUTATE
-         records a model/output-cap override, INJECT/compaction records a carry message;
-      3. admits the call to ``inflight`` (concurrency), dispatches the **mutated** call
-         (swapped model, enforced ``max_output_tokens``, carry messages prepended), and
-         completes ``inflight`` in a ``finally``.
-
-    Requires an :class:`ApplyControls`-style ``controls`` (the one registered on ``governor``)
-    so the wrap can read what pre_call decided.
-    """
-    counter = itertools.count(1)
+    """Wrap a ``complete(provider, model, messages)`` entry point for **pre_call** governance."""
     estimate = est_input_fn or _estimate_input_tokens
     seg = f"run:{attr.run_id}"
 
@@ -119,7 +152,7 @@ def wrap_complete(
             estimated_input_tokens=estimate(messages),
             max_output_tokens=controls.call.max_output_tokens,
         )
-        governor.pre_call(request)  # applies MUTATE into controls.call; may raise Halt/Throttled
+        governor.pre_call(request)
 
         use_model = controls.call.model_override or m
         if controls.carry:
@@ -128,8 +161,42 @@ def wrap_complete(
 
         governor.ledger.admit(seg)
         try:
-            return dispatch(p, use_model, messages, max_output_tokens=controls.call.max_output_tokens)
+            response = dispatch(p, use_model, messages, max_output_tokens=controls.call.max_output_tokens)
+            if current_governance() is not None and current_registration() is not None:
+                emit_observation(
+                    observation_from_crossing(
+                        boundary_id=f"{service or attr.agent}.chat",
+                        kind="llm",
+                        service=service or attr.agent,
+                        input_state={"message_count": len(messages)},
+                        result=response,
+                        provider=provider,
+                        model=use_model,
+                    )
+                )
+            return response
         finally:
             governor.ledger.complete(seg)
 
     return governed
+
+
+def observation_from_delegate(
+    attr: Attribution,
+    *,
+    boundary_id: str,
+    rolled_up_cost_micros: int,
+    ts: float,
+    service: str = "",
+) -> Observation:
+    """Build a delegate rollup observation after an A2A child returns."""
+    span = _span_fields(service=service)
+    return Observation(
+        attr=attr,
+        node_type="delegate",
+        boundary_id=boundary_id,
+        ts=ts,
+        rolled_up_cost_micros=rolled_up_cost_micros,
+        boundary_tags={"node_type": "delegate"},
+        **span,
+    )

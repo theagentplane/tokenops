@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
+from typing import Mapping
+
 from tokenops.a2a.messages import parse_findings, summarize_response
 from tokenops.a2a.server import create_a2a_app, run_server
 from tokenops.agents.summarize.langchain.agent import LangChainSummarizeAgent
@@ -13,7 +15,7 @@ def build_app():
     cfg = load_config().summarize
     agent = LangChainSummarizeAgent(cfg)
 
-    async def handler(payload: dict) -> dict:
+    async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
         task = str(payload.get("task", ""))
         findings = parse_findings(payload.get("findings", []))
         token_usage = TokenUsage()

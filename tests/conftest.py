@@ -11,6 +11,11 @@ Two tools that keep policy tests independent (one failure → one unit):
 
 from __future__ import annotations
 
+import os
+
+# Tests expect an empty governance store unless they seed explicitly.
+os.environ.setdefault("TOKENOPS_SKIP_GOVERNANCE_SEED", "1")
+
 from dataclasses import dataclass, field
 
 from tokenops.control.core import Action, ActionKind, Attribution, BoundaryStep, Halt, Usage

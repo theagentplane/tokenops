@@ -71,7 +71,20 @@ def test_research_server_http_boundary(tmp_path, monkeypatch):
     from tokenops.agents.research.native import server as srv
     monkeypatch.setattr(srv, "complete", _fake_complete)
 
-    resp = TestClient(srv.build_app()).post("/v1/tasks", json={"task": "t", "corpus_profile": "healthy"})
+    app = srv.build_app()
+    client = TestClient(app)
+    resp = client.post(
+        "/v1/runs",
+        json={"intent": "", "user_dims": {}},
+    )
+    assert resp.status_code == 201
+    run_id = resp.json()["run_id"]
+
+    resp = client.post(
+        "/v1/tasks",
+        json={"task": "t", "bench": {"corpus_profile": "healthy"}},
+        headers={"X-TokenOps-Run-Id": run_id},
+    )
     body = resp.json()
     assert resp.status_code == 200 and body["status"] == "halted"
     assert "step" in body["halt_reason"].lower()

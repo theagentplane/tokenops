@@ -1,8 +1,8 @@
 # TokenOps control plane — architecture & dependency graph
 
 Where the code starts, how the modules depend on each other, and what each is for.
-Control plane under `tokenops-dev/src/tokenops/control/`; wired into the A2A native servers
-and two Streamlit UIs; state shared via one SQLite file.
+Control plane under `src/tokenops/control/`; wired into native A2A servers, Chronicle
+boundaries, and three Streamlit UIs; state shared via one SQLite file.
 
 ---
 
@@ -10,106 +10,102 @@ and two Streamlit UIs; state shared via one SQLite file.
 
 | Entry point | Module | Purpose |
 |-------------|--------|---------|
-| `build_governor(config, price)` | `config.py` | turn a `budgets:`/`policies:` config into a wired `Governor` (+ its `Ledger`) |
-| `make_on_step(governor, attr, …)` | `integration.py` | brownfield **IN** tap — agent `StepEvent` → `Observation` → `observe` |
-| `wrap_complete(governor, controls, attr, …)` | `integration.py` | provider wrap — run **pre_call** and **apply** MUTATE/INJECT/REJECT before dispatch |
-| `Store(...)` + `governance_config_for(agent)` | `store.py` | SQLite-backed config + run history; assembles the exact `build_governor` dict |
-| `build_price_book()` | `pricing.py` | the `PriceFn` (tokens → micro-USD) every live governor needs |
+| `POST /v1/runs` + `POST /v1/tasks` | `a2a/server.py` | register run dims; task requires `X-TokenOps-Run-Id` |
+| `build_attribution(reg, service=…)` | `attribution.py` | registration → ledger `Attribution` |
+| `@boundary` + `emit_observation` | `chronicle/boundary.py`, `control/boundary.py` | record crossing + govern ingest |
+| `wrap_complete(…)` | `integration.py` | provider wrap — **pre_call** before dispatch |
+| `build_governor(config, price)` | `config.py` | `budgets:`/`policies:` → wired `Governor` |
+| `Store.governance_config_for(agent)` | `store.py` | SQLite → exact `build_governor` dict |
+| `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
+| `run_simulation(…)` | `ui/simulator.py` | in-process research→summarize with trace log |
 
-The native A2A server wires all of these per run; the Admin UI writes the store; the
-Dashboard UI reads it.
+Native A2A servers wire these per request; Admin writes the store; Dashboard reads runs;
+Simulator runs in-process with full control-plane visibility.
 
 ## Dependency + data-flow graph
 
 ```mermaid
 graph TD
-    subgraph dataplane["data plane (test bench)"]
-        agent["A2A native server\n(research / summarize)"]
+    subgraph dataplane["data plane"]
+        agent["native A2A server\n(research / summarize)"]
+        chronicle["chronicle @boundary"]
     end
 
     subgraph uis["Streamlit UIs"]
-        admin["pages/1_Admin\nsegments · budgets · policies"]
-        dash["pages/2_Dashboard\nruns · failures · cost"]
+        bench["app.py — Test Bench"]
+        sim["pages/3_Simulator"]
+        admin["pages/1_Admin"]
+        dash["pages/2_Dashboard"]
     end
 
-    store[("SQLite store\nsegments/budgets/policies/runs")]
+    store[("SQLite tokenops.db\nregistrations · budgets · policies · runs")]
 
     subgraph control["control plane"]
+        attr["attribution · context"]
+        boundary["boundary · integration"]
         cfg["config.build_governor"]
-        integ["integration\nmake_on_step · wrap_complete"]
-        engine["engine.Governor\n+ Raise/ApplyControls"]
-        policies["policies/* (10 templates)"]
-        ledger["ledger (Attribute + LedgerView)"]
-        pricing["pricing (PriceFn)"]
-        core["core.py (vocabulary)"]
-        util["policies/_util (helpers)"]
+        engine["engine.Governor"]
+        policies["policies/* (10)"]
+        ledger["ledger + pricing"]
     end
 
-    admin -->|write config| store
+    bench -->|A2A| agent
+    sim -->|in-process| agent
+    admin -->|upsert| store
     store -->|governance_config_for| cfg
-    agent -->|on_step / complete| integ
-    agent -->|build per run| cfg
+    agent -->|register + resolve| store
     agent -->|write RunRecord| store
     store -->|list_runs| dash
-
+    chronicle --> boundary
+    boundary --> engine
+    agent --> boundary
+    agent -->|wrap_complete| boundary
     cfg --> engine
-    cfg --> policies
-    integ --> engine
     engine --> ledger
-    engine --> core
     policies --> ledger
-    policies --> core
-    policies --> util
-    pricing --> ledger
-    ledger --> core
 ```
-
-Arrow = "depends on / flows to". The control-plane half is a **DAG bottoming out at
-`core.py`** (zero internal deps). The store is the shared seam between the admin UI (writes),
-the servers (read config + write runs), and the dashboard (reads runs).
-
-## Layers (bottom-up — each layer only knows the ones below)
-
-| Layer | Module(s) | Purpose | Depends on |
-|-------|-----------|---------|-----------|
-| 6 (foundation) | `core.py` | vocabulary: `Observation`→`BoundaryStep`, `Signal`, `Action`/`ActionKind`, `Detector`/`Policy`, `LedgerView` | — |
-| 5 | `ledger.py` | **Attribute** + `LedgerView`: `runs/spent/inflight`, `record()`, `Budget`/`segment_key` (Design A) | core |
-| 5 | `pricing.py` | per-model price book → `PriceFn` (tokens → micros), fail-closed | core, ledger |
-| 4 | `policies/_util.py` | deterministic helpers (edit distance, token estimate, n-gram, SimHash) | — |
-| 4 | `policies/*.py` | 10 `(Detector, Policy)` templates, each exposing `build()` | core, ledger, _util |
-| 3 | `engine.py` | **Enforce** harness `Governor` (3 moments) + `RaiseControls`/`ApplyControls`/`Throttled` | core, ledger |
-| 2 | `config.py` | `build_governor` factory — config dict → registered templates | engine, ledger, policies |
-| 2 | `store.py` + `models.py` | SQLite store; `governance_config_for(agent)` → build_governor dict; `RunRecord` CRUD | config, models |
-| 1 | `integration.py` | brownfield IN tap + provider wrap | core (+ governor/ledger at runtime) |
-| 0 (edges) | `agents/*/native/server.py`, `a2a/server.py`, `ui/pages/*` | per-run governor wiring; structured Halt→200 / Throttled→429; Admin + Dashboard | all of the above |
 
 ## Runtime flow of one governed run
 
 ```
-A2A server handler (per request)
-  ├─ run_id = uuid; attr = Attribution(user, agent, run_id, tags)
-  ├─ governor = build_governor(store.governance_config_for(agent), build_price_book(), ApplyControls())
+POST /v1/runs  { intent, user_dims }  →  run_registrations
+POST /v1/tasks  +  X-TokenOps-Run-Id
+  ├─ downstream_run_scope / entry_run_scope  →  SpanContext + registration in contextvars
+  ├─ governor = build_governor(store.governance_config_for(agent), price, ApplyControls())
   ├─ store.create_run(RunRecord status="running")
   │
-  ├─ agent.run(task, on_step=make_on_step(...), complete_fn=wrap_complete(...))
-  │     complete ──▶ Governor.pre_call  → detect→decide→apply (MUTATE cap/model · REJECT→429 · HALT)
-  │                  └─ dispatch mutated call → providers.complete(..., max_output_tokens)
-  │     on_step ──▶ Governor.observe → ledger.record (price→spent→BoundaryStep)
-  │                  → detect→decide→apply (INJECT next msg · HALT→raise → unwinds loop)
-  │     delegate ──▶ child run cost rolled up via summarize_response.cost_micros
+  ├─ agent.run(…, complete_fn=wrap_complete(…))
+  │     pre_call  → worst-case / concurrency detectors
+  │     dispatch  → providers.complete
+  │     observe   → LLM Observation (via emit_observation in wrap)
+  │     @boundary tool  → Chronicle envelope + observe
   │
-  └─ finally: store.update_run(status, halt_reason, cost_micros, steps)   → Dashboard reads it
+  ├─ delegate  →  child server (same run_id, X-TokenOps-Parent-Span-Id)
+  │     observe(delegate rollup) on parent
+  │
+  └─ store.update_run(status, halt_reason, cost_micros, steps)
 ```
 
-The **IN** side (`observe`) governs *after* each crossing; the **OUT** side (`pre_call` via
-the wrap) governs *before* the next call. The Ledger is the single in-run state both read;
-the SQLite store is the cross-process state (config in, run records out).
+The **Ledger** is per-process in-run state; **SQLite** is cross-process (config + run history).
+Registration dims flow into `Attribution.tags` but seeded budgets use `dimension: run` only
+(see issue #8 for user/tag scoping).
 
-## Design rules the graph encodes
+## DB maintenance
 
-- Dependencies point **one way, downward**; the **data plane never imports control internals**
-  — it only touches `make_on_step` / `wrap_complete`, which duck-type the agent's objects.
-- **The store assembles exactly the `build_governor` dict**, so persistence drops in for static
-  YAML with no change to the factory or engine.
-- **Per-run governor, process-singleton store + price** — concurrent runs never share window/
-  halt/spend state.
+```bash
+make db-clear    # wipe all rows
+make db-reseed   # replace governance from default.yaml
+make db-reset    # clear + reseed
+```
+
+Scripts: `scripts/db_clear.py`, `scripts/db_reseed.py`. UI `get_store()` uses `auto_seed=False`
+(governance seeded at deploy or via scripts; Admin owns edits).
+
+## Design rules
+
+- Dependencies point **one way**; the data plane never imports control internals except taps.
+- **Store assembles the `build_governor` dict** — YAML `governance:` is reference + auto-seed source.
+- **Per-request governor** — concurrent runs never share window/halt/spend state.
+- **Fail closed** — missing registration, unknown template, unknown price → refuse.
+
+See also `docs/run-attribution.md`.

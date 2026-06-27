@@ -13,7 +13,7 @@ From `tokenops-dev/`:
 python -m pytest -q
 ```
 
-You should see `60 passed`. Pytest config lives in `pyproject.toml`
+You should see **89 passed**. Pytest config lives in `pyproject.toml`
 (`[tool.pytest.ini_options]`: `testpaths=["tests"]`, `pythonpath=["src"]`), so no manual
 `PYTHONPATH` is needed.
 
@@ -34,7 +34,13 @@ python -m pytest -x                                # stop at first failure
 | `test_cost_budget.py` … `test_output_runaway.py` | one per policy — detector trips on the right input, policy emits the right Action |
 | `test_config.py` | `build_governor` wires all 10 policies from a dict; fails closed on unknown policy / missing budget |
 | `test_integration.py` | a **real** `NativeResearchAgent` run halts on a budget (model call faked, everything else real) |
-| `test_apply.py` | corrective controls actually apply through `wrap_complete` (output cap, injected message, blocked dispatch) |
+| `test_apply.py` | corrective controls through `wrap_complete` (output cap, injected message, blocked dispatch) |
+| `test_store.py` | SQLite CRUD, `governance_config_for`, auto-seed, clear/reseed helpers |
+| `test_attribution.py` | registration, headers, `build_attribution`, fail-closed resolve |
+| `test_boundary.py` | `@boundary` → `Observation` with span + boundary_tags |
+| `test_chronicle_boundary.py` | Chronicle envelopes + govern ingest |
+| `test_attribution_ledger_policies_e2e.py` | register → ledger → `step_cap` HALT (in-process + HTTP) |
+| `test_server_enforcement.py` | Admin store config → live server → HALT → RunRecord |
 
 ## How the tests stay isolated
 
@@ -48,6 +54,17 @@ Two helpers in `tests/conftest.py`:
   provider wrap exists.
 * **`toy_price`** — a deterministic price book (10 micros/input token, 30/output), fail-closed
   on unknown models.
+
+* **`TOKENOPS_SKIP_GOVERNANCE_SEED=1`** — set in `tests/conftest.py` so test fixtures get an
+  empty governance store unless they seed explicitly.
+
+## DB scripts (governance reset)
+
+```bash
+make db-clear      # delete all rows (runs + governance)
+make db-reseed     # replace governance from default.yaml
+make db-reset      # clear + reseed
+```
 
 ## Try the live halt yourself (offline)
 

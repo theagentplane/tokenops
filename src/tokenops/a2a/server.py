@@ -1,17 +1,26 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Mapping
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import uvicorn
 
 from tokenops.a2a.cards import agent_card
+from tokenops.chronicle.session import reset_session
 from tokenops.control import Halt
 from tokenops.control.engine import Throttled
+from tokenops.control.models import RunAlreadyRegisteredError, RunRegistration
+from tokenops.control.store import Store, new_id
 
-Handler = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+Handler = Callable[[dict[str, Any], Mapping[str, str]], Awaitable[dict[str, Any]]]
+
+
+def _coerce_user_dims(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items()}
 
 
 def create_a2a_app(
@@ -20,6 +29,8 @@ def create_a2a_app(
     base_url: str,
     skills: list[str],
     handler: Handler,
+    *,
+    store: Store | None = None,
 ) -> FastAPI:
     app = FastAPI(title=name)
     card = agent_card(name=name, description=description, url=base_url, skills=skills)
@@ -32,13 +43,30 @@ def create_a2a_app(
     async def health() -> dict[str, str]:
         return {"status": "ok", "agent": name}
 
+    if store is not None:
+
+        @app.post("/v1/runs")
+        async def register_run(request: Request) -> JSONResponse:
+            """Entry registration — required before ``POST /v1/tasks`` (#2 split endpoint)."""
+            payload = await request.json()
+            run_id = str(payload.get("run_id") or "").strip() or new_id("run")
+            intent = str(payload.get("intent", ""))
+            user_dims = _coerce_user_dims(payload.get("user_dims"))
+            try:
+                reg = store.register_run(
+                    RunRegistration(run_id=run_id, intent=intent, user_dims=user_dims)
+                )
+            except RunAlreadyRegisteredError as exc:
+                return JSONResponse({"error": str(exc)}, status_code=409)
+            reset_session().begin_trace(reg.run_id)
+            return JSONResponse({"run_id": reg.run_id, "status": "registered"}, status_code=201)
+
     @app.post("/v1/tasks")
-    async def run_task(payload: dict[str, Any]) -> JSONResponse:
-        # Handlers normally catch Halt/Throttled themselves (to write a RunRecord + return a
-        # partial). These are safety nets: Halt is a BaseException and would otherwise escape
-        # the broad `except Exception` and crash the worker.
+    async def run_task(request: Request) -> JSONResponse:
+        payload = await request.json()
+        headers = {k: v for k, v in request.headers.items()}
         try:
-            result = await handler(payload)
+            result = await handler(payload, headers)
             return JSONResponse(result)
         except Halt as halt:
             return JSONResponse({"status": "halted", "reason": halt.action.reason}, status_code=200)
@@ -56,12 +84,44 @@ def run_server(app: FastAPI, port: int) -> None:
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
 
 
-async def post_task(url: str, payload: dict[str, Any], timeout: float = 300.0) -> dict[str, Any]:
+async def post_run(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    base = url.rstrip("/")
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(f"{base}/v1/runs", json=payload)
+        _raise_for_response(response)
+        return response.json()
+
+
+def post_run_sync(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    base = url.rstrip("/")
+    with httpx.Client(timeout=timeout) as client:
+        response = client.post(f"{base}/v1/runs", json=payload)
+        _raise_for_response(response)
+        return response.json()
+
+
+async def post_task(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float = 300.0,
+) -> dict[str, Any]:
     base = url.rstrip("/")
     async with httpx.AsyncClient(timeout=timeout) as client:
         health = await client.get(f"{base}/health")
         health.raise_for_status()
-        response = await client.post(f"{base}/v1/tasks", json=payload)
+        response = await client.post(f"{base}/v1/tasks", json=payload, headers=headers or {})
         _raise_for_response(response)
         return response.json()
 
@@ -92,12 +152,18 @@ def _raise_for_response(response: httpx.Response) -> None:
         ) from exc
 
 
-def post_task_sync(url: str, payload: dict[str, Any], timeout: float = 300.0) -> dict[str, Any]:
+def post_task_sync(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float = 300.0,
+) -> dict[str, Any]:
     base = url.rstrip("/")
     with httpx.Client(timeout=timeout) as client:
         health = client.get(f"{base}/health")
         health.raise_for_status()
-        response = client.post(f"{base}/v1/tasks", json=payload)
+        response = client.post(f"{base}/v1/tasks", json=payload, headers=headers or {})
         _raise_for_response(response)
         return response.json()
 

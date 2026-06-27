@@ -62,7 +62,18 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
 | always | `attribution` | base | always on | tag and total every call per customer; emit a standard span | Telemetry |
  
 **When a policy stops a run:** a stop halts spend and preserves state (cost so far, reason, snapshot). It never destroys the run. Resume is delegated and always deliberate. TokenOps provides the snapshot, and the runtime or a human decides whether to resume; never automatic.
- 
-## 4. V2
+
+## 5. Configuration & ops (v1 bench)
+
+| Concern | Where |
+|---|---|
+| Governance source of truth | SQLite `tokenops.db` (`TOKENOPS_DB`) |
+| Reference + auto-seed | `src/tokenops/config/default.yaml` → `governance:` |
+| Admin edits | Streamlit **Policy admin** → next run picks up |
+| Reset | `make db-reset` / `scripts/db_reseed.py` |
+| Registration dims | `POST /v1/runs` — `intent`, `user_dims` (see `docs/run-attribution.md`) |
+| Segment-scoped budgets | Supported via `Budget.dimension` + `segment_key_for`; seed is run-only ([#8](https://github.com/theagentplane/tokenops/issues/8)) |
+
+## 6. V2
  
 Smart dashboard: live per-customer cost, run health, a halt and steer feed, and the observe-to-enforce recommender. Reads the ledger, off the hot path.

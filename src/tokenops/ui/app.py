@@ -15,7 +15,10 @@ from tokenops.config.loader import PRESETS_DIR
 
 st.set_page_config(page_title="TokenOps Test Bench", layout="wide")
 st.title("Two-Agent Test Bench")
-st.caption("Research agent delegates to summarize agent over A2A. UI calls research only.")
+st.caption(
+    "Research agent delegates to summarize agent over A2A. UI calls research only. "
+    "For in-process trace + control-plane visibility, open **Run simulator** in the sidebar."
+)
 
 
 def cfg_from_session() -> AppConfig:
@@ -99,7 +102,7 @@ def main() -> None:
         with st.spinner("Running research → summarize via A2A..."):
             try:
                 st.session_state.last_result = submit_task_sync(
-                    cfg.research.url, cfg.task, cfg.corpus_profile
+                    cfg.research.url, cfg.task, corpus_profile=cfg.corpus_profile
                 )
             except Exception as exc:
                 st.error(f"Run failed: {exc}")

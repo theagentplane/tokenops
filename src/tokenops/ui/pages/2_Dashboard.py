@@ -13,11 +13,50 @@ from tokenops.ui.store_client import get_store
 
 st.set_page_config(page_title="TokenOps — Dashboard", layout="wide")
 st.title("Run dashboard")
+st.caption("Run history and costs (read-only). Edit budgets and policies on **Policy admin**.")
 store = get_store()
+
+# ---- active governance (read-only) --------------------------------------- #
+with st.expander("Active governance (read-only)", expanded=False):
+    gov_agent = st.selectbox("Agent", ["research", "summarize"], key="dash_gov_agent")
+    cfg = store.governance_config_for(gov_agent)
+    budgets = cfg["governance"].get("budgets", [])
+    policies = cfg["governance"].get("policies", {})
+    if not policies:
+        st.warning("No policies configured — run `make db-reseed` or add them in Policy admin.")
+    else:
+        st.markdown(f"**{len(budgets)}** budget(s), **{len(policies)}** policy template(s) for `{gov_agent}`")
+        if budgets:
+            st.markdown("**Budgets**")
+            st.dataframe(
+                [
+                    {
+                        "id": b["id"],
+                        "limit_usd": None if b.get("limit_micros") is None else b["limit_micros"] / 1_000_000,
+                        "dimension": b.get("dimension", "run"),
+                    }
+                    for b in budgets
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        st.markdown("**Policies → budget link**")
+        st.dataframe(
+            [
+                {
+                    "template": name,
+                    "budget": params.get("budget", "—"),
+                    "params": {k: v for k, v in params.items() if k != "budget"},
+                }
+                for name, params in sorted(policies.items())
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 runs = store.list_runs(limit=500)
 if not runs:
-    st.info("No runs yet. Start one from the Run pipeline page, then refresh.")
+    st.info("No runs yet. Start one from the Test Bench or Run simulator.")
     st.stop()
 
 
@@ -67,6 +106,6 @@ if problematic:
         st.write({
             "run_id": r.run_id, "agent": r.agent, "detector": r.detector,
             "cost_usd": _usd(r.cost_micros), "steps": r.steps,
-            "task": r.task, "corpus_profile": r.corpus_profile,
+            "task": r.task,
             "parent_run": r.parent_run,
         })

@@ -18,6 +18,16 @@ def _default_path() -> Path:
     return DEFAULT_CONFIG
 
 
+def load_governance_yaml(path: Path | str | None = None) -> dict:
+    """Return the ``governance:`` block from the config YAML (budgets + policies)."""
+    config_path = Path(path) if path else _default_path()
+    if not config_path.exists():
+        return {}
+    data = yaml.safe_load(config_path.read_text()) or {}
+    block = data.get("governance")
+    return block if isinstance(block, dict) else {}
+
+
 def load_config(path: Path | str | None = None) -> AppConfig:
     config_path = Path(path) if path else _default_path()
     if not config_path.exists():

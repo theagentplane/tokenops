@@ -8,6 +8,8 @@ from tokenops.agents.research import prompts
 from tokenops.agents.research.tools import core
 from tokenops.agents.types import CorpusProfile, Finding, StepCallback, StepEvent, TokenUsage
 from tokenops.config.schema import AgentServerConfig
+from tokenops.chronicle import boundary
+from tokenops.chronicle.schema import InputState
 from tokenops.providers import complete
 
 
@@ -24,8 +26,15 @@ def _parse_decision(content: str) -> dict:
 
 def make_search_tool(
     profile: CorpusProfile,
+    *,
+    service: str = "research",
     on_step: StepCallback | None = None,
 ) -> Callable[[str], core.SearchResult]:
+    @boundary(
+        "search",
+        kind="tool",
+        extract_input=lambda query: InputState(graph_state={"name": "search", "args": {"query": query}}),
+    )
     def invoke(query: str) -> core.SearchResult:
         result = core.search(query, profile)
         if on_step:
@@ -53,12 +62,12 @@ class NativeResearchAgent:
         corpus_profile: CorpusProfile,
         on_step: StepCallback | None = None,
         complete_fn=None,
+        *,
+        service: str = "research",
     ) -> list[Finding]:
         cfg = self._config
-        # Injected so a governed wrapper (control.wrap_complete) can run pre_call and apply
-        # MUTATE/REJECT before dispatch. Defaults to the vanilla provider entry point.
         do_complete = complete_fn or complete
-        search_fn = make_search_tool(corpus_profile, on_step)
+        search_fn = make_search_tool(corpus_profile, service=service, on_step=on_step)
         context: list[dict] = []
         findings: list[Finding] = []
 

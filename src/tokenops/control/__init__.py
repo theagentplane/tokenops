@@ -30,8 +30,25 @@ from tokenops.control.core import (
 )
 from tokenops.control.config import build_governor
 from tokenops.control.engine import AgentControls, ApplyControls, Governor, RaiseControls, Throttled
-from tokenops.control.integration import make_on_step, wrap_complete
+from tokenops.control.integration import make_on_step, observation_from_delegate, step_to_observation, wrap_complete
 from tokenops.control.ledger import Budget, Ledger, RunState, segment_key
+from tokenops.control.attribution import (
+    begin_downstream_run,
+    begin_entry_run,
+    build_attribution,
+    downstream_run_scope,
+    entry_run_scope,
+    require_registration,
+)
+from tokenops.control.context import (
+    PARENT_SPAN_ID_HEADER,
+    RUN_ID_HEADER,
+    GovernanceContext,
+    SpanContext,
+    governance_scope,
+)
+from tokenops.control.boundary import emit_observation, observation_from_crossing
+from tokenops.control.models import RunRegistration
 
 __all__ = [
     # vocabulary
@@ -45,5 +62,10 @@ __all__ = [
     # config factory
     "build_governor",
     # data-plane integration
-    "make_on_step", "wrap_complete",
+    "make_on_step", "wrap_complete", "step_to_observation", "observation_from_delegate",
+    # attribution
+    "RunRegistration", "build_attribution", "begin_entry_run", "begin_downstream_run",
+    "require_registration", "entry_run_scope", "downstream_run_scope",
+    "RUN_ID_HEADER", "PARENT_SPAN_ID_HEADER", "SpanContext", "GovernanceContext",
+    "governance_scope", "observation_from_crossing", "emit_observation",
 ]

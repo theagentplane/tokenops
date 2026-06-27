@@ -115,6 +115,10 @@ class Observation:
     node_type: NodeType
     boundary_id: str
     ts: float
+    service: str = ""
+    span_id: str = ""
+    parent_span_id: str | None = None
+    boundary_tags: Mapping[str, str] = field(default_factory=dict)
     input: Mapping[str, object] = field(default_factory=dict)
     output: Mapping[str, object] = field(default_factory=dict)
     tags: Mapping[str, str] = field(default_factory=dict)

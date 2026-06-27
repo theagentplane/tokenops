@@ -63,3 +63,42 @@ def test_run_records_and_problematic_filter(store):
     problematic = store.list_runs(problematic_only=True)
     assert [r.run_id for r in problematic] == ["r2"]
     assert problematic[0].halt_reason == "budget exhausted"
+
+
+def test_seed_default_governance_if_empty(tmp_path, monkeypatch):
+    monkeypatch.delenv("TOKENOPS_SKIP_GOVERNANCE_SEED", raising=False)
+    s = Store(str(tmp_path / "seed.db"), auto_seed=False)
+    governance = {
+        "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "run"}],
+        "policies": {
+            "cost_budget": {"budget": "run_llm_cap"},
+            "step_cap": {"max_steps": 20},
+        },
+    }
+    assert s.seed_default_governance_if_empty(governance) is True
+    assert s.get_budget("run_llm_cap").limit_micros == 2_000_000
+    assert len(s.list_policy_instances()) == 2
+    assert s.seed_default_governance_if_empty(governance) is False  # idempotent
+    cfg = s.governance_config_for("research")
+    gov = build_governor(cfg, toy_price)
+    assert set(gov._policy_by_name) == {"cost_budget", "step_cap"}
+    s.close()
+
+
+def test_clear_and_reseed_governance(tmp_path):
+    s = Store(str(tmp_path / "reset.db"), auto_seed=False)
+    s.upsert_budget(BudgetSpec(id="custom", limit_micros=100, dimension="run"))
+    s.upsert_policy_instance(PolicyInstance(id="pi", template="step_cap", params={"max_steps": 1}))
+    s.create_run(RunRecord(run_id="r1", agent="research", status="completed"))
+    governance = {
+        "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "run"}],
+        "policies": {"cost_budget": {"budget": "run_llm_cap"}},
+    }
+    s.reseed_governance(governance)
+    assert s.get_budget("custom") is None
+    assert s.get_budget("run_llm_cap") is not None
+    assert len(s.list_policy_instances()) == 1
+    assert len(s.list_runs()) == 1  # runs preserved
+    s.clear_all()
+    assert len(s.list_runs()) == 0
+    s.close()

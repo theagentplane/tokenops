@@ -13,13 +13,22 @@ and ``build_governor`` is unchanged.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 import uuid
 from typing import Sequence
 
 from tokenops.control.config import _TEMPLATES
-from tokenops.control.models import BudgetSpec, PolicyInstance, RunRecord, Segment
+from tokenops.control.models import (
+    BudgetSpec,
+    PolicyInstance,
+    RunAlreadyRegisteredError,
+    RunNotRegisteredError,
+    RunRecord,
+    RunRegistration,
+    Segment,
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS segments (
@@ -39,7 +48,13 @@ CREATE TABLE IF NOT EXISTS runs (
   parent_run TEXT, halt_reason TEXT, detector TEXT,
   cost_micros INTEGER NOT NULL DEFAULT 0, steps INTEGER NOT NULL DEFAULT 0,
   started_at REAL NOT NULL DEFAULT 0, ended_at REAL,
-  task TEXT, corpus_profile TEXT
+  task TEXT
+);
+CREATE TABLE IF NOT EXISTS run_registrations (
+  run_id TEXT PRIMARY KEY,
+  intent TEXT NOT NULL DEFAULT '',
+  user_dims TEXT NOT NULL DEFAULT '{}',
+  registered_at REAL NOT NULL DEFAULT 0
 );
 """
 
@@ -49,7 +64,7 @@ def new_id(prefix: str) -> str:
 
 
 class Store:
-    def __init__(self, path: str = "tokenops.db") -> None:
+    def __init__(self, path: str = "tokenops.db", *, auto_seed: bool = True) -> None:
         self.path = path
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
@@ -57,6 +72,8 @@ class Store:
         self._db.execute("PRAGMA foreign_keys=ON")
         self._db.executescript(_SCHEMA)
         self._db.commit()
+        if auto_seed:
+            self.seed_default_governance_if_empty()
 
     def close(self) -> None:
         self._db.close()
@@ -128,6 +145,89 @@ class Store:
         self._db.execute("DELETE FROM policy_instances WHERE id=?", (pid,))
         self._db.commit()
 
+    def seed_default_governance_if_empty(self, governance: dict | None = None) -> bool:
+        """Load budgets + policies from config YAML when the store has none yet.
+
+        Skipped when ``TOKENOPS_SKIP_GOVERNANCE_SEED=1`` or policy instances already
+        exist (Admin edits are never overwritten).
+        """
+        if os.environ.get("TOKENOPS_SKIP_GOVERNANCE_SEED"):
+            return False
+        if self.list_policy_instances():
+            return False
+        return self._apply_governance_yaml(governance)
+
+    def clear_all(self) -> None:
+        """Delete every row (runs, registrations, governance). Schema is preserved."""
+        for table in ("runs", "run_registrations", "policy_instances", "budgets", "segments"):
+            self._db.execute(f"DELETE FROM {table}")
+        self._db.commit()
+
+    def clear_governance(self) -> None:
+        """Delete segments, budgets, and policy instances only."""
+        for table in ("policy_instances", "budgets", "segments"):
+            self._db.execute(f"DELETE FROM {table}")
+        self._db.commit()
+
+    def reseed_governance(self, governance: dict | None = None) -> bool:
+        """Replace governance config from YAML (discards Admin edits)."""
+        self.clear_governance()
+        return self._apply_governance_yaml(governance)
+
+    def _apply_governance_yaml(self, governance: dict | None = None) -> bool:
+        if governance is None:
+            from tokenops.config.loader import load_governance_yaml
+
+            governance = load_governance_yaml()
+        if not governance:
+            return False
+
+        for spec in governance.get("budgets") or []:
+            self.upsert_budget(
+                BudgetSpec(
+                    id=spec["id"],
+                    limit_micros=spec.get("limit_micros"),
+                    dimension=spec.get("dimension", "run"),
+                    tag_key=spec.get("tag_key"),
+                    period=spec.get("period", "lifetime"),
+                )
+            )
+
+        for template, raw_params in (governance.get("policies") or {}).items():
+            params = dict(raw_params or {})
+            budget_id = params.pop("budget", None)
+            self.upsert_policy_instance(
+                PolicyInstance(
+                    id=f"seed_{template}",
+                    template=template,
+                    params=params,
+                    budget_id=budget_id,
+                )
+            )
+        return True
+
+    # ---- run registration (attribution) ----------------------------------- #
+
+    def register_run(self, reg: RunRegistration) -> RunRegistration:
+        if self.get_run_registration(reg.run_id) is not None:
+            raise RunAlreadyRegisteredError(f"run {reg.run_id!r} is already registered")
+        self._db.execute(
+            "INSERT INTO run_registrations(run_id, intent, user_dims, registered_at) VALUES (?,?,?,?)",
+            (reg.run_id, reg.intent, json.dumps(reg.user_dims), time.time()),
+        )
+        self._db.commit()
+        return reg
+
+    def resolve_run(self, run_id: str) -> RunRegistration:
+        reg = self.get_run_registration(run_id)
+        if reg is None:
+            raise RunNotRegisteredError(f"run {run_id!r} is not registered")
+        return reg
+
+    def get_run_registration(self, run_id: str) -> RunRegistration | None:
+        row = self._db.execute("SELECT * FROM run_registrations WHERE run_id=?", (run_id,)).fetchone()
+        return _registration(row) if row else None
+
     # ---- the bridge to build_governor ------------------------------------- #
 
     def governance_config_for(self, agent: str) -> dict:
@@ -164,10 +264,10 @@ class Store:
             rec.started_at = time.time()
         self._db.execute(
             "REPLACE INTO runs(run_id, agent, status, parent_run, halt_reason, detector, "
-            "cost_micros, steps, started_at, ended_at, task, corpus_profile) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "cost_micros, steps, started_at, ended_at, task) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (rec.run_id, rec.agent, rec.status, rec.parent_run, rec.halt_reason, rec.detector,
-             rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task, rec.corpus_profile),
+             rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task),
         )
         self._db.commit()
         return rec
@@ -192,6 +292,14 @@ class Store:
 
 
 # ---- row -> model ---------------------------------------------------------- #
+
+def _registration(r: sqlite3.Row) -> RunRegistration:
+    return RunRegistration(
+        run_id=r["run_id"],
+        intent=r["intent"] or "",
+        user_dims=json.loads(r["user_dims"] or "{}"),
+    )
+
 
 def _segment(r: sqlite3.Row) -> Segment:
     return Segment(id=r["id"], name=r["name"], dimension=r["dimension"],
@@ -220,4 +328,4 @@ def _run(r: sqlite3.Row) -> RunRecord:
     return RunRecord(run_id=r["run_id"], agent=r["agent"], status=r["status"],
                      parent_run=r["parent_run"], halt_reason=r["halt_reason"], detector=r["detector"],
                      cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
-                     ended_at=r["ended_at"], task=r["task"], corpus_profile=r["corpus_profile"])
+                     ended_at=r["ended_at"], task=r["task"])

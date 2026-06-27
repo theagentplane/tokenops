@@ -10,9 +10,10 @@ A two-agent research pipeline test bench. **Research** (Agent A) runs a search l
 
 ```bash
 make install
-cp .env.example .env   # add your API keys
+cp .env.example .env   # add your API keys (optional for simulator demo mode)
 
-make run               # starts both agents + UI (Ctrl+C stops all)
+make db-reset          # optional: clean SQLite + seed governance from default.yaml
+make run               # starts both agents + UI (Ctrl+C stops all; frees stale ports)
 ```
 
 Or run each process separately:
@@ -28,7 +29,22 @@ make summarize-server
 make ui
 ```
 
-Open http://localhost:8501. Configure agents in the sidebar, then click **Run pipeline**.
+Open http://localhost:8501.
+
+| Page | Purpose |
+|------|---------|
+| **Test Bench** | Live A2A pipeline (research → summarize) |
+| **Run simulator** | In-process run with trace, spans, control-plane timeline (demo mode = no API key) |
+| **Policy admin** | Edit budgets, policies, segments (SQLite) |
+| **Dashboard** | Run history, cost, halt reasons |
+
+Configure agents in the Test Bench sidebar, or use **Run simulator** for governance debugging.
+
+### Governance / DB
+
+- Config lives in **`tokenops.db`** (env `TOKENOPS_DB`), seeded from `default.yaml` `governance:` on first open.
+- Edit budgets/policies in **Policy admin** — changes apply on the next run.
+- Reset: `make db-reset` · see `CONTROL_PLANE.md`
 
 API keys live in a **`.env`** file at the repo root (loaded by both agent servers). Copy `.env.example` to `.env` and set:
 
@@ -69,6 +85,9 @@ See [`docs/code-navigation.md`](docs/code-navigation.md) for code navigation dia
 
 ## Documentation
 
+- [Control plane status](CONTROL_PLANE.md)
+- [Run attribution](docs/run-attribution.md)
+- [Architecture](docs/architecture.md)
 - [Why Token Governance?](docs/why-token-governance.md)
 - [Agent Spec](docs/agent-spec.md)
 - [Code Navigation](docs/code-navigation.md)

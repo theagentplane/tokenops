@@ -2,15 +2,35 @@ from __future__ import annotations
 
 from typing import Any
 
-from tokenops.agents.types import Finding, RunResult, StepEvent, TokenUsage
+from tokenops.agents.types import CorpusProfile, Finding, RunResult, StepEvent, TokenUsage
 
 
-def task_request(task: str, corpus_profile: str, run_id: str | None = None,
-                 user: str = "ui") -> dict[str, Any]:
-    msg: dict[str, Any] = {"type": "TaskRequest", "task": task, "corpus_profile": corpus_profile,
-                           "user": user}
+def bench_corpus_profile(payload: dict[str, Any]) -> CorpusProfile:
+    """Test-bench search mock profile — not a control-plane dim (see docs/run-attribution.md)."""
+    bench = payload.get("bench") or {}
+    profile = bench.get("corpus_profile", "healthy")
+    return "leak" if profile == "leak" else "healthy"
+
+
+def task_request(
+    task: str,
+    *,
+    run_id: str | None = None,
+    user: str = "ui",
+    intent: str = "",
+    user_dims: dict[str, str] | None = None,
+    bench: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    msg: dict[str, Any] = {
+        "type": "TaskRequest",
+        "task": task,
+        "user": user,
+        "intent": intent,
+        "user_dims": user_dims or {},
+        "bench": bench or {},
+    }
     if run_id is not None:
-        msg["run_id"] = run_id  # else the research boundary generates one
+        msg["run_id"] = run_id
     return msg
 
 
@@ -24,7 +44,7 @@ def summarize_request(task: str, findings: list[Finding], parent_run: str | None
         "type": "SummarizeRequest",
         "task": task,
         "findings": [f.to_dict() for f in findings],
-        "parent_run": parent_run,  # the research run_id this delegation belongs to
+        "parent_run": parent_run,
         "user": user,
     }
 
@@ -55,7 +75,7 @@ def summarize_response(
         "summary": summary,
         "token_usage": (token_usage or TokenUsage()).to_dict(),
         "steps": [s.to_dict() for s in step_list],
-        "cost_micros": cost_micros,  # child run total, rolled up to the parent
+        "cost_micros": cost_micros,
     }
 
 

@@ -194,7 +194,7 @@ class Ledger:
             cum_spent_micros=cum,
             input=obs.input,
             output=obs.output,
-            tags=obs.tags,
+            tags={**dict(obs.boundary_tags), **dict(obs.tags)},
             usage=obs.usage,
             signature=obs.signature,
             result_hash=obs.result_hash,

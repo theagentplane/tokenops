@@ -14,6 +14,27 @@ Dimension = Literal["run", "user", "agent", "tenant", "tag"]
 RunStatus = Literal["running", "completed", "halted", "throttled", "error"]
 
 
+@dataclass(frozen=True, kw_only=True)
+class RunRegistration:
+    """Frozen trace dims registered before any telemetry for a ``run_id``.
+
+    See ``docs/run-attribution.md``. Registration is required and immutable for
+    the life of the run.
+    """
+
+    run_id: str
+    intent: str = ""
+    user_dims: dict[str, str] = field(default_factory=dict)
+
+
+class RunNotRegisteredError(LookupError):
+    """Telemetry references a ``run_id`` that was never registered."""
+
+
+class RunAlreadyRegisteredError(ValueError):
+    """``register_run`` was called twice for the same ``run_id``."""
+
+
 @dataclass
 class Segment:
     """A named, reusable matcher — generalizes ``Budget.dimension/tag_key`` into a thing a
@@ -67,7 +88,6 @@ class RunRecord:
     started_at: float = 0.0
     ended_at: float | None = None
     task: str | None = None
-    corpus_profile: str | None = None
 
     @property
     def problematic(self) -> bool:

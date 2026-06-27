@@ -4,8 +4,11 @@ Who does what: the **agent (data plane)** emits telemetry; the **control plane**
 This is the exact interface between the two, so the finalized A2A research agent and the
 control plane can be built in parallel and snap together.
 
-Code: `control/integration.py` (`make_on_step`, `wrap_complete`), `control/core.py`
-(`Observation`, `Attribution`).
+**Run registration and trace dims:** see `docs/run-attribution.md` (authoritative for
+`run_id`, `intent`, `user_dims`, span graph, and `boundary_tags`).
+
+Code: `control/integration.py` (`make_on_step`, `wrap_complete`), `control/attribution.py`,
+`control/context.py`, `control/core.py` (`Observation`, `Attribution`).
 
 ---
 
@@ -41,7 +44,7 @@ is just a resolved attribution dimension (`segment_key_for`):
 | user | `user:<user>` | request payload `user` (today defaults to `"ui"`) |
 | agent | `agent:<agent>` | the server (`research` / `summarize`) |
 | tenant | `tenant:<tenant>` | **must be supplied** in the request/attribution (today unset) |
-| tag | `tag:<key>=<value>` | `attr.tags` (today only `corpus_profile`) |
+| tag | `tag:<key>=<value>` | registration `user_dims` + `intent` |
 
 **To govern or report by tenant / user / a custom tag, the agent path must populate that
 dimension.** This is the main instrumentation work on the co-presenter's side: thread
