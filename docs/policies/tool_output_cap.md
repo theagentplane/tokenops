@@ -50,5 +50,7 @@ never under-count and let a big payload slip through.
 
 ## Status
 
-✅ implemented, ✅ tested (unit). The real store offload + descriptor substitution into the
-next input is wired with the provider wrap in Phase 5; the handle here is a content hash.
+✅ implemented, ✅ tested (unit + e2e). Descriptor substitution is **live**:
+`Action.replace_tool_result` → the research agent's `take_tool_result()` swaps the oversized
+payload for the descriptor in context. The handle here is a content hash (real store offload
+is a later refinement).

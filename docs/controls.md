@@ -65,24 +65,28 @@ This is exactly the LLD's MUTATE = *"swap model, cap output, rewrite prompt."*
 
 The breaker owns HALT and CANCEL; every other policy heals or bounds.
 
-## Apply requirements (what each needs to actually work)
+## Apply requirements + status (what makes each actually work)
 
-`RaiseControls` (brownfield) can only do **HALT** — it raises `Halt` through the agent's
-callback. Everything else needs a richer OUT connector:
+`RaiseControls` (brownfield) does **HALT** only. The greenfield `ApplyControls` behind the
+provider wrap (`wrap_complete` / `wrap_stream`) applies the rest. All seven are now built:
 
-| Control | Needs |
-|---------|-------|
-| HALT | nothing — works under `RaiseControls` today |
-| MUTATE / INJECT / RETRY | the **provider wrap** (Phase 5) that can rewrite the outgoing call or inject into the next input |
-| CANCEL | a **streaming** wrap that can tear down an in-flight stream |
-| REJECT / QUEUE | admission control around call dispatch (`admit`/`complete`) |
+| Control | Applied by | Status |
+|---------|-----------|--------|
+| HALT | `RaiseControls` / `ApplyControls` raise `Halt` | ✅ live |
+| MUTATE (model / output cap) | `wrap_complete` reads `controls.call` | ✅ live |
+| MUTATE (deep prompt compaction) | `Action.compact` → `wrap` rewrites outgoing messages (dedup, pin system) | ✅ live |
+| INJECT (next-call message) | `controls.carry` prepended | ✅ live |
+| INJECT (deep tool-result swap) | `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result | ✅ live (research-native; `tool_output_cap`) |
+| RETRY | bounded loop in `wrap_complete`: re-issue with tighter cap + raised penalties | ✅ live |
+| REJECT / QUEUE | `Throttled` → 429 + Retry-After at the boundary | ✅ live |
+| CANCEL | `wrap_stream` + `providers.stream_chat`: detect degeneration, `generator.close()` mid-flight | ✅ built + tested; **not in the default live path** (agent calls the non-streaming wrap — switch it to `wrap_stream` to activate) |
 
-Under `RaiseControls`, any unsupported corrective kind **fails closed to HALT** rather than
-silently vanishing. Tests assert corrective decisions via `CollectingControls`, which
-records the `Action` without needing an apply layer.
+Under `RaiseControls`, any unsupported corrective kind still **fails closed to HALT**.
 
-## Known cleanup
+## Remaining parity work
 
-`context_compaction`'s MUTATE currently carries its prompt-rewrite directive in the
-`Action.inject_message` field (named for INJECT). Functionally fine; rename to a neutral
-`directive` when the Phase 5 provider wrap lands.
+- **CANCEL** is implemented and tested but the native agent runs non-streaming, so it only
+  fires when the server uses `wrap_stream`. Flip the model call to streaming to activate.
+- **`tool_fix`** INJECT still uses the carry (next-message) path; only `tool_output_cap`
+  does in-place tool-result substitution.
+- Deep hooks are wired into **research-native** only — not the summarize or LangChain variants.

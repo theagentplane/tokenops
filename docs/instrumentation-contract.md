@@ -70,10 +70,12 @@ at `make_on_step` and set those fields on the server's `Attribution` — done.
 | MUTATE (model swap / output cap) | ✅ applied in `wrap_complete` (cap reaches the provider via `max_output_tokens`) |
 | INJECT (next-call message) | ✅ via `controls.carry`, prepended on the next dispatch |
 | REJECT / QUEUE | ✅ `Throttled` → 429 + Retry-After at the boundary |
-| MUTATE (programmatic prompt compaction) | 🟡 directive injected via carry; full history-rewrite needs an agent prompt-assembly hook |
-| INJECT (replace a tool *result*) | 🟡 needs an agent tool-result hook; carry delivers a correction message on the next call instead |
-| RETRY | ⛔ deferred — needs the wrap to observe the model output (greenfield) |
-| CANCEL | ⛔ deferred — needs a streaming provider path |
+| MUTATE (programmatic prompt compaction) | ✅ `Action.compact` → `wrap_complete` rewrites outgoing messages (dedup, pin system) |
+| INJECT (replace a tool *result*) | ✅ `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result (research-native; `tool_output_cap`) |
+| RETRY | ✅ bounded loop in `wrap_complete` — re-issue with tighter cap + raised penalties |
+| CANCEL | ✅ built + tested via `wrap_stream` + `providers.stream_chat` (mid-stream teardown); not in the default live path until the server streams |
 
-The 🟡/⛔ items are **agent-surface or streaming changes**, not control-plane gaps — they're
-intentionally out of scope while the test bench stays as-is.
+All seven actuators are implemented and tested. The only live-path gap is CANCEL: the native
+agent runs non-streaming, so CANCEL fires only when the server uses `wrap_stream`. Parity
+items remaining: `tool_fix` deep tool-result swap, and deep hooks for the summarize/LangChain
+variants.
