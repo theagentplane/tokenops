@@ -178,7 +178,7 @@ class _TraceGovernor(Governor):
 
 
 def _demo_research_complete(call_n: list[int]):
-    def complete(provider, model, messages, max_output_tokens=None):
+    def complete(provider, model, messages, max_output_tokens=None, **kwargs):
         call_n[0] += 1
         if call_n[0] == 1:
             content = '{"action": "search", "query": "enterprise SaaS pricing"}'
@@ -192,7 +192,7 @@ def _demo_research_complete(call_n: list[int]):
 
 
 def _demo_summarize_complete(_call_n: list[int]):
-    def complete(provider, model, messages, max_output_tokens=None):
+    def complete(provider, model, messages, max_output_tokens=None, **kwargs):
         _call_n[0] += 1
         return ModelResponse(
             content="Enterprise SaaS pricing typically uses per-seat tiers with annual contracts. "
