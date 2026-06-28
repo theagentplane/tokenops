@@ -125,3 +125,21 @@ def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
     assert body["status"] == "completed"
     snippets = [f["snippet"] for f in body["findings"]]
     assert any(s.startswith("TOOL OUTPUT OFFLOADED") for s in snippets)  # deep swap landed in context
+
+
+# 5) custom tag flows onto the persisted RunRecord (segmentation backbone)
+def test_run_dims_persisted_for_segmentation(monkeypatch, tmp_path):
+    import os
+    from tokenops.control.store import Store
+    srv, client = _client(monkeypatch, tmp_path,
+                          [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
+                          model=_always_search)
+    reg = client.post("/v1/runs", json={"intent": "demo", "user_dims": {"user_id": "alice", "team": "growth"}})
+    run_id = reg.json()["run_id"]
+    client.post("/v1/tasks", json={"task": "x", "bench": {"corpus_profile": "healthy"}},
+                headers={"X-TokenOps-Run-Id": run_id})
+    s = Store(os.environ["TOKENOPS_DB"], auto_seed=False)
+    rec = s.get_run(run_id)
+    assert rec.dims.get("team") == "growth"          # custom tag persisted on the run
+    assert "team" in s.run_tag_keys()                # dashboard can group by it
+    s.close()

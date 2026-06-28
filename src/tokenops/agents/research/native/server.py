@@ -60,7 +60,8 @@ def build_app():
             controls = governor.controls
             governor.ledger.open_run(run_id)
             store.create_run(
-                RunRecord(run_id=run_id, agent=AGENT, status="running", task=task, started_at=time.time())
+                RunRecord(run_id=run_id, agent=AGENT, status="running", task=task,
+                          started_at=time.time(), dims=dict(attr.tags))
             )
 
             steps: list[StepEvent] = []

@@ -40,6 +40,20 @@ with st.sidebar:
     intent = st.text_input("Intent", "simulator_demo")
     country = st.text_input("Country", "US")
     user_id = st.text_input("user_id", "simulator")
+    custom_tags_raw = st.text_area(
+        "Custom tags (key=value per line)", "team=growth", height=70,
+        help="Segment runs by any tag — group/filter them on the Dashboard.",
+    )
+
+
+def _parse_tags(raw: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for line in raw.splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            if k.strip():
+                out[k.strip()] = v.strip()
+    return out
 
     st.subheader("Agents")
     max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=5)
@@ -67,7 +81,7 @@ if start:
                 task=task,
                 corpus_profile=corpus_profile,
                 intent=intent,
-                user_dims={"Country": country, "user_id": user_id},
+                user_dims={"Country": country, "user_id": user_id, **_parse_tags(custom_tags_raw)},
                 research_cfg=AgentServerConfig(
                     provider=cfg.research.provider,
                     model=cfg.research.model,

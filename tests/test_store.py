@@ -102,3 +102,35 @@ def test_clear_and_reseed_governance(tmp_path):
     s.clear_all()
     assert len(s.list_runs()) == 0
     s.close()
+
+
+def test_run_dims_roundtrip_grouping_and_tag_keys(store):
+    store.create_run(RunRecord(run_id="a", agent="research", status="completed",
+                               cost_micros=300, dims={"team": "growth", "Country": "US"}))
+    store.create_run(RunRecord(run_id="b", agent="research", status="completed",
+                               cost_micros=100, dims={"team": "core"}))
+    assert store.get_run("a").dims == {"team": "growth", "Country": "US"}
+    assert set(store.run_tag_keys()) == {"team", "Country"}
+    # group cost by the custom 'team' tag (what the dashboard does)
+    by_team: dict[str, int] = {}
+    for r in store.list_runs():
+        by_team[r.dims.get("team", "—")] = by_team.get(r.dims.get("team", "—"), 0) + r.cost_micros
+    assert by_team == {"growth": 300, "core": 100}
+
+
+def test_dims_migration_on_legacy_db(tmp_path):
+    import sqlite3
+    # simulate a pre-dims runs table, then open with Store (which should migrate)
+    db = str(tmp_path / "legacy.db")
+    con = sqlite3.connect(db)
+    con.executescript("CREATE TABLE runs (run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, "
+                      "status TEXT NOT NULL, parent_run TEXT, halt_reason TEXT, detector TEXT, "
+                      "cost_micros INTEGER DEFAULT 0, steps INTEGER DEFAULT 0, "
+                      "started_at REAL DEFAULT 0, ended_at REAL, task TEXT);")
+    con.execute("INSERT INTO runs(run_id, agent, status) VALUES ('old','research','completed')")
+    con.commit(); con.close()
+    s = Store(db, auto_seed=False)
+    assert s.get_run("old").dims == {}            # migrated column, default empty
+    s.create_run(RunRecord(run_id="new", agent="research", dims={"team": "x"}))
+    assert s.get_run("new").dims == {"team": "x"}
+    s.close()

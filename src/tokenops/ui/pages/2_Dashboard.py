@@ -77,21 +77,43 @@ c2.metric("Total cost", f"${_usd(total_cost):.4f}")
 c3.metric("Problematic", len(problematic))
 c4.metric("Avg $/run", f"${_usd(total_cost // max(1, len(runs))):.4f}")
 
-# cost by agent
-by_agent: dict[str, int] = {}
+# ---- segment grouping (by agent or any custom tag) ----------------------- #
+tag_keys = store.run_tag_keys()
+group_by = st.selectbox("Segment by", ["agent"] + tag_keys, key="dash_group_by",
+                        help="Group runs by agent, or by any custom tag emitted on the run "
+                             "(set tags in the Run simulator or via user_dims on /v1/runs).")
+
+
+def _seg(r) -> str:
+    return r.agent if group_by == "agent" else (r.dims.get(group_by) or "—")
+
+
+seg_cost: dict[str, int] = {}
+seg_runs: dict[str, int] = {}
 for r in runs:
-    by_agent[r.agent] = by_agent.get(r.agent, 0) + r.cost_micros
-st.subheader("Cost by agent")
-st.bar_chart(pd.DataFrame({"cost_usd": {a: _usd(m) for a, m in by_agent.items()}}))
+    sv = _seg(r)
+    seg_cost[sv] = seg_cost.get(sv, 0) + r.cost_micros
+    seg_runs[sv] = seg_runs.get(sv, 0) + 1
+
+st.subheader(f"Cost by {group_by}")
+st.bar_chart(pd.DataFrame({"cost_usd": {s: _usd(m) for s, m in seg_cost.items()}}))
+st.dataframe(
+    pd.DataFrame([{group_by: s, "runs": seg_runs[s], "cost_usd": _usd(seg_cost[s])}
+                  for s in sorted(seg_cost)]),
+    use_container_width=True, hide_index=True,
+)
 
 # ---- runs table ----------------------------------------------------------- #
 st.subheader("Runs")
-only_bad = st.toggle("Problematic only (halted / throttled / error)")
-shown = problematic if only_bad else runs
+fcol1, fcol2 = st.columns(2)
+only_bad = fcol1.toggle("Problematic only (halted / throttled / error)")
+seg_values = ["(all)"] + sorted({_seg(r) for r in runs})
+pick = fcol2.selectbox(f"Filter by {group_by}", seg_values)
+shown = [r for r in (problematic if only_bad else runs) if pick == "(all)" or _seg(r) == pick]
 table = pd.DataFrame([{
     "run_id": r.run_id, "agent": r.agent, "status": r.status,
     "cost_usd": _usd(r.cost_micros), "steps": r.steps,
-    "duration_s": _duration(r), "halt_reason": r.halt_reason or "",
+    "duration_s": _duration(r), "dims": r.dims, "halt_reason": r.halt_reason or "",
     "parent_run": r.parent_run or "",
 } for r in shown])
 st.dataframe(table, use_container_width=True, hide_index=True)

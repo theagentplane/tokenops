@@ -280,7 +280,8 @@ def run_simulation(
 
     research_gov.ledger.open_run(run_id)
     store.create_run(
-        RunRecord(run_id=run_id, agent="research", status="running", task=task, started_at=time.time())
+        RunRecord(run_id=run_id, agent="research", status="running", task=task,
+                  started_at=time.time(), dims={**user_dims, "intent": intent})
     )
 
     attr_research = build_attribution(reg, service="research")
@@ -368,6 +369,7 @@ def run_simulation(
                             parent_run=parent_span_id,
                             task=task,
                             started_at=time.time(),
+                            dims={**user_dims, "intent": intent},  # preserve segment dims across the REPLACE
                         )
                     )
 

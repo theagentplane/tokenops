@@ -88,6 +88,7 @@ class RunRecord:
     started_at: float = 0.0
     ended_at: float | None = None
     task: str | None = None
+    dims: dict[str, str] = field(default_factory=dict)  # segment dims (tags) for grouping/filtering
 
     @property
     def problematic(self) -> bool:
