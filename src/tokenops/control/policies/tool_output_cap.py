@@ -47,6 +47,11 @@ class ToolOutputCapDetector(Detector):
         if step.node_type != "tool":
             return None
         est = est_tokens(step.output)
+        # the boundary projection truncates the stored payload, so trust the reported true
+        # size (size_chars) when present — otherwise a huge result hides behind the truncation.
+        size_chars = step.output.get("size_chars") if isinstance(step.output, dict) else None
+        if size_chars:
+            est = max(est, int(size_chars / 2.8))
         if est >= self.cap_tokens:
             count = len(step.output) if isinstance(step.output, (list, dict)) else None
             return Signal(

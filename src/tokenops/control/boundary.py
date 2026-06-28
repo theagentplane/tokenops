@@ -82,13 +82,16 @@ def observation_from_crossing(
         args = input_state.get("args", input_state)
         signature = _tool_signature(name, args)
         if hasattr(result, "snippet"):
+            full = str(getattr(result, "snippet", ""))
             output = {
-                "snippet": getattr(result, "snippet", "")[:500],
+                "snippet": full[:500],
                 "completeness": getattr(result, "completeness", None),
+                "size_chars": len(full),  # true size (pre-truncation) so tool_output_cap can detect
             }
-            result_hash = _hash(getattr(result, "snippet", result))
+            result_hash = _hash(full)
         else:
-            output = {"result": str(result)[:500]}
+            full = str(result)
+            output = {"result": full[:500], "size_chars": len(full)}
             result_hash = _hash(result)
         tags.setdefault("tool", name)
     elif node_type == "delegate":
