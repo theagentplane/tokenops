@@ -72,11 +72,29 @@ def observation_from_crossing(
     rolled_up: int = 0
 
     if node_type == "llm":
-        usage = Usage(
-            input=int(getattr(result, "input_tokens", 0) or 0),
-            output=int(getattr(result, "output_tokens", 0) or 0),
-        )
-        output = {"text": str(getattr(result, "content", result))[:500]}
+        usage_obj = getattr(result, "usage", None)
+        if usage_obj is not None:
+            usage = Usage(
+                input=int(
+                    getattr(usage_obj, "prompt_tokens", 0)
+                    or getattr(usage_obj, "input_tokens", 0)
+                    or 0
+                ),
+                output=int(
+                    getattr(usage_obj, "completion_tokens", 0)
+                    or getattr(usage_obj, "output_tokens", 0)
+                    or 0
+                ),
+            )
+        else:
+            usage = Usage(
+                input=int(getattr(result, "input_tokens", 0) or 0),
+                output=int(getattr(result, "output_tokens", 0) or 0),
+            )
+        text = getattr(result, "content", None)
+        if text is None and hasattr(result, "completion"):
+            text = getattr(result, "completion", result)
+        output = {"text": str(text)[:500]}
     elif node_type == "tool":
         name = str(input_state.get("name", boundary_id))
         args = input_state.get("args", input_state)

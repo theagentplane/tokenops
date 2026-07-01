@@ -12,6 +12,22 @@ from tokenops.control.core import CallRequest
 from benchmarking.browseruse.session import current_active_run
 
 
+def _inject_carry_messages(messages, carry: list[str]):
+    """Prepend governance INJECT directives using browser-use message types."""
+    if not carry:
+        return messages
+    try:
+        from browser_use.llm.messages import SystemMessage
+    except ImportError:
+        SystemMessage = None  # type: ignore[misc, assignment]
+    prefix = (
+        [SystemMessage(content=c) for c in carry]
+        if SystemMessage is not None
+        else [{"role": "system", "content": c} for c in carry]
+    )
+    return prefix + list(messages)
+
+
 def _estimate_tokens(messages) -> int:
     total = 0
     for msg in messages or []:
@@ -50,16 +66,20 @@ def wrap_ainvoke(llm: Any) -> None:
                 max_output_tokens=active.controls.call.max_output_tokens,
             )
         )
+        dispatch_messages = list(messages)
+        if active.controls.carry:
+            dispatch_messages = _inject_carry_messages(dispatch_messages, active.controls.carry)
+            active.controls.carry.clear()
         seg = f"run:{attr.run_id}"
         active.governor.ledger.admit(seg)
         try:
-            raw = await orig(messages, *args, **kwargs)
+            raw = await orig(dispatch_messages, *args, **kwargs)
             emit_observation(
                 observation_from_crossing(
                     boundary_id="browseruse.chat",
                     kind="llm",
                     service="browseruse",
-                    input_state={"message_count": len(messages)},
+                    input_state={"message_count": len(dispatch_messages)},
                     result=raw,
                     provider=provider,
                     model=model,

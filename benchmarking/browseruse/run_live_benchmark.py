@@ -26,6 +26,7 @@ from benchmarking.browseruse.integration import (  # noqa: E402
 )
 from benchmarking.browseruse.scenarios_live import (  # noqa: E402
     POLICY_SUITE,
+    STRESS_SUITE,
     LiveScenario,
     get_scenario,
 )
@@ -129,6 +130,7 @@ def _trial_from_result(
 ) -> LiveTrial:
     m = result.metrics
     usage = _usage_from_history(result.history)
+    browser_spend = int(round(usage.get("browser_cost_usd", 0.0) * 1_000_000))
     if m is None:
         outcome = RunOutcome(
             scenario_id=scenario_id,
@@ -140,15 +142,21 @@ def _trial_from_result(
         return LiveTrial(trial=0, mode=mode, outcome=outcome)
 
     if mode is CompareMode.UNGOVERNED:
-        spend = int(round(usage.get("browser_cost_usd", 0.0) * 1_000_000)) or m.spend_micros
+        spend = browser_spend or m.spend_micros
         success = bool(m.agent_success)
         halted = False
     else:
-        spend = m.spend_micros or int(round(usage.get("browser_cost_usd", 0.0) * 1_000_000))
-        success = result.success and not m.halted
+        spend = browser_spend or m.spend_micros
         halted = m.halted
+        success = (result.success and not halted) or (
+            halted
+            and bool(m.agent_success)
+            and (m.agent_done or bool(usage.get("browser_cost_usd")))
+        )
 
-    within_budget = spend <= limit_micros and not halted
+    within_budget = spend <= limit_micros and (
+        not halted or (success and m.agent_done)
+    )
     outcome = RunOutcome(
         scenario_id=scenario_id,
         success=success,
@@ -335,13 +343,13 @@ async def _run_scenario_ab(
 
 async def async_main() -> int:
     load_env()
-    scenario_names = list(POLICY_SUITE) + ["flight_sfo_india"]
+    scenario_names = list(dict.fromkeys([*POLICY_SUITE, *STRESS_SUITE, "flight_sfo_india"]))
     parser = argparse.ArgumentParser(description="Live browser-use: vanilla vs TokenOps")
     parser.add_argument(
         "--scenario",
-        choices=[*scenario_names, "all", "policy_suite"],
+        choices=[*scenario_names, "all", "policy_suite", "stress_suite"],
         default="policy_suite",
-        help="Task preset (default: policy_suite = example + books)",
+        help="Task preset (default: policy_suite; stress_suite = verify/pagination traps)",
     )
     parser.add_argument("--limit-usd", type=float, default=None, help="Override scenario cap")
     parser.add_argument("--max-steps", type=int, default=None, help="Override scenario steps")
@@ -352,8 +360,12 @@ async def async_main() -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
 
-    if args.scenario in ("all", "policy_suite"):
+    if args.scenario == "all":
+        scenario_ids = scenario_names
+    elif args.scenario == "policy_suite":
         scenario_ids = list(POLICY_SUITE)
+    elif args.scenario == "stress_suite":
+        scenario_ids = list(STRESS_SUITE)
     else:
         scenario_ids = [args.scenario]
 

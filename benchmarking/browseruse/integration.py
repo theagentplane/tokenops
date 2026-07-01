@@ -87,11 +87,15 @@ def _agent_llms(agent) -> list[Any]:
 def _snapshot_metrics(active: ActiveRun, history) -> None:
     run_id = active.registration.run_id
     rs = active.governor.ledger.runs.get(run_id)
+    spend = active.governor.ledger.cost_micros(run_id)
+    if history is not None and spend == 0:
+        usage = getattr(history, "usage", None)
+        spend = int(round((getattr(usage, "total_cost", 0.0) or 0.0) * 1_000_000))
     set_last_metrics(
         GovernedRunMetrics(
             run_id=run_id,
             mode=active.config.mode.value,
-            spend_micros=active.governor.ledger.cost_micros(run_id),
+            spend_micros=spend,
             halted=active.governor.ledger.is_halted(run_id),
             halt_reason=rs.halt_reason if rs else None,
             agent_steps=history.number_of_steps() if history is not None else 0,
@@ -150,6 +154,8 @@ def install() -> None:
                     history = await _orig_run(self, *args, **kwargs)
             return history
         except Halt:
+            if history is None:
+                history = getattr(self, "history", None)
             raise
         finally:
             _snapshot_metrics(active, history)
@@ -217,6 +223,7 @@ async def run_governed(
         )
     except Halt as exc:
         err = exc.action.reason
+        history = history or getattr(agent, "history", None)
     except Exception as exc:
         err = str(exc)
     finally:

@@ -24,8 +24,9 @@ def tokenops_config(*, limit_micros: int) -> dict[str, Any]:
         ],
         "policies": {
             "cost_budget": {"budget": "run_llm_cap"},
-            "pre_call_worst_case": {"budget": "run_llm_cap", "default_max_output": 64},
-            "progress_guard": {"window": 6, "repeats": 2, "max_corrections": 4},
+            # cost_budget is the backstop; pre_call_worst_case blocks late-step completion on
+            # browser-use when remaining budget is tight but the agent already has an answer.
+            "progress_guard": {"window": 6, "repeats": 2, "max_corrections": 50},
             # tool_fix registry is research-agent shaped; browser-use actions differ — skip for live bench
             "tool_output_cap": {"cap_tokens": 8000},
             "output_runaway": {"repeats": 12, "domination": 0.9, "max_retries": 2},
