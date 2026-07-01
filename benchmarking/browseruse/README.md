@@ -47,7 +47,7 @@ Presets live in `configs.py` and map to scenario `governance_preset` fields.
 
 Shared on all presets: `cost_budget` (hard cap backstop).
 
-INJECT carry is appended as the **last user message** on the main agent LLM only. Tool policies use `take_tool_result()` after `Tools.act` to substitute `ActionResult` text.
+INJECT carry is appended as the **last user message** via `tokenops.control.consume_carry` (main agent LLM only in browser-use). Tool policies use `take_tool_result()` after `Tools.act` to substitute `ActionResult` text.
 
 ## Cost showcase scenarios (live results)
 

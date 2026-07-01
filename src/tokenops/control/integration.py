@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
-from typing import Callable
+from collections.abc import Callable, Sequence
 
 from tokenops.control.context import current_span
 from tokenops.control.boundary import emit_observation, observation_from_crossing
@@ -138,6 +138,39 @@ def _tighten_cap(cap: int | None) -> int:
     return max(64, (cap or _RETRY_BASE_CAP) // 2)
 
 
+def apply_carry_to_messages(
+    messages,
+    carry: Sequence[str],
+    *,
+    as_user: Callable[[str], object] | None = None,
+) -> list:
+    """Append governance INJECT directives as the final user turns.
+
+    Steer messages belong at the end of the context so recency favors the correction
+    over stale task history — not as a prepended system slot."""
+    if not carry:
+        return list(messages)
+    out = list(messages)
+    for text in carry:
+        if as_user is not None:
+            out.append(as_user(text))
+        else:
+            out.append({"role": "user", "content": text})
+    return out
+
+
+def consume_carry(
+    controls,
+    messages,
+    *,
+    as_user: Callable[[str], object] | None = None,
+) -> list:
+    """Apply pending ``controls.carry`` injects and clear the queue."""
+    out = apply_carry_to_messages(messages, controls.carry, as_user=as_user)
+    controls.carry.clear()
+    return out
+
+
 def _compact_messages(messages):
     """Deep context_compaction MUTATE: rewrite the outgoing messages — pin every system
     message, drop duplicate non-system messages (deduped tool outputs / repeated context)."""
@@ -203,9 +236,7 @@ def wrap_complete(
         governor.pre_call(request)
 
         use_model = controls.call.model_override or m
-        if controls.carry:
-            messages = [{"role": "system", "content": c} for c in controls.carry] + list(messages)
-            controls.carry.clear()
+        messages = consume_carry(controls, messages)
         if controls.call.compact:  # deep prompt compaction
             messages = _compact_messages(messages)
 
@@ -309,9 +340,7 @@ def wrap_stream(
             max_output_tokens=controls.call.max_output_tokens,
         ))
         use_model = controls.call.model_override or m
-        if controls.carry:
-            messages = [{"role": "system", "content": c} for c in controls.carry] + list(messages)
-            controls.carry.clear()
+        messages = consume_carry(controls, messages)
         if controls.call.compact:  # deep prompt compaction
             messages = _compact_messages(messages)
 

@@ -100,7 +100,7 @@ class ApplyControls:
     HALT still raises; REJECT/QUEUE raise :class:`Throttled`. The rest are recorded so the
     wrap can act on them:
       * MUTATE  → ``call`` overrides (model swap, output cap) + any prompt directive carried
-      * INJECT  → ``carry`` messages prepended to the next dispatch
+      * INJECT  → ``carry`` messages appended as final user turns on the next dispatch
       * RETRY   → ``retry`` flag (the wrap may re-issue; streaming CANCEL is out of scope here)
     """
 

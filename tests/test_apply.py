@@ -14,6 +14,7 @@ from tokenops.control import (
     Halt,
     Ledger,
     Throttled,
+    apply_carry_to_messages,
     build_governor,
     wrap_complete,
 )
@@ -34,6 +35,15 @@ def test_apply_inject_carries_message():
     c = ApplyControls()
     c.apply(Action(kind=ActionKind.INJECT, run_id="r", inject_message="be minimal"))
     assert c.carry == ["be minimal"]
+
+
+def test_apply_carry_to_messages_appends_user_turns():
+    out = apply_carry_to_messages(
+        [{"role": "user", "content": "task"}],
+        ["NO PROGRESS: finalize now"],
+    )
+    assert out[0] == {"role": "user", "content": "task"}
+    assert out[-1] == {"role": "user", "content": "NO PROGRESS: finalize now"}
 
 
 def test_apply_reject_raises_throttled():
@@ -78,7 +88,7 @@ def test_worst_case_caps_the_dispatched_call():
     assert calls[0]["max_output_tokens"] == 1024
 
 
-def test_inject_message_prepended_to_next_dispatch():
+def test_inject_message_appended_to_next_dispatch():
     controls = ApplyControls()
     ledger = Ledger(budgets=[], price=toy_price)
     gov = Governor(ledger, controls)
@@ -90,7 +100,7 @@ def test_inject_message_prepended_to_next_dispatch():
     governed = wrap_complete(gov, controls, attr, provider="openai", model="gpt-4o-mini", dispatch=dispatch)
     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
 
-    assert calls[0]["messages"][0] == {"role": "system", "content": "BUDGET PRESSURE: keep minimal"}
+    assert calls[0]["messages"][-1] == {"role": "user", "content": "BUDGET PRESSURE: keep minimal"}
     assert controls.carry == []  # consumed
 
 

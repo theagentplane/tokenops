@@ -75,7 +75,7 @@ provider wrap (`wrap_complete` / `wrap_stream`) applies the rest. All seven are 
 | HALT | `RaiseControls` / `ApplyControls` raise `Halt` | ✅ live |
 | MUTATE (model / output cap) | `wrap_complete` reads `controls.call` | ✅ live |
 | MUTATE (deep prompt compaction) | `Action.compact` → `wrap` rewrites outgoing messages (dedup, pin system) | ✅ live |
-| INJECT (next-call message) | `controls.carry` prepended | ✅ live |
+| INJECT (next-call message) | `controls.carry` appended as final user turn | ✅ live |
 | INJECT (deep tool-result swap) | `Action.replace_tool_result` → agent `take_tool_result()` substitutes the result | ✅ live (research-native; `tool_output_cap` + `tool_fix`) |
 | RETRY | bounded loop in `wrap_complete`: re-issue with tighter cap + raised penalties | ✅ live |
 | REJECT / QUEUE | `Throttled` → 429 + Retry-After at the boundary | ✅ live |

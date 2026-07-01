@@ -8,6 +8,7 @@ from typing import Any
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.context import current_governance
 from tokenops.control.core import CallRequest, Usage
+from tokenops.control.integration import consume_carry
 from tokenops.providers.types import ModelResponse
 
 from benchmarking.metagpt.crossing import resolve_llm_crossing
@@ -56,17 +57,13 @@ def _text_from_result(result, llm) -> str:
     return str(result)
 
 
-def _apply_carry(messages: list, controls) -> list:
-    if not controls.carry:
-        return list(messages)
-    carried = [{"role": "system", "content": c} for c in controls.carry]
-    controls.carry.clear()
-    for msg in carried:
-        if "progress_guard" in msg["content"].lower() or "no progress" in msg["content"].lower():
+def _record_carry_signals(carry: list[str]) -> None:
+    for text in carry:
+        lower = text.lower()
+        if "progress_guard" in lower or "no progress" in lower:
             record_policy_signal("progress_guard")
-        if "budget pressure" in msg["content"].lower():
+        if "budget pressure" in lower:
             record_policy_signal("cost_guard")
-    return carried + list(messages)
 
 
 def wrap_llm(llm: Any) -> Any:
@@ -110,7 +107,9 @@ def wrap_llm(llm: Any) -> Any:
         elif controls.call.model_override:
             record_policy_signal("cost_guard_downgrade")
 
-        payload = _apply_carry(messages, controls)
+        if controls.carry:
+            _record_carry_signals(list(controls.carry))
+        payload = consume_carry(controls, messages)
 
         seg = f"run:{attr.run_id}"
         governor.ledger.admit(seg)

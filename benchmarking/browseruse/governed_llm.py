@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import wraps
 from typing import Any
 
-from tokenops.control import build_attribution
+from tokenops.control import build_attribution, consume_carry
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.core import CallRequest
 
@@ -58,21 +58,12 @@ def _compact_messages(messages):
     return out
 
 
-def _append_carry_messages(messages, carry: list[str]):
-    """Append governance INJECT directives as the final user/context slot."""
-    if not carry:
-        return messages
+def _browser_user_message(text: str):
     try:
         from browser_use.llm.messages import UserMessage
     except ImportError:
-        UserMessage = None  # type: ignore[misc, assignment]
-    out = list(messages)
-    for text in carry:
-        if UserMessage is not None:
-            out.append(UserMessage(content=text))
-        else:
-            out.append({"role": "user", "content": text})
-    return out
+        return {"role": "user", "content": text}
+    return UserMessage(content=text)
 
 
 def _estimate_tokens(messages) -> int:
@@ -120,8 +111,11 @@ def wrap_ainvoke(llm: Any) -> None:
         main_llm = _is_main_llm(active, llm)
         if main_llm:
             if active.controls.carry:
-                dispatch_messages = _append_carry_messages(dispatch_messages, active.controls.carry)
-                active.controls.carry.clear()
+                dispatch_messages = consume_carry(
+                    active.controls,
+                    dispatch_messages,
+                    as_user=_browser_user_message,
+                )
             if active.controls.call.compact:
                 dispatch_messages = _compact_messages(dispatch_messages)
 
