@@ -25,14 +25,18 @@ from benchmarking.browseruse.integration import (  # noqa: E402
     run_ungoverned,
 )
 from benchmarking.browseruse.scenarios_live import (  # noqa: E402
-    COST_SHOWCASE_SUITE,
-    POLICY_SUITE,
-    STEER_SUITE,
-    STRESS_SUITE,
+    ALL_SUITE,
+    SUITE_BY_NAME,
     LiveScenario,
     get_scenario,
 )
 from benchmarking.common.harness import BenchmarkMode, CompareMode, RunOutcome  # noqa: E402
+from benchmarking.common.trial import (  # noqa: E402
+    TrialStatus,
+    classify_trial,
+    classify_win,
+    showcase_pass,
+)
 
 LIVE_DEFAULT_LIMIT_USD = 0.50
 COOLDOWN_BETWEEN_ARMS_SEC = 90
@@ -47,6 +51,8 @@ class LiveTrial:
     browser_cost_usd: float = 0.0
     within_budget: bool = False
     success_within_budget: bool = False
+    status: TrialStatus = TrialStatus.FAILED
+    halted: bool = False
 
 
 @dataclass
@@ -54,35 +60,55 @@ class LiveModeSummary:
     mode: CompareMode
     trials: list[LiveTrial] = field(default_factory=list)
 
+    def _scored(self) -> list[LiveTrial]:
+        return [t for t in self.trials if t.status is not TrialStatus.INFRA]
+
     def _spends(self) -> list[float]:
-        return [t.outcome.spend_micros / 1_000_000 for t in self.trials]
+        return [t.outcome.spend_micros / 1_000_000 for t in self._scored()]
 
     def _tokens(self) -> list[int]:
-        return [t.total_tokens for t in self.trials]
+        return [t.total_tokens for t in self._scored()]
+
+    @property
+    def total_trials(self) -> int:
+        return len(self.trials)
+
+    @property
+    def scored_trials(self) -> int:
+        return len(self._scored())
+
+    @property
+    def infra_trials(self) -> int:
+        return sum(1 for t in self.trials if t.status is TrialStatus.INFRA)
 
     @property
     def avg_spend_usd(self) -> float:
-        return mean(self._spends()) if self.trials else 0.0
+        return mean(self._spends()) if self._scored() else 0.0
 
     @property
     def median_spend_usd(self) -> float:
-        return float(median(self._spends())) if self.trials else 0.0
+        return float(median(self._spends())) if self._scored() else 0.0
 
     @property
     def avg_tokens(self) -> float:
-        return mean(self._tokens()) if self.trials else 0.0
+        return mean(self._tokens()) if self._scored() else 0.0
 
     @property
     def median_tokens(self) -> float:
-        return float(median(self._tokens())) if self.trials else 0.0
+        return float(median(self._tokens())) if self._scored() else 0.0
 
     @property
     def successes(self) -> int:
-        return sum(1 for t in self.trials if t.outcome.success)
+        return sum(1 for t in self._scored() if t.outcome.success)
 
     @property
     def success_within_budget_count(self) -> int:
-        return sum(1 for t in self.trials if t.success_within_budget)
+        return sum(1 for t in self._scored() if t.success_within_budget)
+
+    @property
+    def avg_steps(self) -> float:
+        scored = self._scored()
+        return mean([t.outcome.steps for t in scored]) if scored else 0.0
 
 
 @dataclass
@@ -141,7 +167,14 @@ def _trial_from_result(
             steps=0,
             halt_reason=result.error or "no metrics",
         )
-        return LiveTrial(trial=0, mode=mode, outcome=outcome)
+        status = classify_trial(
+            success=False,
+            spend_micros=0,
+            steps=0,
+            halt_reason=outcome.halt_reason,
+            halted=False,
+        )
+        return LiveTrial(trial=0, mode=mode, outcome=outcome, status=status)
 
     if mode is CompareMode.UNGOVERNED:
         spend = browser_spend or m.spend_micros
@@ -166,6 +199,13 @@ def _trial_from_result(
         steps=m.agent_steps,
         halt_reason=m.halt_reason or result.error,
     )
+    status = classify_trial(
+        success=success,
+        spend_micros=spend,
+        steps=m.agent_steps,
+        halt_reason=outcome.halt_reason,
+        halted=halted,
+    )
     return LiveTrial(
         trial=0,
         mode=mode,
@@ -174,6 +214,8 @@ def _trial_from_result(
         browser_cost_usd=float(usage.get("browser_cost_usd", 0.0)),
         within_budget=within_budget,
         success_within_budget=success and within_budget,
+        status=status,
+        halted=halted,
     )
 
 
@@ -201,7 +243,7 @@ async def _run_trial(
             limit_micros=limit_micros,
             live_pricing=True,
             max_steps=max_steps,
-            governance_preset=scenario.governance_preset,
+            governance_preset="steering",
         )
 
     m = result.metrics
@@ -218,9 +260,29 @@ async def _run_trial(
             if mode is CompareMode.UNGOVERNED
             else f"cap ${cap:.2f} ({'under' if m.spend_micros <= limit_micros and not m.halted else 'over/halted'})"
         )
+        browser_spend = int(round(usage.get("browser_cost_usd", 0.0) * 1_000_000))
+        if mode is CompareMode.UNGOVERNED:
+            spend = browser_spend or m.spend_micros
+            success = bool(m.agent_success)
+            halted = False
+        else:
+            spend = browser_spend or m.spend_micros
+            halted = m.halted
+            success = (result.success and not halted) or (
+                halted
+                and bool(m.agent_success)
+                and (m.agent_done or bool(usage.get("browser_cost_usd")))
+            )
+        trial_status = classify_trial(
+            success=success,
+            spend_micros=spend,
+            steps=m.agent_steps,
+            halt_reason=m.halt_reason or result.error,
+            halted=halted,
+        )
         print(
             f"  spend ${spend_usd:.4f} ({budget_note})  steps {m.agent_steps}  "
-            f"success={m.agent_success}  halted={getattr(m, 'halted', False)}",
+            f"success={m.agent_success}  halted={halted}  status={trial_status.value}",
             flush=True,
         )
         if usage.get("total_tokens"):
@@ -249,24 +311,45 @@ def _format_summary(
     scenario: LiveScenario,
     limit_usd: float,
     trials: int,
+    suite: str | None = None,
 ) -> str:
     spend_red = _pct_reduction(base.avg_spend_usd, governed.avg_spend_usd)
     token_red = _pct_reduction(base.avg_tokens, governed.avg_tokens)
+    win = classify_win(
+        ungoverned_spend=base.avg_spend_usd,
+        tokenops_spend=governed.avg_spend_usd,
+        ungoverned_steps=base.avg_steps,
+        tokenops_steps=governed.avg_steps,
+        ungoverned_success_within=base.success_within_budget_count,
+        tokenops_success_within=governed.success_within_budget_count,
+        trials=trials,
+    )
+    demo_ok = showcase_pass(
+        ungoverned_spend=base.avg_spend_usd,
+        tokenops_spend=governed.avg_spend_usd,
+        ungoverned_success_within=base.success_within_budget_count,
+        tokenops_success_within=governed.success_within_budget_count,
+    )
     lines = [
         f"=== {scenario.id}: ungoverned vs TokenOps ({trials} trial(s)) ===",
+        f"    suite: {suite or scenario.suite}  |  win: {win}"
+        + (f"  |  showcase_pass: {demo_ok}" if suite == "showcase" or scenario.suite == "showcase" else ""),
         f"    {scenario.description}",
         f"    TokenOps cap: ${limit_usd:.2f}  max_steps: {scenario.default_max_steps}",
         "",
         "Without TokenOps",
-        f"   successes: {base.successes}/{trials}  success within ${limit_usd:.2f}: {base.success_within_budget_count}/{trials}",
+        f"   scored: {base.scored_trials}/{base.total_trials}  infra dropped: {base.infra_trials}",
+        f"   successes: {base.successes}/{base.scored_trials or trials}  "
+        f"within cap: {base.success_within_budget_count}/{base.scored_trials or trials}",
         f"   avg spend: ${base.avg_spend_usd:.4f}  median ${base.median_spend_usd:.4f}",
-        f"   avg tokens: {base.avg_tokens:,.0f}",
+        f"   avg steps: {base.avg_steps:.1f}  avg tokens: {base.avg_tokens:,.0f}",
         "",
         "With TokenOps",
-        f"   successes: {governed.successes}/{trials} (+{governed.successes - base.successes})",
-        f"   success within cap: {governed.success_within_budget_count}/{trials} (+{governed.success_within_budget_count - base.success_within_budget_count})",
+        f"   scored: {governed.scored_trials}/{governed.total_trials}  infra dropped: {governed.infra_trials}",
+        f"   successes: {governed.successes}/{governed.scored_trials or trials}  "
+        f"within cap: {governed.success_within_budget_count}/{governed.scored_trials or trials}",
         f"   avg spend: ${governed.avg_spend_usd:.4f} ({spend_red:+.1f}% vs ungoverned)",
-        f"   avg tokens: {governed.avg_tokens:,.0f} ({token_red:+.1f}% vs ungoverned)",
+        f"   avg steps: {governed.avg_steps:.1f}  avg tokens: {governed.avg_tokens:,.0f} ({token_red:+.1f}%)",
         "",
         "Per-trial:",
     ]
@@ -275,10 +358,12 @@ def _format_summary(
         g = governed.trials[i] if i < len(governed.trials) else None
         if u and g:
             lines.append(
-                f"  trial {i + 1}:  vanilla {'ok' if u.outcome.success else 'FAIL':4} "
-                f"${u.outcome.spend_micros / 1_000_000:.4f} {u.total_tokens:,} tok  |  "
-                f"TokenOps {'ok' if g.outcome.success else 'FAIL':4} "
-                f"${g.outcome.spend_micros / 1_000_000:.4f} {g.total_tokens:,} tok"
+                f"  trial {i + 1}:  vanilla {u.status.value:6} "
+                f"{'ok' if u.outcome.success else 'FAIL':4} "
+                f"${u.outcome.spend_micros / 1_000_000:.4f} {u.total_tokens:,} tok {u.outcome.steps} steps  |  "
+                f"TokenOps {g.status.value:6} "
+                f"{'ok' if g.outcome.success else 'FAIL':4} "
+                f"${g.outcome.spend_micros / 1_000_000:.4f} {g.total_tokens:,} tok {g.outcome.steps} steps"
             )
     return "\n".join(lines)
 
@@ -323,16 +408,24 @@ async def _run_scenario_ab(
                 summaries[mode].trials.append(live)
             except Exception as exc:
                 print(f"  run failed: {exc}", file=sys.stderr)
+                outcome = RunOutcome(
+                    scenario_id=scenario.id,
+                    success=False,
+                    spend_micros=0,
+                    steps=0,
+                    halt_reason=str(exc),
+                )
                 summaries[mode].trials.append(
                     LiveTrial(
                         trial=trial,
                         mode=mode,
-                        outcome=RunOutcome(
-                            scenario_id=scenario.id,
+                        outcome=outcome,
+                        status=classify_trial(
                             success=False,
                             spend_micros=0,
                             steps=0,
                             halt_reason=str(exc),
+                            halted=False,
                         ),
                     )
                 )
@@ -346,30 +439,20 @@ async def _run_scenario_ab(
 
 async def async_main() -> int:
     load_env()
-    scenario_names = list(
-        dict.fromkeys([
-            *POLICY_SUITE,
-            *STRESS_SUITE,
-            *STEER_SUITE,
-            *COST_SHOWCASE_SUITE,
-            "flight_sfo_india",
-        ])
-    )
+    scenario_names = list(ALL_SUITE)
+    suite_choices = list(SUITE_BY_NAME)
+    legacy = {
+        "policy_suite": "fair_suite",
+        "stress_suite": "trap_suite",
+        "steer_suite": "cap_suite",
+        "cost_showcase_suite": "showcase_suite",
+    }
     parser = argparse.ArgumentParser(description="Live browser-use: vanilla vs TokenOps")
     parser.add_argument(
         "--scenario",
-        choices=[
-            *scenario_names,
-            "all",
-            "policy_suite",
-            "stress_suite",
-            "steer_suite",
-            "cost_showcase_suite",
-        ],
-        default="policy_suite",
-        help=(
-            "Task preset (default: policy_suite; cost_showcase_suite = 4 cost-optimization A/B demos)"
-        ),
+        choices=[*scenario_names, *suite_choices, *legacy],
+        default="fair_suite",
+        help="Scenario id or suite (fair, trap, cap, showcase)",
     )
     parser.add_argument("--limit-usd", type=float, default=None, help="Override scenario cap")
     parser.add_argument("--max-steps", type=int, default=None, help="Override scenario steps")
@@ -380,16 +463,11 @@ async def async_main() -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
 
-    if args.scenario == "all":
-        scenario_ids = scenario_names
-    elif args.scenario == "policy_suite":
-        scenario_ids = list(POLICY_SUITE)
-    elif args.scenario == "stress_suite":
-        scenario_ids = list(STRESS_SUITE)
-    elif args.scenario == "steer_suite":
-        scenario_ids = list(STEER_SUITE)
-    elif args.scenario == "cost_showcase_suite":
-        scenario_ids = list(COST_SHOWCASE_SUITE)
+    suite_key = legacy.get(args.scenario, args.scenario)
+    active_suite: str | None = None
+    if suite_key in SUITE_BY_NAME:
+        scenario_ids = list(SUITE_BY_NAME[suite_key])
+        active_suite = suite_key.removesuffix("_suite")
     else:
         scenario_ids = [args.scenario]
 
@@ -403,7 +481,7 @@ async def async_main() -> int:
                 description=sc.description,
                 default_limit_usd=sc.default_limit_usd,
                 default_max_steps=sc.default_max_steps,
-                governance_preset=sc.governance_preset,
+                suite=sc.suite,
             )
         limit_usd = args.limit_usd if args.limit_usd is not None else sc.default_limit_usd
         max_steps = args.max_steps if args.max_steps is not None else sc.default_max_steps
@@ -421,29 +499,60 @@ async def async_main() -> int:
     if args.as_json:
         payload = []
         for r in results:
+            u, g = r.ungoverned, r.tokenops
+            red = 0.0
+            if u.avg_spend_usd > 0:
+                red = round(100.0 * (u.avg_spend_usd - g.avg_spend_usd) / u.avg_spend_usd, 1)
+            delta = u.avg_spend_usd - g.avg_spend_usd
+            win = classify_win(
+                ungoverned_spend=u.avg_spend_usd,
+                tokenops_spend=g.avg_spend_usd,
+                ungoverned_steps=u.avg_steps,
+                tokenops_steps=g.avg_steps,
+                ungoverned_success_within=u.success_within_budget_count,
+                tokenops_success_within=g.success_within_budget_count,
+                trials=args.trials,
+            )
+
+            def _arm(s: LiveModeSummary) -> dict:
+                return {
+                    "scored_trials": s.scored_trials,
+                    "infra_trials": s.infra_trials,
+                    "successes": s.successes,
+                    "success_within_budget": s.success_within_budget_count,
+                    "avg_spend_usd": round(s.avg_spend_usd, 6),
+                    "median_spend_usd": round(s.median_spend_usd, 6),
+                    "avg_steps": round(s.avg_steps, 2),
+                    "avg_tokens": round(s.avg_tokens),
+                }
+
             payload.append({
+                "suite": active_suite or r.scenario.suite,
                 "scenario": r.scenario.id,
+                "trials": args.trials,
                 "limit_usd": args.limit_usd or r.scenario.default_limit_usd,
-                "ungoverned": {
-                    "successes": r.ungoverned.successes,
-                    "success_within_budget": r.ungoverned.success_within_budget_count,
-                    "avg_spend_usd": round(r.ungoverned.avg_spend_usd, 6),
-                    "avg_tokens": round(r.ungoverned.avg_tokens),
-                },
-                "tokenops": {
-                    "successes": r.tokenops.successes,
-                    "success_within_budget": r.tokenops.success_within_budget_count,
-                    "avg_spend_usd": round(r.tokenops.avg_spend_usd, 6),
-                    "avg_tokens": round(r.tokenops.avg_tokens),
-                },
+                "ungoverned": _arm(u),
+                "tokenops": _arm(g),
+                "spend_reduction_pct": red,
+                "delta_usd_per_trial": round(delta, 6),
+                "savings_per_1k_runs_usd": round(delta * 1000, 2),
+                "win_type": win,
+                "showcase_pass": showcase_pass(
+                    ungoverned_spend=u.avg_spend_usd,
+                    tokenops_spend=g.avg_spend_usd,
+                    ungoverned_success_within=u.success_within_budget_count,
+                    tokenops_success_within=g.success_within_budget_count,
+                ),
             })
         print(json.dumps(payload, indent=2))
     else:
+        if active_suite:
+            print(f"\n{'=' * 60}\nSuite: {active_suite}  ({len(results)} scenario(s), N={args.trials})\n{'=' * 60}")
         for r in results:
             if args.mode_only:
                 s = r.ungoverned if args.mode_only == "ungoverned" else r.tokenops
                 print(f"\n=== {r.scenario.id} ({args.mode_only}) ===")
-                print(f"successes: {s.successes}/{args.trials}  avg ${s.avg_spend_usd:.4f}")
+                print(f"scored: {s.scored_trials}/{s.total_trials}  avg ${s.avg_spend_usd:.4f}")
             else:
                 print("\n" + _format_summary(
                     r.ungoverned,
@@ -451,6 +560,7 @@ async def async_main() -> int:
                     scenario=r.scenario,
                     limit_usd=args.limit_usd or r.scenario.default_limit_usd,
                     trials=args.trials,
+                    suite=active_suite or r.scenario.suite,
                 ))
     return 0
 

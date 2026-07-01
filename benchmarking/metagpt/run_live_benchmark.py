@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import sys
 from dataclasses import dataclass, field
@@ -36,6 +37,21 @@ from benchmarking.metagpt.scenarios_live import (  # noqa: E402
 )
 
 COOLDOWN_BETWEEN_ARMS_SEC = 90
+
+
+def _progress(msg: str, *, json_mode: bool) -> None:
+    print(msg, file=sys.stderr if json_mode else sys.stdout, flush=True)
+
+
+@contextlib.contextmanager
+def _agent_stdout_to_stderr():
+    """Route MetaGPT agent library prints away from --json stdout."""
+    saved = sys.stdout
+    sys.stdout = sys.stderr
+    try:
+        yield
+    finally:
+        sys.stdout = saved
 
 
 @dataclass
@@ -72,6 +88,10 @@ class LiveModeSummary:
     @property
     def success_within_budget_count(self) -> int:
         return sum(1 for t in self.trials if t.success_within_budget)
+
+    @property
+    def avg_steps(self) -> float:
+        return mean([t.outcome.steps for t in self.trials]) if self.trials else 0.0
 
 
 @dataclass
@@ -149,31 +169,34 @@ async def _run_trial(
     scenario: LiveScenario,
     limit_micros: int,
     trial: int,
+    json_mode: bool = False,
 ) -> GovernedRunResult:
     _require_metagpt()
     role = make_bench_role(
         max_react_loop=scenario.default_max_react_loop,
         model=scenario.primary_model,
     )
-    print(
+    _progress(
         f"\n--- {scenario.id} | trial {trial} | {mode.value} ({scenario.primary_model}) ---",
-        flush=True,
+        json_mode=json_mode,
     )
 
-    if mode is CompareMode.UNGOVERNED:
-        return await run_ungoverned(role, scenario.task)
+    ctx = _agent_stdout_to_stderr() if json_mode else contextlib.nullcontext()
+    with ctx:
+        if mode is CompareMode.UNGOVERNED:
+            return await run_ungoverned(role, scenario.task)
 
-    install()
-    return await run_governed(
-        role,
-        scenario.task,
-        mode=BenchmarkMode.TOKENOPS,
-        limit_micros=limit_micros,
-        live_pricing=True,
-        governance_preset=scenario.governance_preset,
-        downgrade_to=scenario.downgrade_to,
-        max_react_loop=scenario.default_max_react_loop,
-    )
+        install()
+        return await run_governed(
+            role,
+            scenario.task,
+            mode=BenchmarkMode.TOKENOPS,
+            limit_micros=limit_micros,
+            live_pricing=True,
+            governance_preset=governance_preset_for(scenario),
+            downgrade_to=scenario.downgrade_to,
+            max_react_loop=scenario.default_max_react_loop,
+        )
 
 
 def _pct_reduction(baseline: float, improved: float) -> float:
@@ -195,7 +218,7 @@ def _format_summary(
     lines = [
         f"=== {scenario.id}: ungoverned vs TokenOps ({trials} trial(s)) ===",
         f"    {scenario.description}",
-        f"    preset: {scenario.governance_preset}  cap: ${limit_usd:.3f}  "
+        f"    cap: ${limit_usd:.3f}  "
         f"model: {scenario.primary_model}  max_react: {scenario.default_max_react_loop}",
         "",
         "Without TokenOps",
@@ -244,6 +267,7 @@ async def _run_scenario_ab(
     trials: int,
     mode_only: str | None,
     cooldown_sec: int,
+    json_mode: bool = False,
 ) -> ScenarioResult:
     limit_micros = int(limit_usd * 1_000_000)
     summaries = {
@@ -256,10 +280,16 @@ async def _run_scenario_ab(
     for trial in range(1, trials + 1):
         for i, mode in enumerate(order):
             if i > 0 and cooldown_sec > 0:
-                print(f"\n… cooldown {cooldown_sec}s before {mode.value} …", flush=True)
+                _progress(f"\n… cooldown {cooldown_sec}s before {mode.value} …", json_mode=json_mode)
                 await asyncio.sleep(cooldown_sec)
             try:
-                res = await _run_trial(mode, scenario=scenario, limit_micros=limit_micros, trial=trial)
+                res = await _run_trial(
+                    mode,
+                    scenario=scenario,
+                    limit_micros=limit_micros,
+                    trial=trial,
+                    json_mode=json_mode,
+                )
                 live = _trial_from_result(
                     res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
                 )
@@ -275,14 +305,14 @@ async def _run_scenario_ab(
                         if mode is CompareMode.UNGOVERNED
                         else f"cap ${cap:.3f} ({'under' if m.spend_micros <= limit_micros and not m.halted else 'over/halted'})"
                     )
-                    print(
+                    _progress(
                         f"  spend ${m.spend_micros / 1_000_000:.4f} ({budget_note})  "
                         f"rounds {m.react_rounds}  success={res.success}  "
                         f"halted={m.halted}  signals={list(m.policy_signals)}",
-                        flush=True,
+                        json_mode=json_mode,
                     )
                     if m.halt_reason or res.error:
-                        print(f"  halt/error: {m.halt_reason or res.error}", flush=True)
+                        _progress(f"  halt/error: {m.halt_reason or res.error}", json_mode=json_mode)
             except Exception as exc:
                 print(f"  run failed: {exc}", file=sys.stderr)
                 summaries[mode].trials.append(
@@ -360,20 +390,36 @@ async def async_main() -> int:
                 trials=args.trials,
                 mode_only=args.mode_only,
                 cooldown_sec=args.cooldown_sec if not args.mode_only else 0,
+                json_mode=args.as_json,
             )
         )
 
     if args.as_json:
-        print(json.dumps([
-            {
-                "scenario": r.scenario.id,
-                "preset": r.scenario.governance_preset,
-                "evaluation": r.evaluation,
-                "ungoverned_avg_spend": round(r.ungoverned.avg_spend_usd, 6),
-                "tokenops_avg_spend": round(r.tokenops.avg_spend_usd, 6),
+        def _arm_summary(s: LiveModeSummary) -> dict:
+            return {
+                "successes": s.successes,
+                "success_within_budget": s.success_within_budget_count,
+                "avg_spend_usd": round(s.avg_spend_usd, 6),
+                "median_spend_usd": round(s.median_spend_usd, 6),
+                "avg_steps": round(s.avg_steps, 2),
             }
-            for r in results
-        ], indent=2))
+
+        payload = []
+        for r in results:
+            u, g = r.ungoverned, r.tokenops
+            red = 0.0
+            if u.avg_spend_usd > 0:
+                red = round(100.0 * (u.avg_spend_usd - g.avg_spend_usd) / u.avg_spend_usd, 1)
+            payload.append({
+                "scenario": r.scenario.id,
+                "trials": args.trials,
+                "limit_usd": args.limit_usd or r.scenario.default_limit_usd,
+                "ungoverned": _arm_summary(u),
+                "tokenops": _arm_summary(g),
+                "spend_reduction_pct": red,
+                "evaluation": r.evaluation,
+            })
+        print(json.dumps(payload, indent=2))
     else:
         for r in results:
             limit = args.limit_usd or r.scenario.default_limit_usd

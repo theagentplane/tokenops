@@ -12,14 +12,15 @@ class LiveScenario:
     description: str
     default_limit_usd: float
     default_max_steps: int
-    governance_preset: str = "steering"
+    suite: str = "fair"
 
 
 EXAMPLE_TIGHT_CAP = LiveScenario(
     id="example_tight_cap",
-    description="Trivial finish under tight cap — cost_guard / cost_budget",
+    description="Normal task — read example.com once under a cap",
     default_limit_usd=0.30,
     default_max_steps=12,
+    suite="fair",
     task="""
 On https://example.com, report the page title and the first sentence of the body text.
 Reply with a one-line summary, then call done with success=true.
@@ -29,9 +30,10 @@ Do not navigate elsewhere.
 
 BOOKS_LOOP_TRAP = LiveScenario(
     id="books_loop_trap",
-    description="Stable site, loop-prone — progress_guard",
+    description="Normal browse — find a book on books.toscrape.com",
     default_limit_usd=0.50,
     default_max_steps=20,
+    suite="fair",
     task="""
 Go to https://books.toscrape.com and find the book "A Light in the Attic".
 Report its price (including currency) and whether it is in stock.
@@ -42,9 +44,10 @@ Finish with a short summary. Do not book or purchase anything.
 
 FLIGHT_SFO_INDIA = LiveScenario(
     id="flight_sfo_india",
-    description="Hard travel UI (not recommended for policy A/B)",
+    description="Hard travel UI — not used in standard suites",
     default_limit_usd=1.00,
     default_max_steps=25,
+    suite="skip",
     task="""
 Search for round-trip economy flight options from San Francisco (SFO) to India
 (Delhi DEL or Mumbai BOM).
@@ -58,9 +61,10 @@ Search for round-trip economy flight options from San Francisco (SFO) to India
 
 BOOKS_VERIFY_TRAP = LiveScenario(
     id="books_verify_trap",
-    description="Loop-bait verification under tight cap — progress_guard INJECT vs vanilla overspend",
+    description="Trap — reload homepage 10× before done",
     default_limit_usd=0.034,
     default_max_steps=20,
+    suite="trap",
     task="""
 Go to https://books.toscrape.com and find the book "A Light in the Attic".
 Report its price (with currency) and whether it is in stock.
@@ -74,9 +78,10 @@ Do not purchase anything.
 
 BOOKS_PAGINATION_STRESS = LiveScenario(
     id="books_pagination_stress",
-    description="Deep catalogue crawl under tight cap — cost_guard / cost_budget",
+    description="Cap test — paginate one page at a time under a tight budget",
     default_limit_usd=0.10,
     default_max_steps=22,
+    suite="cap",
     task="""
 On https://books.toscrape.com, find the book "The Requiem Red" (not on the homepage).
 You must browse forward through the catalogue using the "next" page link one page at a time
@@ -87,9 +92,10 @@ Report its price and stock. Call done with success=true when found.
 
 EXAMPLE_VERIFY_TRAP = LiveScenario(
     id="example_verify_trap",
-    description="Reload loop on cheap page — progress_guard INJECT vs vanilla overspend",
+    description="Trap — reload example.com 9× before done",
     default_limit_usd=0.018,
     default_max_steps=15,
+    suite="trap",
     task="""
 On https://example.com, read the page title and first sentence of body text.
 
@@ -100,10 +106,10 @@ Before finishing, reload the page and re-read the same fields at least eight mor
 
 BOOKS_COST_GUARD = LiveScenario(
     id="books_cost_guard",
-    description="Multi-category browse under tight cap — cost_guard minimize at ~80% spend",
+    description="Cap test — browse three categories under a tight budget",
     default_limit_usd=0.052,
     default_max_steps=18,
-    governance_preset="cost_guard",
+    suite="cap",
     task="""
 On https://books.toscrape.com:
 1. Open the Travel category and note one book title and price.
@@ -116,10 +122,10 @@ Finish with a short summary, then call done with success=true. Do not purchase a
 
 BOOKS_TOOL_FIX = LiveScenario(
     id="books_tool_fix",
-    description="Click-heavy browse — tool_fix steers off disallowed actions",
+    description="Dev-only — click-heavy browse",
     default_limit_usd=0.12,
     default_max_steps=16,
-    governance_preset="tool_fix",
+    suite="skip",
     task="""
 Go to https://books.toscrape.com and find the book "A Light in the Attic".
 Report its price (with currency) and stock status.
@@ -130,10 +136,10 @@ You will need to open the book detail page to read the price. Finish with done s
 
 EXAMPLE_TOOL_OUTPUT_CAP = LiveScenario(
     id="example_tool_output_cap",
-    description="Synthetic huge evaluate payload — tool_output_cap avoids context bloat",
+    description="Dev-only — huge evaluate payload",
     default_limit_usd=0.035,
     default_max_steps=12,
-    governance_preset="tool_output_cap",
+    suite="skip",
     task="""
 Navigate to https://example.com.
 
@@ -148,10 +154,10 @@ Call done with success=true and a one-line summary.
 
 BOOKS_HUGE_EVAL = LiveScenario(
     id="books_huge_eval",
-    description="Full-page evaluate dump — tool_output_cap offloads oversized payload",
+    description="Dev-only — full-page evaluate dump",
     default_limit_usd=0.08,
     default_max_steps=16,
-    governance_preset="tool_output_cap",
+    suite="skip",
     task="""
 Navigate to https://books.toscrape.com and wait for the catalogue to load.
 
@@ -180,30 +186,42 @@ SCENARIOS: dict[str, LiveScenario] = {
     )
 }
 
-# Default suite for policy-focused live A/B
-POLICY_SUITE: tuple[str, ...] = ("example_tight_cap", "books_loop_trap")
+# Normal tasks — TokenOps should be about the same as vanilla
+FAIR_SUITE: tuple[str, ...] = ("example_tight_cap", "books_loop_trap")
 
-# Scenarios designed to surface vanilla failure modes TokenOps mitigates
-STRESS_SUITE: tuple[str, ...] = (
-    "example_verify_trap",
-    "books_verify_trap",
-    "books_pagination_stress",
-)
+# Prompts force wasteful repetition
+TRAP_SUITE: tuple[str, ...] = ("example_verify_trap", "books_verify_trap")
 
-# Scenarios tuned to exercise steer actuators (cost_guard, tool_fix, tool_output_cap)
-STEER_SUITE: tuple[str, ...] = (
-    "books_cost_guard",
+# Long job + tight cap
+CAP_SUITE: tuple[str, ...] = ("books_pagination_stress", "books_cost_guard")
+
+# Hand-picked demo scenarios (slide-safe at N≥5)
+SHOWCASE_SUITE: tuple[str, ...] = ("books_verify_trap", "books_pagination_stress")
+
+SKIP_SUITE: tuple[str, ...] = (
+    "flight_sfo_india",
     "books_tool_fix",
     "books_huge_eval",
+    "example_tool_output_cap",
 )
 
-# Curated A/B set: each scenario highlights a different TokenOps cost strategy vs vanilla
-COST_SHOWCASE_SUITE: tuple[str, ...] = (
-    "example_verify_trap",     # progress_guard — breaks reload loops early
-    "books_verify_trap",       # progress_guard + cost_budget — stops verify-loop overspend
-    "books_cost_guard",        # cost_guard — minimize steer as budget threshold nears
-    "books_pagination_stress", # cost_budget — halts deep crawl before vanilla blowout
+ALL_SUITE: tuple[str, ...] = tuple(
+    dict.fromkeys([*FAIR_SUITE, *TRAP_SUITE, *CAP_SUITE, *SHOWCASE_SUITE])
 )
+
+SUITE_BY_NAME: dict[str, tuple[str, ...]] = {
+    "fair_suite": FAIR_SUITE,
+    "trap_suite": TRAP_SUITE,
+    "cap_suite": CAP_SUITE,
+    "showcase_suite": SHOWCASE_SUITE,
+    "all": ALL_SUITE,
+}
+
+# Backward-compatible aliases
+POLICY_SUITE = FAIR_SUITE
+STRESS_SUITE = TRAP_SUITE
+STEER_SUITE = CAP_SUITE
+COST_SHOWCASE_SUITE = SHOWCASE_SUITE
 
 
 def get_scenario(scenario_id: str) -> LiveScenario:

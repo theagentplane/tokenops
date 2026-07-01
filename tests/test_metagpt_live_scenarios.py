@@ -15,11 +15,12 @@ from benchmarking.metagpt.configs import (
 from benchmarking.metagpt.evaluate import evaluate_ab, policies_present
 from benchmarking.metagpt.scenario_expectations import EXPECTATIONS
 from benchmarking.metagpt.scenarios_live import (
-    POLICY_SUITE,
+    ALL_SUITE,
+    CAP_SUITE,
+    FAIR_SUITE,
     SCENARIOS,
     SHOWCASE_SUITE,
-    STEER_SUITE,
-    STRESS_SUITE,
+    TRAP_SUITE,
     get_scenario,
 )
 from benchmarking.metagpt.scenario_expectations import get_expectation
@@ -37,7 +38,7 @@ def test_every_scenario_has_expectation():
 
 
 def test_suites_reference_known_scenarios():
-    for sid in (*POLICY_SUITE, *STRESS_SUITE, *STEER_SUITE, *SHOWCASE_SUITE):
+    for sid in (*FAIR_SUITE, *TRAP_SUITE, *CAP_SUITE, *SHOWCASE_SUITE, *ALL_SUITE):
         get_scenario(sid)
         get_expectation(sid)
 
@@ -111,7 +112,7 @@ def test_live_baseline_smoke():
     from benchmarking.common.harness import BenchmarkMode
     from benchmarking.metagpt.bench_role import make_bench_role
     from benchmarking.metagpt.integration import install, run_governed
-    from benchmarking.metagpt.scenarios_live import get_scenario
+    from benchmarking.metagpt.scenarios_live import get_scenario, governance_preset_for
 
     sc = get_scenario("saas_baseline")
     install()
@@ -124,7 +125,7 @@ def test_live_baseline_smoke():
             mode=BenchmarkMode.TOKENOPS,
             limit_micros=int(sc.default_limit_usd * 1_000_000),
             live_pricing=True,
-            governance_preset=sc.governance_preset,
+            governance_preset=governance_preset_for(sc),
         )
 
     result = asyncio.run(_run())

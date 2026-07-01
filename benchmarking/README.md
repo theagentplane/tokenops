@@ -1,54 +1,23 @@
 # TokenOps live benchmarks
 
-Compare **vanilla browser-use** vs **TokenOps-governed** on real tasks.
+Side-by-side runs: **vanilla agent** vs **TokenOps-governed** on the same task, same model, same step limit.
+
+## What this proves (and does not)
+
+**Proves:** On loop-prone or cap-tight tasks, TokenOps often spends less than vanilla.
+
+**Does not prove:** That a specific policy fires every run, that every scenario is a clean win, or that production ROI is guaranteed. LLM agents are non-deterministic — we score outcomes, not “policy X must fire on trial 3.”
 
 ## Setup
+
+**Browser-use**
 
 ```bash
 bash benchmarking/browseruse/setup_live.sh
 source benchmarking/browseruse/.venv/bin/activate
 ```
 
-Set `OPENAI_API_KEY` or `BROWSER_USE_API_KEY` in `.env`.
-
-## Run
-
-```bash
-# Policy-focused suite (example.com tight cap + books loop trap)
-python benchmarking/run_all.py --scenario policy_suite
-
-# Stress suite (loop traps under tight caps — vanilla overspend vs TokenOps governance)
-python benchmarking/run_all.py --scenario stress_suite
-
-# Cost showcase — four scenarios, each a different TokenOps cost strategy (see browseruse/README.md)
-python benchmarking/run_all.py --scenario cost_showcase_suite --cooldown-sec 60
-
-# Single scenario
-python benchmarking/browseruse/run_live_benchmark.py --scenario books_verify_trap
-python benchmarking/browseruse/run_live_benchmark.py --scenario books_loop_trap --mode-only tokenops
-```
-
-See **[benchmarking/browseruse/README.md](browseruse/README.md)** for setup, governance presets, and the cost showcase scenarios with live results.
-
-Scenarios:
-- `example_tight_cap` ($0.30 / 12 steps), `books_loop_trap` ($0.50 / 20 steps) — policy suite
-- `books_verify_trap` ($0.034 / 20 steps) — reload loop bait; vanilla often overspends on mandatory re-checks while TokenOps `progress_guard` INJECT + `cost_budget` cap spend
-- `example_verify_trap` ($0.018 / 15 steps) — nine reload cycles on example.com
-
-**Cost showcase suite** (`cost_showcase_suite`):
-
-| Scenario | Optimization | Cap | Live win (spend) |
-|----------|--------------|-----|------------------|
-| `example_verify_trap` | `progress_guard` | $0.018 | −65% |
-| `books_verify_trap` | `progress_guard` + `cost_budget` | $0.034 | −73%, within cap |
-| `books_cost_guard` | `cost_guard` minimize | $0.052 | −16% to −49% |
-| `books_pagination_stress` | `cost_budget` | $0.10 | −74%, vanilla fails |
-
-Default suite runs vanilla first, 90s cooldown, then TokenOps per scenario.
-
-## MetaGPT live runs
-
-See **[benchmarking/metagpt/README.md](metagpt/README.md)** for setup, showcase scenarios, live results, and governance presets.
+**MetaGPT**
 
 ```bash
 bash benchmarking/metagpt/setup_live.sh
@@ -56,26 +25,65 @@ source benchmarking/metagpt/.venv/bin/activate
 pip install -e . && pip install -e benchmarking/metagpt/vendor
 ```
 
-```bash
-# Four-scenario showcase (one optimization each)
-python benchmarking/metagpt/run_live_benchmark.py --scenario pricing_quick_verify_trap --cooldown-sec 120
-python benchmarking/metagpt/run_live_benchmark.py --scenario pricing_loop_trap --cooldown-sec 120
-python benchmarking/metagpt/run_live_benchmark.py --scenario pricing_cost_guard --cooldown-sec 120
-python benchmarking/metagpt/run_live_benchmark.py --scenario pricing_model_routing --cooldown-sec 120
+Set `OPENAI_API_KEY` (or `BROWSER_USE_API_KEY` for browser-use) in `.env`.
 
-# Suites
-python benchmarking/metagpt/run_live_benchmark.py --scenario policy_suite
-python benchmarking/metagpt/run_live_benchmark.py --scenario showcase_suite
-python benchmarking/run_all.py --framework metagpt --scenario steer_suite
+## Suites
+
+Both frameworks use the same idea:
+
+| Suite | Purpose | What “good” looks like |
+|-------|---------|------------------------|
+| `fair_suite` | Normal tasks | TokenOps ≈ vanilla (no big regression) |
+| `trap_suite` | Forced wasteful repeats (reload / re-research) | TokenOps usually cheaper |
+| `cap_suite` | Long job + tight budget | TokenOps stays under cap more often |
+| `showcase_suite` | Hand-picked demo tasks | Cheaper **and** success within budget (`showcase_pass`) |
+
+Old names still work: `policy_suite` → `fair_suite`, `stress_suite` → `trap_suite`, `steer_suite` → `cap_suite`, `cost_showcase_suite` → `showcase_suite`.
+
+## Run
+
+```bash
+# Browser-use showcase (2 scenarios)
+python benchmarking/browseruse/run_live_benchmark.py --scenario showcase_suite --trials 5 --cooldown-sec 60
+
+# MetaGPT showcase
+python benchmarking/metagpt/run_live_benchmark.py --scenario showcase_suite --trials 5 --cooldown-sec 120
+
+# Single scenario
+python benchmarking/browseruse/run_live_benchmark.py --scenario books_verify_trap --trials 1 --json
+
+# Both frameworks
+python benchmarking/run_all.py --scenario showcase_suite --cooldown-sec 60
 ```
 
-| Scenario | Optimization | Cap | Live win (spend) |
-|----------|--------------|-----|------------------|
-| `pricing_quick_verify_trap` | `progress_guard` | $0.06 | −53% |
-| `pricing_loop_trap` | `progress_guard` | $0.50 | −60%, fewer rounds |
-| `pricing_cost_guard` | `cost_guard` minimize | $0.12 | −74% |
-| `pricing_model_routing` | model routing (`gpt-4o`) | $0.14 | −73% |
+**Multi-trial sweep** (N=1,5,10):
 
-TDD (no API key): `pytest tests/test_metagpt_live_scenarios.py -k "not install_idempotent and not live_baseline"`
+```bash
+python benchmarking/run_trials_sweep.py --framework browseruse --scenario books_verify_trap --trial-counts 1,5,10
+```
 
-Live smoke: `pytest tests/test_metagpt_live_scenarios.py -k live_baseline`
+Use `--cooldown-sec 60`–`120` between arms to reduce rate limits. Vanilla runs first, then TokenOps.
+
+## Scoring (browser-use)
+
+Each trial is tagged: `ok`, `infra` (rate limit / empty run — dropped from averages), `halted`, `failed`.
+
+JSON output includes:
+
+- `spend_reduction_pct`, `delta_usd_per_trial`, `savings_per_1k_runs_usd`
+- `win_type`: `fewer_steps`, `cheaper_steps`, `outcome`, `mixed`, `none`
+- `showcase_pass`: TokenOps cheaper **and** at least as good on success-within-budget
+
+We do **not** require a named policy to fire on every trial.
+
+## Framework docs
+
+- [browseruse/README.md](browseruse/README.md) — browser tasks, suites, scoring
+- [metagpt/README.md](metagpt/README.md) — MetaGPT adapter, suites
+
+## Tests (no API key)
+
+```bash
+pytest tests/test_trial_status.py tests/test_browseruse_suites.py \
+  tests/test_metagpt_live_scenarios.py -k "not install_idempotent and not live_baseline"
+```
