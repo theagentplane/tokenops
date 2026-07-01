@@ -15,14 +15,16 @@ class NativeSummarizeAgent:
         task: str,
         findings: list[Finding],
         on_step: StepCallback | None = None,
+        complete_fn=None,
     ) -> str:
         cfg = self._config
+        do_complete = complete_fn or complete  # governed wrapper or vanilla provider entry
         finding_dicts = [f.to_dict() for f in findings]
         messages = [
             {"role": "system", "content": "You are a concise summarizer."},
             {"role": "user", "content": summarize_prompt(task, finding_dicts)},
         ]
-        response = complete(cfg.provider, cfg.model, messages)
+        response = do_complete(cfg.provider, cfg.model, messages)
         if on_step:
             on_step(
                 StepEvent(

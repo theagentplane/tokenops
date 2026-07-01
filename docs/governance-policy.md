@@ -40,7 +40,7 @@ Every call is tagged with `run / user / agent / tenant / tags`. Budgets and poli
  
 ## 3. Policies
  
-> **Four failure modes:** **Spend** (runaway cost) · **Stuck** (loops, stalls, hangs) · **Decay** (context rot) · **Fan-out** (parallel or recursive explosion). Attribution is the always-on base.
+> **Four failure modes:** **Spend** (runaway cost) · **Stuck** (loops, stalls, hangs) · **Decay** (context rot) · **Fan-out** (parallel explosion). Attribution is the always-on base.
  
 > **Design rule:** every policy is deterministic (no model in the path) and **acts**. It either **Heals** (recovers in flight), **Bounds** (caps or refuses, run continues), or **Stops** (halts). No passive alerts.
  
@@ -48,7 +48,7 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
  
 | When | Policy | Mode | Detect (when it fires) | Fix | Acts |
 |---|---|---|---|---|---|
-| pre-call | `delegation_cap` | fan-out | an agent spawns sub-agents too deep, or too many at once | refuse the new sub-agent | Bound |
+| ~~pre-call~~ | ~~`delegation_cap`~~ | ~~fan-out~~ | ~~an agent spawns sub-agents too deep, or too many at once~~ | ~~refuse the new sub-agent~~ | ~~Bound~~ *Removed — depth-based spawn limits dropped; see `concurrency_cap` and spend breakers.* |
 | pre-call | `concurrency_cap` | fan-out | too many calls run at the same time | hold the extra ones, or reject so the caller retries | Bound |
 | pre-call | `tool_fix` | stuck | the agent calls an unknown tool, or with bad arguments | return a clear error so it self-corrects; stop after repeated failures | Heal |
 | pre-call | `context_compaction` | decay | the prompt is large or steadily growing | shrink it: restore cache order, drop duplicates, summarize filler (keep the important parts) | Heal |
@@ -62,7 +62,18 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
 | always | `attribution` | base | always on | tag and total every call per customer; emit a standard span | Telemetry |
  
 **When a policy stops a run:** a stop halts spend and preserves state (cost so far, reason, snapshot). It never destroys the run. Resume is delegated and always deliberate. TokenOps provides the snapshot, and the runtime or a human decides whether to resume; never automatic.
- 
-## 4. V2
+
+## 5. Configuration & ops (v1 bench)
+
+| Concern | Where |
+|---|---|
+| Governance source of truth | SQLite `tokenops.db` (`TOKENOPS_DB`) |
+| Reference + auto-seed | `src/tokenops/config/default.yaml` → `governance:` |
+| Admin edits | Streamlit **Policy admin** → next run picks up |
+| Reset | `make db-reset` / `scripts/db_reseed.py` |
+| Registration dims | `POST /v1/runs` — `intent`, `user_dims` (see `docs/run-attribution.md`) |
+| Segment-scoped budgets | Supported via `Budget.dimension` + `segment_key_for`; seed is run-only ([#8](https://github.com/theagentplane/tokenops/issues/8)) |
+
+## 6. V2
  
 Smart dashboard: live per-customer cost, run health, a halt and steer feed, and the observe-to-enforce recommender. Reads the ledger, off the hot path.

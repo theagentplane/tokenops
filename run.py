@@ -36,7 +36,7 @@ def _free_port(port: int) -> None:
     """Stop any process listening on *port* so fresh servers can bind."""
     try:
         result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
+            ["lsof", "-tiTCP", f":{port}", "-sTCP:LISTEN"],
             capture_output=True,
             text=True,
             check=False,
@@ -46,13 +46,27 @@ def _free_port(port: int) -> None:
     pids = [p.strip() for p in result.stdout.splitlines() if p.strip()]
     if not pids:
         return
-    print(f"Stopping stale process on port {port} (pid {', '.join(pids)})...")
+    print(f"Stopping stale listener on port {port} (pid {', '.join(pids)})...")
     for pid in pids:
         try:
             os.kill(int(pid), signal.SIGTERM)
         except (ProcessLookupError, ValueError):
             pass
     time.sleep(0.5)
+    try:
+        result = subprocess.run(
+            ["lsof", "-tiTCP", f":{port}", "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return
+    for pid in [p.strip() for p in result.stdout.splitlines() if p.strip()]:
+        try:
+            os.kill(int(pid), signal.SIGKILL)
+        except (ProcessLookupError, ValueError):
+            pass
 
 
 def _shutdown() -> None:
@@ -106,7 +120,7 @@ def main() -> int:
     from tokenops.config import load_config
 
     cfg = load_config()
-    for port in {cfg.research.port, cfg.summarize.port}:
+    for port in {cfg.research.port, cfg.summarize.port, UI_PORT}:
         _free_port(port)
 
     print("Starting summarize server...")

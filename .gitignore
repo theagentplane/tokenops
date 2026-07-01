@@ -26,3 +26,8 @@ saved-config.yaml
 .DS_Store
 .idea/
 .vscode/
+
+# TokenOps runtime store
+*.db
+*.db-wal
+*.db-shm
