@@ -45,6 +45,9 @@ with st.sidebar:
         help="Segment runs by any tag — group/filter them on the Dashboard.",
     )
 
+    st.subheader("Agents")
+    max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=5)
+
 
 def _parse_tags(raw: str) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -55,8 +58,6 @@ def _parse_tags(raw: str) -> dict[str, str]:
                 out[k.strip()] = v.strip()
     return out
 
-    st.subheader("Agents")
-    max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=5)
 
 start = st.button("Start run", type="primary", use_container_width=True)
 
@@ -111,12 +112,26 @@ if "sim_result" not in st.session_state:
 result: SimulationResult = st.session_state.sim_result
 
 # ---- summary bar --------------------------------------------------------- #
-c1, c2, c3, c4, c5 = st.columns(5)
+cap_spec = store.get_budget("run_llm_cap")
+budget_cap_micros = cap_spec.limit_micros if cap_spec and cap_spec.limit_micros else None
+total_micros = result.research_cost_micros + result.summarize_cost_micros
+
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Run ID", result.run_id[:16] + "…")
 c2.metric("Status", result.status)
 c3.metric("Research $", f"${result.research_cost_micros / 1_000_000:.4f}")
 c4.metric("Summarize $", f"${result.summarize_cost_micros / 1_000_000:.4f}")
-c5.metric("Steps (ledger)", len(result.research_window) + len(result.summarize_window))
+c5.metric("Total run $", f"${total_micros / 1_000_000:.4f}")
+if budget_cap_micros is not None:
+    over = total_micros > budget_cap_micros
+    c6.metric(
+        "Run budget cap",
+        f"${budget_cap_micros / 1_000_000:.4f}",
+        delta="over cap" if over else "within cap",
+        delta_color="inverse" if over else "normal",
+    )
+else:
+    c6.metric("Steps (ledger)", len(result.research_window) + len(result.summarize_window))
 
 if result.halt_reason:
     st.warning(f"Halt reason: {result.halt_reason}")
