@@ -15,6 +15,8 @@ from tokenops.config import load_config
 from tokenops.control import (
     ApplyControls,
     Halt,
+    Action,
+    ActionKind,
     build_attribution,
     build_governor,
     downstream_run_scope,
@@ -24,6 +26,7 @@ from tokenops.control import (
 )
 from tokenops.control.context import RUN_ID_HEADER, current_registration, current_span, governance_scope
 from tokenops.control.engine import Throttled
+from tokenops.control.ledger import LIFETIME
 from tokenops.control.models import RunNotRegisteredError, RunRecord
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -56,7 +59,9 @@ def build_app():
             task = str(payload.get("task", ""))
             corpus_profile = bench_corpus_profile(payload)
 
-            governor = build_governor(store.governance_config_for(AGENT), price, ApplyControls())
+            governor = build_governor(
+                store.governance_config_for(AGENT), price, ApplyControls(), store=store,
+            )
             controls = governor.controls
             governor.ledger.open_run(run_id)
             store.create_run(
@@ -99,6 +104,17 @@ def build_app():
                         service=AGENT,
                     )
                     steps.append(StepEvent(agent="research", action="delegate", detail="calling summarize agent"))
+                    remaining = governor.ledger.budget_left(
+                        "run_llm_cap", f"run:{run_id}", LIFETIME,
+                    )
+                    if (
+                        "run_llm_cap" in governor.ledger._budget_by_id
+                        and remaining <= 0
+                    ):
+                        raise Halt(Action(
+                            kind=ActionKind.HALT, run_id=run_id,
+                            reason="no budget remaining; refusing to delegate",
+                        ))
                     summary, sum_tokens, sum_steps, sum_cost = await delegate_summarize(
                         cfg.summarize_url,
                         task,

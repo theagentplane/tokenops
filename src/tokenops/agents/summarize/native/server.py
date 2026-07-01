@@ -45,7 +45,9 @@ def build_app():
             findings = parse_findings(payload.get("findings", []))
             parent_span = headers.get("X-TokenOps-Parent-Span-Id") or payload.get("parent_run")
 
-            governor = build_governor(store.governance_config_for(AGENT), price, ApplyControls())
+            governor = build_governor(
+                store.governance_config_for(AGENT), price, ApplyControls(), store=store,
+            )
             controls = governor.controls
             governor.ledger.open_run(run_id)
             store.create_run(
@@ -53,7 +55,7 @@ def build_app():
                     run_id=run_id,
                     agent=AGENT,
                     status="running",
-                    parent_run=parent_span,
+                    parent_span=parent_span,
                     task=task,
                     started_at=time.time(),
                 )

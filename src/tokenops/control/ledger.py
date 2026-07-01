@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable, Literal, Sequence
+from typing import TYPE_CHECKING, Callable, Literal, Sequence
 
 from tokenops.control.core import (
     Attribution,
@@ -36,6 +36,9 @@ from tokenops.control.core import (
     Micros,
     Observation,
 )
+
+if TYPE_CHECKING:
+    from tokenops.control.store import Store
 
 #: Resolve a call's price. Injected (the Instrument module owns the price book). Must
 #: fail closed: an unknown (provider, model) raises rather than returning 0.
@@ -129,21 +132,40 @@ class RunState:
 # =========================================================================== #
 
 class Ledger:
-    """In-memory Attribute. Single-process backend for v1; the same shape backs a shared
-    store in distributed A2A (only the dict gets swapped for Redis/etc.)."""
+    """Attribute + LedgerView. Per-process run state (window, local step count); spend,
+    inflight, and halt may be backed by :class:`Store` for cross-process A2A."""
 
-    def __init__(self, *, budgets: Sequence[Budget] = (), price: PriceFn | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        budgets: Sequence[Budget] = (),
+        price: PriceFn | None = None,
+        store: Store | None = None,
+    ) -> None:
+        self._store = store
         self.runs: dict[str, RunState] = {}
-        # Internal accumulators (underscored so the public ``inflight()`` read method from
-        # LedgerView does not collide with the dict). Conceptually these are the LLD's
-        # ``spent`` and ``inflight`` maps.
         self._spent: dict[tuple[str, str, str], Micros] = defaultdict(int)
         self._inflight: dict[str, int] = defaultdict(int)
-        # The system run-total accumulator is always first, so every run's total has one
-        # home in ``spent`` regardless of which (if any) budgets the caller configured.
         self._budgets: list[Budget] = [RUN_TOTAL_BUDGET, *budgets]
         self._budget_by_id: dict[str, Budget] = {b.budget_id: b for b in self._budgets}
         self._price = price
+
+    def _spent_key(self, budget_id: str, segment_key: str, period: str) -> tuple[str, str, str]:
+        return (budget_id, segment_key, period)
+
+    def _read_spent(self, budget_id: str, segment_key: str, period: str) -> Micros:
+        if self._store is not None:
+            return self._store.ledger_get_spent(budget_id, segment_key, period)
+        return self._spent[self._spent_key(budget_id, segment_key, period)]
+
+    def _write_spent_delta(
+        self, budget_id: str, segment_key: str, period: str, delta: Micros,
+    ) -> Micros:
+        if self._store is not None:
+            return self._store.ledger_add_spent(budget_id, segment_key, period, delta)
+        key = self._spent_key(budget_id, segment_key, period)
+        self._spent[key] += delta
+        return self._spent[key]
 
     # ---- write side (Attribute) ------------------------------------------ #
 
@@ -152,12 +174,18 @@ class Ledger:
 
     def admit(self, segment_key: str) -> None:
         """A call for this segment has started (concurrency)."""
-        self._inflight[segment_key] += 1
+        if self._store is not None:
+            self._store.ledger_admit(segment_key)
+        else:
+            self._inflight[segment_key] += 1
 
     def complete(self, segment_key: str) -> None:
         """A call for this segment has returned. Floored at 0 so a stray complete cannot
         drive the counter negative."""
-        self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
+        if self._store is not None:
+            self._store.ledger_complete(segment_key)
+        else:
+            self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
 
     def record(self, obs: Observation) -> BoundaryStep:
         """Price the crossing, update every matching budget accumulator, append a
@@ -181,11 +209,12 @@ class Ledger:
             sk = segment_key(obs.attr, b)
             if sk is None:
                 continue
-            self._spent[(b.budget_id, sk, b.period)] += cost
+            self._write_spent_delta(b.budget_id, sk, b.period, cost)
 
         rs.steps += 1
-        # cum_spent is READ back from the canonical run accumulator — single source of truth.
-        cum = self._spent[(RUN_TOTAL_BUDGET.budget_id, f"run:{obs.attr.run_id}", LIFETIME)]
+        cum = self._read_spent(
+            RUN_TOTAL_BUDGET.budget_id, f"run:{obs.attr.run_id}", LIFETIME,
+        )
         step = BoundaryStep(
             step=rs.steps,
             ts=obs.ts,
@@ -208,6 +237,8 @@ class Ledger:
             rs = self.runs[run_id] = RunState()
         rs.halted = True
         rs.halt_reason = reason or rs.halt_reason
+        if self._store is not None:
+            self._store.ledger_mark_halted(run_id, reason)
 
     def clear_halt(self, run_id: str) -> None:
         """Explicit resume of the *same* run — lift the gate. Deliberately separate from
@@ -216,18 +247,21 @@ class Ledger:
         if rs is not None:
             rs.halted = False
             rs.halt_reason = None
+        if self._store is not None:
+            self._store.ledger_clear_halt(run_id)
 
     # ---- read side (LedgerView) ------------------------------------------ #
 
     def cost_micros(self, run_id: str) -> Micros:
-        # Read of the canonical run accumulator — the single source of spend truth.
-        return self._spent[(RUN_TOTAL_BUDGET.budget_id, f"run:{run_id}", LIFETIME)]
+        return self._read_spent(RUN_TOTAL_BUDGET.budget_id, f"run:{run_id}", LIFETIME)
 
     def step_count(self, run_id: str) -> int:
         rs = self.runs.get(run_id)
         return rs.steps if rs else 0
 
     def is_halted(self, run_id: str) -> bool:
+        if self._store is not None and self._store.ledger_is_halted(run_id):
+            return True
         rs = self.runs.get(run_id)
         return bool(rs and rs.halted)
 
@@ -236,10 +270,13 @@ class Ledger:
         if b is None:
             return 0  # unknown budget → no headroom (fail closed)
         if b.limit_micros is None:
-            return UNLIMITED_LEFT  # pure accumulator (e.g. run-total) — never trips
-        return b.limit_micros - self._spent[(budget_id, segment_key, period)]
+            return UNLIMITED_LEFT
+        spent = self._read_spent(budget_id, segment_key, period)
+        return b.limit_micros - spent
 
     def inflight(self, segment_key: str) -> int:
+        if self._store is not None:
+            return self._store.ledger_inflight(segment_key)
         return self._inflight[segment_key]
 
     def velocity(self, run_id: str, m: int) -> float:

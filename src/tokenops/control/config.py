@@ -30,7 +30,7 @@ parameter raises at build time — never silently skipped.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from tokenops.control.engine import AgentControls, Governor
 from tokenops.control.ledger import Budget, Ledger, PriceFn
@@ -46,6 +46,10 @@ from tokenops.control.policies import (
     tool_fix,
     tool_output_cap,
 )
+
+
+if TYPE_CHECKING:
+    from tokenops.control.store import Store
 
 
 @dataclass
@@ -109,14 +113,18 @@ def build_governor(
     config: Mapping[str, Any],
     price: PriceFn,
     controls: AgentControls | None = None,
+    *,
+    store: Store | None = None,
 ) -> Governor:
     """Build a fully-registered Governor (and its Ledger, on ``governor.ledger``) from a
     declarative governance config. ``config`` is the ``governance:`` block (or a mapping
-    that contains ``budgets`` / ``policies``)."""
+    that contains ``budgets`` / ``policies``).
+
+    Pass ``store`` to share spend, inflight, and halt state across A2A agent processes."""
     gov_cfg = config.get("governance", config)
     budgets = parse_budgets(gov_cfg.get("budgets"))
 
-    ledger = Ledger(budgets=list(budgets.values()), price=price)
+    ledger = Ledger(budgets=list(budgets.values()), price=price, store=store)
     governor = Governor(ledger, controls)
     ctx = _Ctx(budgets=budgets, price=price)
 

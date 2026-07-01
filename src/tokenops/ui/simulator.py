@@ -366,10 +366,10 @@ def run_simulation(
                             run_id=run_id,
                             agent="summarize",
                             status="running",
-                            parent_run=parent_span_id,
+                            parent_span=parent_span_id,
                             task=task,
                             started_at=time.time(),
-                            dims={**user_dims, "intent": intent},  # preserve segment dims across the REPLACE
+                            dims={**user_dims, "intent": intent},
                         )
                     )
 
@@ -486,7 +486,7 @@ def _make_trace_governor(
     store: Store, agent: str, log: _TraceLog, price
 ) -> _TraceGovernor:
     controls = _LoggingApplyControls(log, agent)
-    base = build_governor(store.governance_config_for(agent), price, controls)
+    base = build_governor(store.governance_config_for(agent), price, controls, store=store)
     gov = _TraceGovernor(base.ledger, controls, agent=agent, log=log)
     for det in base._detectors:
         gov.register(det, base._policy_by_name[det.name])

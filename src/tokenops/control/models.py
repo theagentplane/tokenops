@@ -81,6 +81,7 @@ class RunRecord:
     agent: str
     status: RunStatus = "running"
     parent_run: str | None = None
+    parent_span: str | None = None
     halt_reason: str | None = None
     detector: str | None = None
     cost_micros: int = 0

@@ -163,8 +163,16 @@ X-TokenOps-Run-Id: <run_id>
 Implemented in `a2a/server.py` (`register_run` when `store=` is passed to `create_a2a_app`).
 Research native server: `agents/research/native/server.py` task handler resolves only.
 
+## Cross-process ledger (spend + halt)
+
+A2A servers pass the shared ``Store`` into ``build_governor(..., store=store)``. Spend,
+inflight, and halt accumulators live in SQLite ``ledger_*`` tables so research and summarize
+enforce the same ``run_llm_cap`` on one ``run_id``. Step windows stay per-process.
+
+Research refuses to delegate when ``run_llm_cap`` headroom is exhausted.
+
 ## Out of scope (this doc)
 
 - Composite segment AND matchers → #5
-- Cross-process halt flag → #4
+- Distributed halt revocation / gateway tokens → future
 - **`corpus_profile`** — test-bench agent config under ``payload["bench"]`` only; not registration or attribution

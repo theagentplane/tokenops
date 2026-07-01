@@ -1,9 +1,9 @@
 """SQLite store — the shared backbone for admin config + run history.
 
 One ``tokenops.db`` is shared by four processes (research server, summarize server, the
-Admin UI, the Dashboard UI), so they must agree on policies and runs. SQLite (WAL) gives
-ACID + concurrent readers as a single inspectable, deletable file — no daemon, matching the
-ledger's "swap the dict for a store" note.
+Admin UI, the Dashboard UI), so they must agree on policies, runs, and **ledger
+accumulators** (spend, inflight, halt). SQLite (WAL) gives ACID + concurrent readers as a
+single inspectable, deletable file — no daemon.
 
 The key method is :meth:`Store.governance_config_for`, which assembles exactly the dict
 ``control.config.build_governor`` already consumes — so the store drops in for static YAML
@@ -56,6 +56,22 @@ CREATE TABLE IF NOT EXISTS run_registrations (
   user_dims TEXT NOT NULL DEFAULT '{}',
   registered_at REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS ledger_spent (
+  budget_id TEXT NOT NULL,
+  segment_key TEXT NOT NULL,
+  period TEXT NOT NULL DEFAULT 'lifetime',
+  spent_micros INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (budget_id, segment_key, period)
+);
+CREATE TABLE IF NOT EXISTS ledger_inflight (
+  segment_key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS ledger_halt (
+  run_id TEXT PRIMARY KEY,
+  halted INTEGER NOT NULL DEFAULT 0,
+  halt_reason TEXT
+);
 """
 
 
@@ -81,6 +97,8 @@ class Store:
         cols = {row[1] for row in self._db.execute("PRAGMA table_info(runs)")}
         if "dims" not in cols:
             self._db.execute("ALTER TABLE runs ADD COLUMN dims TEXT NOT NULL DEFAULT '{}'")
+        if "parent_span" not in cols:
+            self._db.execute("ALTER TABLE runs ADD COLUMN parent_span TEXT")
 
     def close(self) -> None:
         self._db.close()
@@ -165,8 +183,11 @@ class Store:
         return self._apply_governance_yaml(governance)
 
     def clear_all(self) -> None:
-        """Delete every row (runs, registrations, governance). Schema is preserved."""
-        for table in ("runs", "run_registrations", "policy_instances", "budgets", "segments"):
+        """Delete every row (runs, registrations, governance, ledger). Schema is preserved."""
+        for table in (
+            "runs", "run_registrations", "policy_instances", "budgets", "segments",
+            "ledger_spent", "ledger_inflight", "ledger_halt",
+        ):
             self._db.execute(f"DELETE FROM {table}")
         self._db.commit()
 
@@ -270,11 +291,12 @@ class Store:
         if not rec.started_at:
             rec.started_at = time.time()
         self._db.execute(
-            "REPLACE INTO runs(run_id, agent, status, parent_run, halt_reason, detector, "
+            "REPLACE INTO runs(run_id, agent, status, parent_run, parent_span, halt_reason, detector, "
             "cost_micros, steps, started_at, ended_at, task, dims) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (rec.run_id, rec.agent, rec.status, rec.parent_run, rec.halt_reason, rec.detector,
-             rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task, json.dumps(rec.dims)),
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (rec.run_id, rec.agent, rec.status, rec.parent_run, rec.parent_span, rec.halt_reason,
+             rec.detector, rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task,
+             json.dumps(rec.dims)),
         )
         self._db.commit()
         return rec
@@ -304,6 +326,93 @@ class Store:
         for r in self.list_runs(limit=limit):
             keys.update(r.dims.keys())
         return sorted(keys)
+
+    # ---- shared ledger (cross-process spend / inflight / halt) ------------ #
+
+    def ledger_add_spent(
+        self, budget_id: str, segment_key: str, period: str, delta: int,
+    ) -> int:
+        """Atomically increment a budget accumulator; return the new total."""
+        self._db.execute(
+            "INSERT INTO ledger_spent(budget_id, segment_key, period, spent_micros) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(budget_id, segment_key, period) "
+            "DO UPDATE SET spent_micros = spent_micros + excluded.spent_micros",
+            (budget_id, segment_key, period, delta),
+        )
+        row = self._db.execute(
+            "SELECT spent_micros FROM ledger_spent "
+            "WHERE budget_id=? AND segment_key=? AND period=?",
+            (budget_id, segment_key, period),
+        ).fetchone()
+        self._db.commit()
+        return int(row[0]) if row else 0
+
+    def ledger_get_spent(self, budget_id: str, segment_key: str, period: str) -> int:
+        row = self._db.execute(
+            "SELECT spent_micros FROM ledger_spent "
+            "WHERE budget_id=? AND segment_key=? AND period=?",
+            (budget_id, segment_key, period),
+        ).fetchone()
+        return int(row[0]) if row else 0
+
+    def ledger_admit(self, segment_key: str) -> int:
+        self._db.execute(
+            "INSERT INTO ledger_inflight(segment_key, count) VALUES (?, 1) "
+            "ON CONFLICT(segment_key) DO UPDATE SET count = count + 1",
+            (segment_key,),
+        )
+        row = self._db.execute(
+            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+        ).fetchone()
+        self._db.commit()
+        return int(row[0]) if row else 0
+
+    def ledger_complete(self, segment_key: str) -> int:
+        self._db.execute(
+            "UPDATE ledger_inflight SET count = MAX(0, count - 1) WHERE segment_key=?",
+            (segment_key,),
+        )
+        row = self._db.execute(
+            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+        ).fetchone()
+        self._db.commit()
+        return int(row[0]) if row else 0
+
+    def ledger_inflight(self, segment_key: str) -> int:
+        row = self._db.execute(
+            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+        ).fetchone()
+        return int(row[0]) if row else 0
+
+    def ledger_mark_halted(self, run_id: str, reason: str = "") -> None:
+        self._db.execute(
+            "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 1, ?) "
+            "ON CONFLICT(run_id) DO UPDATE SET halted=1, "
+            "halt_reason=COALESCE(excluded.halt_reason, ledger_halt.halt_reason)",
+            (run_id, reason or None),
+        )
+        self._db.commit()
+
+    def ledger_is_halted(self, run_id: str) -> bool:
+        row = self._db.execute(
+            "SELECT halted FROM ledger_halt WHERE run_id=?", (run_id,),
+        ).fetchone()
+        return bool(row and row[0])
+
+    def ledger_halt_reason(self, run_id: str) -> str | None:
+        row = self._db.execute(
+            "SELECT halt_reason FROM ledger_halt WHERE run_id=?", (run_id,),
+        ).fetchone()
+        return row[0] if row else None
+
+    def ledger_clear_halt(self, run_id: str) -> None:
+        self._db.execute(
+            "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 0, NULL) "
+            "ON CONFLICT(run_id) DO UPDATE SET halted=0, halt_reason=NULL",
+            (run_id,),
+        )
+        self._db.commit()
 
 
 # ---- row -> model ---------------------------------------------------------- #
@@ -341,7 +450,12 @@ def _policy(r: sqlite3.Row) -> PolicyInstance:
 
 def _run(r: sqlite3.Row) -> RunRecord:
     dims = json.loads((r["dims"] if "dims" in r.keys() else None) or "{}")
-    return RunRecord(run_id=r["run_id"], agent=r["agent"], status=r["status"],
-                     parent_run=r["parent_run"], halt_reason=r["halt_reason"], detector=r["detector"],
-                     cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
-                     ended_at=r["ended_at"], task=r["task"], dims=dims)
+    keys = r.keys()
+    return RunRecord(
+        run_id=r["run_id"], agent=r["agent"], status=r["status"],
+        parent_run=r["parent_run"],
+        parent_span=r["parent_span"] if "parent_span" in keys else None,
+        halt_reason=r["halt_reason"], detector=r["detector"],
+        cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
+        ended_at=r["ended_at"], task=r["task"], dims=dims,
+    )

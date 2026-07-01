@@ -86,9 +86,14 @@ POST /v1/tasks  +  X-TokenOps-Run-Id
   └─ store.update_run(status, halt_reason, cost_micros, steps)
 ```
 
-The **Ledger** is per-process in-run state; **SQLite** is cross-process (config + run history).
-Registration dims flow into `Attribution.tags` but seeded budgets use `dimension: run` only
-(see issue #8 for user/tag scoping).
+The **Ledger** splits state by lifetime:
+
+| State | Scope | Backend |
+|---|---|---|
+| Spend, inflight, halt | Cross-process (same `run_id`) | SQLite `ledger_*` tables in `tokenops.db` |
+| Step window, local step count | Per agent process | In-memory `RunState` |
+
+SQLite also holds config + run history. Pass `store=` into `build_governor(...)` so A2A servers share accumulators.
 
 ## DB maintenance
 
