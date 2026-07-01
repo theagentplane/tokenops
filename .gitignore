@@ -1,0 +1,35 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+benchmarking/**/.venv/
+benchmarking/**/vendor/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local config / UI output
+saved-config.yaml
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# TokenOps runtime store
+*.db
+*.db-wal
+*.db-shm

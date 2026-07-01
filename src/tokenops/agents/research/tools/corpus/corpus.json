@@ -1,0 +1,22 @@
+{
+  "pricing": {
+    "snippet": "Acme Analytics publishes list pricing at $49/user/month (Starter) and $99/user/month (Growth). Enterprise is custom; the pricing page notes a 20% annual discount and volume breaks starting at 100 seats. A cached snapshot from last week also listed a $39 promotional tier for startups under 10 employees.",
+    "completeness": 0.91
+  },
+  "enterprise pricing": {
+    "snippet": "Enterprise tier includes SSO, audit logs, and dedicated support. Public docs say 'contact sales' but a G2 review thread quotes $120–$150/seat for 200+ seats. Competitor PriceGrid lists Acme Enterprise at ~$8k/month minimum commit.",
+    "completeness": 0.87
+  },
+  "competitor pricing": {
+    "snippet": "PeerSet ($39–$79/seat), DataLoop ($55 flat + usage), and MetricHub ($129 enterprise) are the closest comps. Analyst note: Acme's Growth tier undercuts MetricHub on per-seat cost but lacks native data residency add-ons.",
+    "completeness": 0.84
+  },
+  "saas pricing trends": {
+    "snippet": "2024–2025 B2B SaaS benchmarks show median list price rising 8% YoY; usage-based hybrid models now represent ~35% of new SKUs. Seat-based pricing still dominates analytics verticals.",
+    "completeness": 0.78
+  },
+  "default": {
+    "snippet": "Broad market scan returned mixed fragments on subscription models, discounting, and packaging. Consider narrowing the query to a specific vendor or pricing dimension (per-seat, usage, platform fee).",
+    "completeness": 0.62
+  }
+}

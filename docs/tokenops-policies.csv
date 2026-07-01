@@ -1,0 +1,15 @@
+Policy,Short Definition,Signal Type,Tier,Fires When (Calculation),Action,Hook,Defined In,Defaults,Default On
+loop_redirect,"Same valid tool call repeating; break the loop by injecting guidance",Structural,Optimize,"count(e in recent(run,W): e.sig == sig) >= K",REDIRECT,observe,policy config,"W=5, K=3",Yes
+tool_schema_guard,"Invalid or malformed tool call; return a synthetic error so the agent self-corrects",Structural,Optimize,"tool not in registry OR args fail tool schema",INJECT_ERROR,pre_call,policy config,"",Recommended
+context_bloat,"Context window swelling over a long run; compress or summarize history",Structural,Optimize,"input_tokens(call) >= ctx_max OR rising over recent(run,W)",COMPRESS / SUMMARIZE,pre_call,policy config,"ctx_max=50000",Optional
+spend_velocity,"Cost rising too fast per step; slow or cheapen before it spikes",Structural,Notify / Optimize,"(cost(run) - cost M events ago) / M > slope",NOTIFY / DOWNGRADE / THROTTLE,observe,policy config,"M=5",Recommended
+model_guard,"Agent using a pricier model than its tier allows; route to the permitted one",Structural,Optimize,"priceTier(request.model) > allowedTier(segment)",DOWNGRADE,pre_call,policy config,"",Optional
+cache_serve,"Request near-duplicate of a cached one; serve the cached answer",Structural,Optimize,"max similarity(request, cache) >= tau",CACHE_SERVE,pre_call,policy config,"tau=0.95",Optional
+budget_tiers,"Spend crossing budget thresholds; warn, then steer before the cap",Structural,Notify / Optimize,"cost(run)/budget >= 0.70 (notify); >= 0.90 (steer)",NOTIFY / THROTTLE / DOWNGRADE,observe,policy config,"0.70, 0.90",Recommended
+cache_health,"Cache hit rate collapsing (silent cost leak); alert a human",Structural,Notify,"cacheHit(run,W) < floor",NOTIFY,observe,policy config,"W=10, floor=0.30",Optional
+no_progress,"Run not improving over time; pause for review (stuck, not looping)",Structural,Escalate,"completeness gain over last N events <= epsilon",PAUSE / NOTIFY,tick / observe,policy config,"N=5",Optional
+hitl_approval,"Spend crosses a money line; pause for explicit human approval",Structural,Escalate,"cost(run) >= money_line (actual or projected)",PAUSE,observe / pre_call,policy config,"money_line per deployment",Optional
+semantic_guard,"Output or args drift unsafe or off-topic; roll back or pause (optional, off hot path)",Semantic (classifier),Escalate,"risk_score(output or args) >= threshold",ROLLBACK / PAUSE,off-path / async,guardrail config,"threshold tuned, off hot path",Optional
+cost_budget,"Spend reaches the budget; stop the run",Structural,Halt (breaker),"cost(run) >= budget",HALT,observe,breaker config,"budget per segment",Yes
+step_cap,"Step count reaches the max; stop a runaway loop",Structural,Halt (breaker),"steps(run) >= max_steps",HALT,observe,breaker config,"max_steps=20",Yes
+pre_call_worst_case,"Worst-case next call would breach budget; stop before any spend",Structural,Halt (breaker),"cost(run) + price(est_in) + price(max_out) >= budget",HALT,pre_call,breaker config,"",Yes
