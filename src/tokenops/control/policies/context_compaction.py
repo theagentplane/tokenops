@@ -68,7 +68,7 @@ class ContextCompactionPolicy(Policy):
             return Action(kind=ActionKind.ALLOW, run_id=signal.run_id,
                           reason=f"{signal.reason} (no assembly hook — telemetry only)")
         return Action(
-            kind=ActionKind.MUTATE, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.MUTATE, run_id=signal.run_id, reason=signal.reason, compact=True,
             inject_message="COMPACT: move volatile values below the static prefix, dedup tool "
                            "outputs by hash, summarize filler; pin system/schema/constraints/state.",
         )

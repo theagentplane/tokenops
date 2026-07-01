@@ -51,6 +51,6 @@ HALT: a bloated prompt or a lost cache discount is a cost issue, not a safety st
 
 ## Status
 
-✅ implemented, ✅ tested (unit). The actual prompt rewrite (and the `inject_message` →
-`directive` field rename noted in `controls.md`) lands with the provider/assembly hook in
-Phase 5.
+✅ implemented, ✅ tested (unit + e2e). The deep prompt rewrite is **live**: `Action.compact`
+→ `wrap_complete` rewrites the outgoing messages (dedup non-system, pin system) before
+dispatch — no longer just a carry directive.

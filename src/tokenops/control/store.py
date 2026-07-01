@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS runs (
   parent_run TEXT, halt_reason TEXT, detector TEXT,
   cost_micros INTEGER NOT NULL DEFAULT 0, steps INTEGER NOT NULL DEFAULT 0,
   started_at REAL NOT NULL DEFAULT 0, ended_at REAL,
-  task TEXT
+  task TEXT, dims TEXT NOT NULL DEFAULT '{}'
 );
 CREATE TABLE IF NOT EXISTS run_registrations (
   run_id TEXT PRIMARY KEY,
@@ -71,9 +71,16 @@ class Store:
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA foreign_keys=ON")
         self._db.executescript(_SCHEMA)
+        self._migrate()
         self._db.commit()
         if auto_seed:
             self.seed_default_governance_if_empty()
+
+    def _migrate(self) -> None:
+        # Additive migrations for pre-existing databases.
+        cols = {row[1] for row in self._db.execute("PRAGMA table_info(runs)")}
+        if "dims" not in cols:
+            self._db.execute("ALTER TABLE runs ADD COLUMN dims TEXT NOT NULL DEFAULT '{}'")
 
     def close(self) -> None:
         self._db.close()
@@ -264,10 +271,10 @@ class Store:
             rec.started_at = time.time()
         self._db.execute(
             "REPLACE INTO runs(run_id, agent, status, parent_run, halt_reason, detector, "
-            "cost_micros, steps, started_at, ended_at, task) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "cost_micros, steps, started_at, ended_at, task, dims) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (rec.run_id, rec.agent, rec.status, rec.parent_run, rec.halt_reason, rec.detector,
-             rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task),
+             rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task, json.dumps(rec.dims)),
         )
         self._db.commit()
         return rec
@@ -289,6 +296,14 @@ class Store:
             sql += " WHERE status IN ('halted','throttled','error')"
         sql += " ORDER BY started_at DESC LIMIT ?"
         return [_run(r) for r in self._db.execute(sql, (limit,))]
+
+    def run_tag_keys(self, *, limit: int = 500) -> list[str]:
+        """Distinct segment-tag keys seen across recent runs — the choices a dashboard can
+        group runs by (in addition to ``agent``)."""
+        keys: set[str] = set()
+        for r in self.list_runs(limit=limit):
+            keys.update(r.dims.keys())
+        return sorted(keys)
 
 
 # ---- row -> model ---------------------------------------------------------- #
@@ -325,7 +340,8 @@ def _policy(r: sqlite3.Row) -> PolicyInstance:
 
 
 def _run(r: sqlite3.Row) -> RunRecord:
+    dims = json.loads((r["dims"] if "dims" in r.keys() else None) or "{}")
     return RunRecord(run_id=r["run_id"], agent=r["agent"], status=r["status"],
                      parent_run=r["parent_run"], halt_reason=r["halt_reason"], detector=r["detector"],
                      cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
-                     ended_at=r["ended_at"], task=r["task"])
+                     ended_at=r["ended_at"], task=r["task"], dims=dims)

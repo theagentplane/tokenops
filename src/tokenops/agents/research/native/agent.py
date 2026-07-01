@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from typing import Callable
+
+from tokenops.control.context import current_governance
 
 from tokenops.agents.research import prompts
 from tokenops.agents.research.tools import core
@@ -96,6 +99,15 @@ class NativeResearchAgent:
 
             query = str(decision.get("query", task))
             result = search_fn(query)
+            # deep INJECT: a tool policy (tool_output_cap / tool_fix) decided during the tool
+            # crossing's observe may substitute the result fed into context.
+            gov_ctx = current_governance()
+            if gov_ctx is not None:
+                _controls = getattr(gov_ctx.governor, "controls", None)
+                _take = getattr(_controls, "take_tool_result", None)
+                _override = _take() if _take else None
+                if _override:
+                    result = replace(result, snippet=_override)
             entry = {
                 "query": result.query,
                 "snippet": result.snippet,

@@ -178,7 +178,7 @@ class _TraceGovernor(Governor):
 
 
 def _demo_research_complete(call_n: list[int]):
-    def complete(provider, model, messages, max_output_tokens=None):
+    def complete(provider, model, messages, max_output_tokens=None, **kwargs):
         call_n[0] += 1
         if call_n[0] == 1:
             content = '{"action": "search", "query": "enterprise SaaS pricing"}'
@@ -192,7 +192,7 @@ def _demo_research_complete(call_n: list[int]):
 
 
 def _demo_summarize_complete(_call_n: list[int]):
-    def complete(provider, model, messages, max_output_tokens=None):
+    def complete(provider, model, messages, max_output_tokens=None, **kwargs):
         _call_n[0] += 1
         return ModelResponse(
             content="Enterprise SaaS pricing typically uses per-seat tiers with annual contracts. "
@@ -280,7 +280,8 @@ def run_simulation(
 
     research_gov.ledger.open_run(run_id)
     store.create_run(
-        RunRecord(run_id=run_id, agent="research", status="running", task=task, started_at=time.time())
+        RunRecord(run_id=run_id, agent="research", status="running", task=task,
+                  started_at=time.time(), dims={**user_dims, "intent": intent})
     )
 
     attr_research = build_attribution(reg, service="research")
@@ -368,6 +369,7 @@ def run_simulation(
                             parent_run=parent_span_id,
                             task=task,
                             started_at=time.time(),
+                            dims={**user_dims, "intent": intent},  # preserve segment dims across the REPLACE
                         )
                     )
 

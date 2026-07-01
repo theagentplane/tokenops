@@ -47,6 +47,11 @@ class ToolOutputCapDetector(Detector):
         if step.node_type != "tool":
             return None
         est = est_tokens(step.output)
+        # the boundary projection truncates the stored payload, so trust the reported true
+        # size (size_chars) when present — otherwise a huge result hides behind the truncation.
+        size_chars = step.output.get("size_chars") if isinstance(step.output, dict) else None
+        if size_chars:
+            est = max(est, int(size_chars / 2.8))
         if est >= self.cap_tokens:
             count = len(step.output) if isinstance(step.output, (list, dict)) else None
             return Signal(
@@ -70,6 +75,7 @@ class ToolOutputCapPolicy(Policy):
         ev = signal.evidence
         return Action(
             kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            replace_tool_result=True,  # deep: substitute the oversized payload with the descriptor
             inject_message=(
                 f"TOOL OUTPUT OFFLOADED: ~{ev['est_tokens']} tokens, count={ev['count']}, "
                 f"handle={ev['handle']}. Paginate or filter via the handle instead of "

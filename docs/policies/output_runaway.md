@@ -57,6 +57,7 @@ the hard stop if the degeneration also burns budget or steps.
 
 ## Status
 
-✅ implemented, ✅ tested (unit). RETRY/INJECT detection + decisions done; CANCEL (true
-stream tear-down) and the retry param application land with the streaming provider wrap
-(Phase 5).
+✅ implemented, ✅ tested (unit + e2e). RETRY is **live** (bounded loop in `wrap_complete`:
+re-issue with tighter cap + raised frequency/presence penalties). CANCEL is **built + tested**
+via `wrap_stream` + `providers.stream_chat` (mid-stream `generator.close()`); it fires once the
+server uses the streaming wrap.
