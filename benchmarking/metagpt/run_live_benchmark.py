@@ -29,11 +29,11 @@ from benchmarking.metagpt.integration import (  # noqa: E402
     run_ungoverned,
 )
 from benchmarking.metagpt.scenarios_live import (  # noqa: E402
-    POLICY_SUITE,
-    STEER_SUITE,
-    STRESS_SUITE,
+    ALL_SUITE,
+    SUITE_BY_NAME,
     LiveScenario,
     get_scenario,
+    governance_preset_for,
 )
 
 COOLDOWN_BETWEEN_ARMS_SEC = 90
@@ -260,6 +260,71 @@ def _format_summary(
     return "\n".join(lines)
 
 
+async def _run_single_trial(
+    trial: int,
+    *,
+    order: list[CompareMode],
+    scenario: LiveScenario,
+    limit_micros: int,
+    cooldown_sec: int,
+    json_mode: bool,
+) -> tuple[dict[CompareMode, LiveTrial], object | None]:
+    out: dict[CompareMode, LiveTrial] = {}
+    last_tokenops_metrics = None
+    for i, mode in enumerate(order):
+        if i > 0 and cooldown_sec > 0:
+            _progress(
+                f"\n… cooldown {cooldown_sec}s before {mode.value} (trial {trial}) …",
+                json_mode=json_mode,
+            )
+            await asyncio.sleep(cooldown_sec)
+        try:
+            res = await _run_trial(
+                mode,
+                scenario=scenario,
+                limit_micros=limit_micros,
+                trial=trial,
+                json_mode=json_mode,
+            )
+            live = _trial_from_result(
+                res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
+            )
+            live.trial = trial
+            out[mode] = live
+            if mode is CompareMode.TOKENOPS:
+                last_tokenops_metrics = res.metrics
+            m = res.metrics
+            if m:
+                cap = limit_micros / 1_000_000
+                budget_note = (
+                    f"ref cap ${cap:.3f}"
+                    if mode is CompareMode.UNGOVERNED
+                    else f"cap ${cap:.3f} ({'under' if m.spend_micros <= limit_micros and not m.halted else 'over/halted'})"
+                )
+                _progress(
+                    f"  spend ${m.spend_micros / 1_000_000:.4f} ({budget_note})  "
+                    f"rounds {m.react_rounds}  success={res.success}  "
+                    f"halted={m.halted}  signals={list(m.policy_signals)}",
+                    json_mode=json_mode,
+                )
+                if m.halt_reason or res.error:
+                    _progress(f"  halt/error: {m.halt_reason or res.error}", json_mode=json_mode)
+        except Exception as exc:
+            print(f"  run failed (trial {trial}): {exc}", file=sys.stderr)
+            out[mode] = LiveTrial(
+                trial=trial,
+                mode=mode,
+                outcome=RunOutcome(
+                    scenario_id=scenario.id,
+                    success=False,
+                    spend_micros=0,
+                    steps=0,
+                    halt_reason=str(exc),
+                ),
+            )
+    return out, last_tokenops_metrics
+
+
 async def _run_scenario_ab(
     scenario: LiveScenario,
     *,
@@ -268,6 +333,7 @@ async def _run_scenario_ab(
     mode_only: str | None,
     cooldown_sec: int,
     json_mode: bool = False,
+    parallel_batch: int = 1,
 ) -> ScenarioResult:
     limit_micros = int(limit_usd * 1_000_000)
     summaries = {
@@ -277,57 +343,46 @@ async def _run_scenario_ab(
     order = [CompareMode(mode_only)] if mode_only else [CompareMode.UNGOVERNED, CompareMode.TOKENOPS]
     last_tokenops_metrics = None
 
-    for trial in range(1, trials + 1):
-        for i, mode in enumerate(order):
-            if i > 0 and cooldown_sec > 0:
-                _progress(f"\n… cooldown {cooldown_sec}s before {mode.value} …", json_mode=json_mode)
-                await asyncio.sleep(cooldown_sec)
-            try:
-                res = await _run_trial(
-                    mode,
-                    scenario=scenario,
-                    limit_micros=limit_micros,
-                    trial=trial,
-                    json_mode=json_mode,
-                )
-                live = _trial_from_result(
-                    res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
-                )
-                live.trial = trial
-                summaries[mode].trials.append(live)
-                if mode is CompareMode.TOKENOPS:
-                    last_tokenops_metrics = res.metrics
-                m = res.metrics
-                if m:
-                    cap = limit_micros / 1_000_000
-                    budget_note = (
-                        f"ref cap ${cap:.3f}"
-                        if mode is CompareMode.UNGOVERNED
-                        else f"cap ${cap:.3f} ({'under' if m.spend_micros <= limit_micros and not m.halted else 'over/halted'})"
-                    )
-                    _progress(
-                        f"  spend ${m.spend_micros / 1_000_000:.4f} ({budget_note})  "
-                        f"rounds {m.react_rounds}  success={res.success}  "
-                        f"halted={m.halted}  signals={list(m.policy_signals)}",
+    batch_size = max(1, parallel_batch) if not mode_only else 1
+    trial_nums = list(range(1, trials + 1))
+    for start in range(0, len(trial_nums), batch_size):
+        batch = trial_nums[start : start + batch_size]
+        if len(batch) > 1:
+            _progress(f"\n=== parallel batch trials {batch} ===", json_mode=json_mode)
+            batch_out = await asyncio.gather(
+                *[
+                    _run_single_trial(
+                        t,
+                        order=order,
+                        scenario=scenario,
+                        limit_micros=limit_micros,
+                        cooldown_sec=cooldown_sec,
                         json_mode=json_mode,
                     )
-                    if m.halt_reason or res.error:
-                        _progress(f"  halt/error: {m.halt_reason or res.error}", json_mode=json_mode)
-            except Exception as exc:
-                print(f"  run failed: {exc}", file=sys.stderr)
-                summaries[mode].trials.append(
-                    LiveTrial(
-                        trial=trial,
-                        mode=mode,
-                        outcome=RunOutcome(
-                            scenario_id=scenario.id,
-                            success=False,
-                            spend_micros=0,
-                            steps=0,
-                            halt_reason=str(exc),
-                        ),
-                    )
-                )
+                    for t in batch
+                ]
+            )
+            for trial_out, metrics in batch_out:
+                for mode, live in trial_out.items():
+                    summaries[mode].trials.append(live)
+                if metrics is not None:
+                    last_tokenops_metrics = metrics
+        else:
+            trial_out, metrics = await _run_single_trial(
+                batch[0],
+                order=order,
+                scenario=scenario,
+                limit_micros=limit_micros,
+                cooldown_sec=cooldown_sec,
+                json_mode=json_mode,
+            )
+            for mode, live in trial_out.items():
+                summaries[mode].trials.append(live)
+            if metrics is not None:
+                last_tokenops_metrics = metrics
+
+    for summary in summaries.values():
+        summary.trials.sort(key=lambda t: t.trial)
 
     eval_dict = None
     if not mode_only and summaries[CompareMode.UNGOVERNED].trials and summaries[CompareMode.TOKENOPS].trials:
@@ -351,31 +406,37 @@ async def _run_scenario_ab(
 async def async_main() -> int:
     load_env()
     bootstrap_metagpt_from_env()
-    scenario_names = list(dict.fromkeys([*POLICY_SUITE, *STRESS_SUITE, *STEER_SUITE]))
+    scenario_names = list(ALL_SUITE)
+    suite_choices = list(SUITE_BY_NAME)
+    legacy = {
+        "policy_suite": "fair_suite",
+        "stress_suite": "trap_suite",
+        "steer_suite": "cap_suite",
+        "showcase_suite": "showcase_suite",
+    }
     parser = argparse.ArgumentParser(description="Live MetaGPT: vanilla vs TokenOps")
     parser.add_argument(
         "--scenario",
-        choices=[*scenario_names, "all", "policy_suite", "stress_suite", "steer_suite", "showcase_suite"],
-        default="policy_suite",
-        help="Task preset (default: policy_suite; steer_suite = cost_guard/model_routing)",
+        choices=[*scenario_names, *suite_choices, *legacy],
+        default="fair_suite",
+        help="Scenario id or suite (fair, trap, cap, showcase)",
     )
     parser.add_argument("--limit-usd", type=float, default=None)
     parser.add_argument("--trials", type=int, default=1)
+    parser.add_argument(
+        "--parallel-batch",
+        type=int,
+        default=1,
+        help="Run up to N trials concurrently (default 1 = sequential)",
+    )
     parser.add_argument("--mode-only", choices=["ungoverned", "tokenops"], default=None)
     parser.add_argument("--cooldown-sec", type=int, default=COOLDOWN_BETWEEN_ARMS_SEC)
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
 
-    if args.scenario == "all":
-        ids = scenario_names
-    elif args.scenario == "policy_suite":
-        ids = list(POLICY_SUITE)
-    elif args.scenario == "stress_suite":
-        ids = list(STRESS_SUITE)
-    elif args.scenario == "steer_suite":
-        ids = list(STEER_SUITE)
-    elif args.scenario == "showcase_suite":
-        ids = list(STRESS_SUITE + STEER_SUITE)
+    suite_key = legacy.get(args.scenario, args.scenario)
+    if suite_key in SUITE_BY_NAME:
+        ids = list(SUITE_BY_NAME[suite_key])
     else:
         ids = [args.scenario]
 
@@ -391,6 +452,7 @@ async def async_main() -> int:
                 mode_only=args.mode_only,
                 cooldown_sec=args.cooldown_sec if not args.mode_only else 0,
                 json_mode=args.as_json,
+                parallel_batch=args.parallel_batch,
             )
         )
 

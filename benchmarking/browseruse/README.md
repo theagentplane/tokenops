@@ -45,7 +45,7 @@ INJECT text is appended as the last user turn via `tokenops.control.consume_carr
 | `fair_suite` | `example_tight_cap`, `books_loop_trap` | Normal tasks — parity check |
 | `trap_suite` | `example_verify_trap`, `books_verify_trap` | Prompt forces useless reloads |
 | `cap_suite` | `books_pagination_stress`, `books_cost_guard` | Long work, tight cap |
-| `showcase_suite` | `books_verify_trap`, `books_pagination_stress` | Best demo candidates |
+| `showcase_suite` | `books_verify_trap` | Best demo candidate (`books_pagination_stress` stays in `cap_suite` only) |
 
 **Not in standard suites** (dev only): `flight_sfo_india`, `books_tool_fix`, `books_huge_eval`, `example_tool_output_cap`.
 
@@ -63,7 +63,8 @@ Vanilla often obeys and overspends. TokenOps should catch repetition and finish 
 Two **different task shapes**, not two “policy demos”:
 
 1. **`books_verify_trap`** — reload loop under a very tight cap ($0.034)
-2. **`books_pagination_stress`** — paginate catalogue page-by-page under cap ($0.10)
+
+(`books_pagination_stress` remains in `cap_suite` only — skipped from showcase after repeated local crashes.)
 
 Run multiple trials (`--trials 5` or `run_trials_sweep.py`). Pick results where `showcase_pass` is true for slides — do not assume every iteration wins.
 

@@ -56,10 +56,10 @@ python benchmarking/browseruse/run_live_benchmark.py --scenario books_verify_tra
 python benchmarking/run_all.py --scenario showcase_suite --cooldown-sec 60
 ```
 
-**Multi-trial sweep** (N=1,5,10):
+**Multi-trial sweep** (default N=1,3,5):
 
 ```bash
-python benchmarking/run_trials_sweep.py --framework browseruse --scenario books_verify_trap --trial-counts 1,5,10
+python benchmarking/run_trials_sweep.py --suite showcase_suite --framework both --cooldown-sec 60
 ```
 
 Use `--cooldown-sec 60`–`120` between arms to reduce rate limits. Vanilla runs first, then TokenOps.

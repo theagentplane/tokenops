@@ -196,7 +196,7 @@ TRAP_SUITE: tuple[str, ...] = ("example_verify_trap", "books_verify_trap")
 CAP_SUITE: tuple[str, ...] = ("books_pagination_stress", "books_cost_guard")
 
 # Hand-picked demo scenarios (slide-safe at N≥5)
-SHOWCASE_SUITE: tuple[str, ...] = ("books_verify_trap", "books_pagination_stress")
+SHOWCASE_SUITE: tuple[str, ...] = ("books_verify_trap",)
 
 SKIP_SUITE: tuple[str, ...] = (
     "flight_sfo_india",

@@ -368,6 +368,57 @@ def _format_summary(
     return "\n".join(lines)
 
 
+async def _run_single_trial(
+    trial: int,
+    *,
+    order: list[CompareMode],
+    scenario: LiveScenario,
+    limit_micros: int,
+    max_steps: int,
+    cooldown_sec: int,
+) -> dict[CompareMode, LiveTrial]:
+    out: dict[CompareMode, LiveTrial] = {}
+    for i, mode in enumerate(order):
+        if i > 0 and cooldown_sec > 0:
+            print(f"\n… cooldown {cooldown_sec}s before {mode.value} (trial {trial}) …", flush=True)
+            await asyncio.sleep(cooldown_sec)
+        try:
+            res = await _run_trial(
+                mode,
+                scenario=scenario,
+                limit_micros=limit_micros,
+                max_steps=max_steps,
+                trial=trial,
+            )
+            live = _trial_from_result(
+                res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
+            )
+            live.trial = trial
+            out[mode] = live
+        except Exception as exc:
+            print(f"  run failed (trial {trial}): {exc}", file=sys.stderr)
+            outcome = RunOutcome(
+                scenario_id=scenario.id,
+                success=False,
+                spend_micros=0,
+                steps=0,
+                halt_reason=str(exc),
+            )
+            out[mode] = LiveTrial(
+                trial=trial,
+                mode=mode,
+                outcome=outcome,
+                status=classify_trial(
+                    success=False,
+                    spend_micros=0,
+                    steps=0,
+                    halt_reason=str(exc),
+                    halted=False,
+                ),
+            )
+    return out
+
+
 async def _run_scenario_ab(
     scenario: LiveScenario,
     *,
@@ -376,6 +427,7 @@ async def _run_scenario_ab(
     trials: int,
     mode_only: str | None,
     cooldown_sec: int,
+    parallel_batch: int = 1,
 ) -> ScenarioResult:
     limit_micros = int(limit_usd * 1_000_000)
     summaries: dict[CompareMode, LiveModeSummary] = {
@@ -388,47 +440,42 @@ async def _run_scenario_ab(
     else:
         order = [CompareMode.UNGOVERNED, CompareMode.TOKENOPS]
 
-    for trial in range(1, trials + 1):
-        for i, mode in enumerate(order):
-            if i > 0 and cooldown_sec > 0:
-                print(f"\n… cooldown {cooldown_sec}s before {mode.value} …", flush=True)
-                await asyncio.sleep(cooldown_sec)
-            try:
-                res = await _run_trial(
-                    mode,
-                    scenario=scenario,
-                    limit_micros=limit_micros,
-                    max_steps=max_steps,
-                    trial=trial,
-                )
-                live = _trial_from_result(
-                    res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
-                )
-                live.trial = trial
-                summaries[mode].trials.append(live)
-            except Exception as exc:
-                print(f"  run failed: {exc}", file=sys.stderr)
-                outcome = RunOutcome(
-                    scenario_id=scenario.id,
-                    success=False,
-                    spend_micros=0,
-                    steps=0,
-                    halt_reason=str(exc),
-                )
-                summaries[mode].trials.append(
-                    LiveTrial(
-                        trial=trial,
-                        mode=mode,
-                        outcome=outcome,
-                        status=classify_trial(
-                            success=False,
-                            spend_micros=0,
-                            steps=0,
-                            halt_reason=str(exc),
-                            halted=False,
-                        ),
+    batch_size = max(1, parallel_batch) if not mode_only else 1
+    trial_nums = list(range(1, trials + 1))
+    for start in range(0, len(trial_nums), batch_size):
+        batch = trial_nums[start : start + batch_size]
+        if len(batch) > 1:
+            print(f"\n=== parallel batch trials {batch} ===", flush=True)
+            batch_out = await asyncio.gather(
+                *[
+                    _run_single_trial(
+                        t,
+                        order=order,
+                        scenario=scenario,
+                        limit_micros=limit_micros,
+                        max_steps=max_steps,
+                        cooldown_sec=cooldown_sec,
                     )
-                )
+                    for t in batch
+                ]
+            )
+            for trial_out in batch_out:
+                for mode, live in trial_out.items():
+                    summaries[mode].trials.append(live)
+        else:
+            trial_out = await _run_single_trial(
+                batch[0],
+                order=order,
+                scenario=scenario,
+                limit_micros=limit_micros,
+                max_steps=max_steps,
+                cooldown_sec=cooldown_sec,
+            )
+            for mode, live in trial_out.items():
+                summaries[mode].trials.append(live)
+
+    for summary in summaries.values():
+        summary.trials.sort(key=lambda t: t.trial)
 
     return ScenarioResult(
         scenario=scenario,
@@ -457,6 +504,12 @@ async def async_main() -> int:
     parser.add_argument("--limit-usd", type=float, default=None, help="Override scenario cap")
     parser.add_argument("--max-steps", type=int, default=None, help="Override scenario steps")
     parser.add_argument("--trials", type=int, default=1)
+    parser.add_argument(
+        "--parallel-batch",
+        type=int,
+        default=1,
+        help="Run up to N trials concurrently (default 1 = sequential)",
+    )
     parser.add_argument("--task", default=None, help="Override task text (ignores scenario body)")
     parser.add_argument("--mode-only", choices=["ungoverned", "tokenops"], default=None)
     parser.add_argument("--cooldown-sec", type=int, default=COOLDOWN_BETWEEN_ARMS_SEC)
@@ -493,6 +546,7 @@ async def async_main() -> int:
                 trials=args.trials,
                 mode_only=args.mode_only,
                 cooldown_sec=args.cooldown_sec if not args.mode_only else 0,
+                parallel_batch=args.parallel_batch,
             )
         )
 
