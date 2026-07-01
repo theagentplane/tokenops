@@ -40,3 +40,28 @@ def tokenops_config_for_run(*, limit_micros: int, max_steps: int) -> dict[str, A
     """TokenOps stack for live runs — browser-use ``max_steps`` is the step limit."""
     del max_steps  # agent.run enforces; governor step_cap counts boundary crossings
     return tokenops_config(limit_micros=limit_micros)
+
+
+def tokenops_config_metagpt(*, limit_micros: int) -> dict[str, Any]:
+    """Backward-compatible alias — default MetaGPT steer preset."""
+    from benchmarking.metagpt.configs import tokenops_config_steering
+
+    return tokenops_config_steering(limit_micros=limit_micros)
+
+
+def tokenops_config_metagpt_steering(*, limit_micros: int) -> dict[str, Any]:
+    from benchmarking.metagpt.configs import tokenops_config_steering
+
+    return tokenops_config_steering(limit_micros=limit_micros)
+
+
+def tokenops_config_metagpt_routing(
+    *,
+    limit_micros: int,
+    downgrade_to: str = "gpt-4o-mini",
+    threshold: float = 0.55,
+) -> dict[str, Any]:
+    del threshold
+    from benchmarking.metagpt.configs import tokenops_config_model_routing
+
+    return tokenops_config_model_routing(limit_micros=limit_micros, downgrade_to=downgrade_to)
