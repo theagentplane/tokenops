@@ -28,7 +28,7 @@ from benchmarking.browseruse.session import (
     set_run_config,
     take_last_metrics,
 )
-from benchmarking.common.configs import circuit_breaker_config, tokenops_config
+from benchmarking.common.configs import circuit_breaker_config, tokenops_config, tokenops_config_for_run
 from benchmarking.common.harness import BenchmarkMode, DEFAULT_LIMIT_MICROS
 from benchmarking.common.live_pricing import build_live_price_book
 from benchmarking.common.pricing import benchmark_price
@@ -41,17 +41,19 @@ def _store_patch(obj: Any, attr: str, original: Any) -> None:
     _patches.append((obj, attr, original))
 
 
-def _governance_dict(mode: BenchmarkMode, limit_micros: int) -> dict:
+def _governance_dict(mode: BenchmarkMode, limit_micros: int, max_steps: int = 100) -> dict:
     if mode is BenchmarkMode.CIRCUIT_BREAKER:
         return circuit_breaker_config(limit_micros=limit_micros)
-    return tokenops_config(limit_micros=limit_micros)
+    return tokenops_config_for_run(limit_micros=limit_micros, max_steps=max_steps)
 
 
-def _build_active_run(config: RunConfig, *, task: str) -> ActiveRun:
+def _build_active_run(config: RunConfig, *, task: str, max_steps: int = 100) -> ActiveRun:
     run_id = config.run_id or f"bu-{uuid.uuid4().hex[:12]}"
     price = build_live_price_book() if config.live_pricing else benchmark_price
     controls = ApplyControls()
-    governor = build_governor(_governance_dict(config.mode, config.limit_micros), price, controls)
+    governor = build_governor(
+        _governance_dict(config.mode, config.limit_micros, max_steps), price, controls,
+    )
     reg = RunRegistration(run_id=run_id, intent="browseruse", user_dims={"user_id": config.user_id})
     span = SpanContext(span_id=f"span-{uuid.uuid4().hex[:8]}", service="browseruse")
     governor.ledger.open_run(run_id)
@@ -129,7 +131,7 @@ def install() -> None:
         if cfg is None:
             return await _orig_run(self, *args, **kwargs)
 
-        active = _build_active_run(cfg, task=getattr(self, "task", ""))
+        active = _build_active_run(cfg, task=getattr(self, "task", ""), max_steps=kwargs.get("max_steps", 100))
         fill_llm_ids(active, self)
         for llm in _agent_llms(self):
             wrap_ainvoke(llm)

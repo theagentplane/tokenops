@@ -24,10 +24,15 @@ from benchmarking.browseruse.integration import (  # noqa: E402
     run_governed,
     run_ungoverned,
 )
-from benchmarking.browseruse.scenarios_live import FLIGHT_SFO_INDIA  # noqa: E402
+from benchmarking.browseruse.scenarios_live import (  # noqa: E402
+    POLICY_SUITE,
+    LiveScenario,
+    get_scenario,
+)
 from benchmarking.common.harness import BenchmarkMode, CompareMode, RunOutcome  # noqa: E402
 
-LIVE_DEFAULT_LIMIT_USD = 1.00
+LIVE_DEFAULT_LIMIT_USD = 0.50
+COOLDOWN_BETWEEN_ARMS_SEC = 90
 
 
 @dataclass
@@ -75,6 +80,13 @@ class LiveModeSummary:
     @property
     def success_within_budget_count(self) -> int:
         return sum(1 for t in self.trials if t.success_within_budget)
+
+
+@dataclass
+class ScenarioResult:
+    scenario: LiveScenario
+    ungoverned: LiveModeSummary
+    tokenops: LiveModeSummary
 
 
 def _pick_llm():
@@ -132,7 +144,7 @@ def _trial_from_result(
         success = bool(m.agent_success)
         halted = False
     else:
-        spend = m.spend_micros
+        spend = m.spend_micros or int(round(usage.get("browser_cost_usd", 0.0) * 1_000_000))
         success = result.success and not m.halted
         halted = m.halted
 
@@ -158,13 +170,16 @@ def _trial_from_result(
 async def _run_trial(
     mode: CompareMode,
     *,
-    task: str,
+    scenario: LiveScenario,
     limit_micros: int,
     max_steps: int,
     trial: int,
 ) -> GovernedRunResult:
-    agent, llm_name = _make_agent(task)
-    print(f"\n--- trial {trial} | {mode.value} ({llm_name}) ---", flush=True)
+    agent, llm_name = _make_agent(scenario.task)
+    print(
+        f"\n--- {scenario.id} | trial {trial} | {mode.value} ({llm_name}) ---",
+        flush=True,
+    )
 
     if mode is CompareMode.UNGOVERNED:
         result = await run_ungoverned(agent, max_steps=max_steps)
@@ -185,7 +200,7 @@ async def _run_trial(
         spend_usd = (
             usage.get("browser_cost_usd", m.spend_micros / 1_000_000)
             if mode is CompareMode.UNGOVERNED
-            else m.spend_micros / 1_000_000
+            else (m.spend_micros / 1_000_000) or usage.get("browser_cost_usd", 0.0)
         )
         budget_note = (
             f"ref cap ${cap:.2f}"
@@ -220,28 +235,27 @@ def _format_summary(
     base: LiveModeSummary,
     governed: LiveModeSummary,
     *,
+    scenario: LiveScenario,
     limit_usd: float,
     trials: int,
-    task_label: str,
 ) -> str:
     spend_red = _pct_reduction(base.avg_spend_usd, governed.avg_spend_usd)
     token_red = _pct_reduction(base.avg_tokens, governed.avg_tokens)
     lines = [
-        f"=== browser-use live: ungoverned vs TokenOps ({trials} trial(s)) ===",
-        f"task: {task_label[:80]}{'…' if len(task_label) > 80 else ''}",
-        f"TokenOps budget cap: ${limit_usd:.2f}",
+        f"=== {scenario.id}: ungoverned vs TokenOps ({trials} trial(s)) ===",
+        f"    {scenario.description}",
+        f"    TokenOps cap: ${limit_usd:.2f}  max_steps: {scenario.default_max_steps}",
         "",
-        "Without TokenOps (vanilla browser-use)",
+        "Without TokenOps",
+        f"   successes: {base.successes}/{trials}  success within ${limit_usd:.2f}: {base.success_within_budget_count}/{trials}",
         f"   avg spend: ${base.avg_spend_usd:.4f}  median ${base.median_spend_usd:.4f}",
-        f"   avg tokens: {base.avg_tokens:,.0f}  median {base.median_tokens:,.0f}",
-        f"   successes: {base.successes}/{trials}",
+        f"   avg tokens: {base.avg_tokens:,.0f}",
         "",
         "With TokenOps",
-        f"   avg spend: ${governed.avg_spend_usd:.4f} ({spend_red:+.1f}% vs ungoverned)",
-        f"   median spend: ${governed.median_spend_usd:.4f}",
-        f"   avg tokens: {governed.avg_tokens:,.0f} ({token_red:+.1f}% vs ungoverned)",
         f"   successes: {governed.successes}/{trials} (+{governed.successes - base.successes})",
-        f"   success within cap: {governed.success_within_budget_count}/{trials}",
+        f"   success within cap: {governed.success_within_budget_count}/{trials} (+{governed.success_within_budget_count - base.success_within_budget_count})",
+        f"   avg spend: ${governed.avg_spend_usd:.4f} ({spend_red:+.1f}% vs ungoverned)",
+        f"   avg tokens: {governed.avg_tokens:,.0f} ({token_red:+.1f}% vs ungoverned)",
         "",
         "Per-trial:",
     ]
@@ -258,40 +272,41 @@ def _format_summary(
     return "\n".join(lines)
 
 
-async def async_main() -> int:
-    load_env()
-    parser = argparse.ArgumentParser(description="Live browser-use: vanilla vs TokenOps")
-    parser.add_argument("--limit-usd", type=float, default=LIVE_DEFAULT_LIMIT_USD)
-    parser.add_argument("--max-steps", type=int, default=25)
-    parser.add_argument("--trials", type=int, default=1)
-    parser.add_argument("--task", default=FLIGHT_SFO_INDIA)
-    parser.add_argument("--mode-only", choices=["ungoverned", "tokenops"], default=None)
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    args = parser.parse_args()
-
-    limit_micros = int(args.limit_usd * 1_000_000)
-    scenario_id = "live_task"
-    modes = (
-        [CompareMode(args.mode_only)]
-        if args.mode_only
-        else [CompareMode.UNGOVERNED, CompareMode.TOKENOPS]
-    )
+async def _run_scenario_ab(
+    scenario: LiveScenario,
+    *,
+    limit_usd: float,
+    max_steps: int,
+    trials: int,
+    mode_only: str | None,
+    cooldown_sec: int,
+) -> ScenarioResult:
+    limit_micros = int(limit_usd * 1_000_000)
     summaries: dict[CompareMode, LiveModeSummary] = {
-        m: LiveModeSummary(mode=m) for m in modes
+        CompareMode.UNGOVERNED: LiveModeSummary(mode=CompareMode.UNGOVERNED),
+        CompareMode.TOKENOPS: LiveModeSummary(mode=CompareMode.TOKENOPS),
     }
 
-    for trial in range(1, args.trials + 1):
-        for mode in modes:
+    if mode_only:
+        order = [CompareMode(mode_only)]
+    else:
+        order = [CompareMode.UNGOVERNED, CompareMode.TOKENOPS]
+
+    for trial in range(1, trials + 1):
+        for i, mode in enumerate(order):
+            if i > 0 and cooldown_sec > 0:
+                print(f"\n… cooldown {cooldown_sec}s before {mode.value} …", flush=True)
+                await asyncio.sleep(cooldown_sec)
             try:
                 res = await _run_trial(
                     mode,
-                    task=args.task,
+                    scenario=scenario,
                     limit_micros=limit_micros,
-                    max_steps=args.max_steps,
+                    max_steps=max_steps,
                     trial=trial,
                 )
                 live = _trial_from_result(
-                    res, mode=mode, scenario_id=scenario_id, limit_micros=limit_micros,
+                    res, mode=mode, scenario_id=scenario.id, limit_micros=limit_micros,
                 )
                 live.trial = trial
                 summaries[mode].trials.append(live)
@@ -302,7 +317,7 @@ async def async_main() -> int:
                         trial=trial,
                         mode=mode,
                         outcome=RunOutcome(
-                            scenario_id=scenario_id,
+                            scenario_id=scenario.id,
                             success=False,
                             spend_micros=0,
                             steps=0,
@@ -311,13 +326,95 @@ async def async_main() -> int:
                     )
                 )
 
-    if len(modes) == 2:
-        base = summaries[CompareMode.UNGOVERNED]
-        gov = summaries[CompareMode.TOKENOPS]
-        if not args.as_json:
-            print("\n" + _format_summary(
-                base, gov, limit_usd=args.limit_usd, trials=args.trials, task_label=args.task,
-            ))
+    return ScenarioResult(
+        scenario=scenario,
+        ungoverned=summaries[CompareMode.UNGOVERNED],
+        tokenops=summaries[CompareMode.TOKENOPS],
+    )
+
+
+async def async_main() -> int:
+    load_env()
+    scenario_names = list(POLICY_SUITE) + ["flight_sfo_india"]
+    parser = argparse.ArgumentParser(description="Live browser-use: vanilla vs TokenOps")
+    parser.add_argument(
+        "--scenario",
+        choices=[*scenario_names, "all", "policy_suite"],
+        default="policy_suite",
+        help="Task preset (default: policy_suite = example + books)",
+    )
+    parser.add_argument("--limit-usd", type=float, default=None, help="Override scenario cap")
+    parser.add_argument("--max-steps", type=int, default=None, help="Override scenario steps")
+    parser.add_argument("--trials", type=int, default=1)
+    parser.add_argument("--task", default=None, help="Override task text (ignores scenario body)")
+    parser.add_argument("--mode-only", choices=["ungoverned", "tokenops"], default=None)
+    parser.add_argument("--cooldown-sec", type=int, default=COOLDOWN_BETWEEN_ARMS_SEC)
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args()
+
+    if args.scenario in ("all", "policy_suite"):
+        scenario_ids = list(POLICY_SUITE)
+    else:
+        scenario_ids = [args.scenario]
+
+    results: list[ScenarioResult] = []
+    for sid in scenario_ids:
+        sc = get_scenario(sid)
+        if args.task:
+            sc = LiveScenario(
+                id=sc.id,
+                task=args.task,
+                description=sc.description,
+                default_limit_usd=sc.default_limit_usd,
+                default_max_steps=sc.default_max_steps,
+            )
+        limit_usd = args.limit_usd if args.limit_usd is not None else sc.default_limit_usd
+        max_steps = args.max_steps if args.max_steps is not None else sc.default_max_steps
+        results.append(
+            await _run_scenario_ab(
+                sc,
+                limit_usd=limit_usd,
+                max_steps=max_steps,
+                trials=args.trials,
+                mode_only=args.mode_only,
+                cooldown_sec=args.cooldown_sec if not args.mode_only else 0,
+            )
+        )
+
+    if args.as_json:
+        payload = []
+        for r in results:
+            payload.append({
+                "scenario": r.scenario.id,
+                "limit_usd": args.limit_usd or r.scenario.default_limit_usd,
+                "ungoverned": {
+                    "successes": r.ungoverned.successes,
+                    "success_within_budget": r.ungoverned.success_within_budget_count,
+                    "avg_spend_usd": round(r.ungoverned.avg_spend_usd, 6),
+                    "avg_tokens": round(r.ungoverned.avg_tokens),
+                },
+                "tokenops": {
+                    "successes": r.tokenops.successes,
+                    "success_within_budget": r.tokenops.success_within_budget_count,
+                    "avg_spend_usd": round(r.tokenops.avg_spend_usd, 6),
+                    "avg_tokens": round(r.tokenops.avg_tokens),
+                },
+            })
+        print(json.dumps(payload, indent=2))
+    else:
+        for r in results:
+            if args.mode_only:
+                s = r.ungoverned if args.mode_only == "ungoverned" else r.tokenops
+                print(f"\n=== {r.scenario.id} ({args.mode_only}) ===")
+                print(f"successes: {s.successes}/{args.trials}  avg ${s.avg_spend_usd:.4f}")
+            else:
+                print("\n" + _format_summary(
+                    r.ungoverned,
+                    r.tokenops,
+                    scenario=r.scenario,
+                    limit_usd=args.limit_usd or r.scenario.default_limit_usd,
+                    trials=args.trials,
+                ))
     return 0
 
 

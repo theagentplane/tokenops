@@ -11,6 +11,10 @@ from benchmarking.browseruse.session import current_active_run
 
 
 def _action_label(action) -> str:
+    if hasattr(action, "model_dump"):
+        for key, val in action.model_dump(exclude_unset=True).items():
+            if val is not None:
+                return str(key)
     for attr in ("action", "name", "action_name"):
         val = getattr(action, attr, None)
         if val:
@@ -25,12 +29,13 @@ def make_governed_act(orig_act):
             return await orig_act(self, action, browser_session, *args, **kwargs)
         result = await orig_act(self, action, browser_session, *args, **kwargs)
         if current_registration() is not None:
+            label = _action_label(action)
             emit_observation(
                 observation_from_crossing(
-                    boundary_id=f"browseruse.tool.{_action_label(action)}",
+                    boundary_id=f"browseruse.tool.{label}",
                     kind="tool",
                     service="browseruse",
-                    input_state={"action": _action_label(action)},
+                    input_state={"name": label, "args": {}},
                     result=result,
                 )
             )
