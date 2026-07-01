@@ -20,6 +20,7 @@ from tokenops.control.context import current_span
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.context import current_governance, current_registration
 from tokenops.control.core import Attribution, CallRequest, Observation, Usage
+from tokenops.control.policies._util import classify_complexity
 
 
 def tool_signature(name: str, args) -> str:
@@ -199,6 +200,7 @@ def wrap_complete(
             attr=attr, provider=provider, model=m,
             estimated_input_tokens=estimate(messages),
             max_output_tokens=controls.call.max_output_tokens,
+            route_hint=classify_complexity(messages),  # for model_router
         )
         governor.pre_call(request)
 

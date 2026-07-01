@@ -39,6 +39,7 @@ from tokenops.control.policies import (
     context_compaction,
     cost_budget,
     cost_guard,
+    model_router,
     output_runaway,
     pre_call_worst_case,
     progress_guard,
@@ -92,6 +93,8 @@ _TEMPLATES = {
     "output_runaway": lambda p, c: output_runaway.build(
         n=p.get("n", 3), repeats=p.get("repeats", 4),
         domination=p.get("domination", 0.5), max_retries=p.get("max_retries", 2)),
+    "model_router": lambda p, c: model_router.build(
+        easy_model=p.get("easy_model", "gpt-4o-mini"), hard_model=p.get("hard_model", "gpt-4o")),
 }
 
 

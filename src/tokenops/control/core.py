@@ -165,6 +165,7 @@ class CallRequest:
     model: str
     estimated_input_tokens: int = 0
     max_output_tokens: int | None = None
+    route_hint: str = ""  # "easy" | "hard" — complexity class for model_router (set by the wrap)
 
 
 # =========================================================================== #

@@ -16,7 +16,7 @@ from tokenops.config.schema import AgentServerConfig
 from tokenops.control import ApplyControls, Governor, Ledger, build_attribution, wrap_complete
 from tokenops.control.context import SpanContext, governance_scope, run_scope
 from tokenops.control.models import RunRegistration
-from tokenops.control.policies import progress_guard, tool_output_cap
+from tokenops.control.policies import model_router, progress_guard, tool_output_cap
 from conftest import toy_price
 
 
@@ -56,3 +56,27 @@ def test_browser_agent_hits_traps_through_governor():
     assert sum(1 for s in tools if s.boundary_id == "click") >= 3
     # the trivial extract pulled the phone number
     assert "+1-555-0142" in result
+
+
+def test_model_router_routes_hard_page_to_strong_model():
+    from tokenops.control.pricing import build_price_book
+    ledger = Ledger(price=build_price_book())  # real book knows gpt-4o + gpt-4o-mini
+    controls = ApplyControls()
+    gov = Governor(ledger, controls)
+    gov.register(*model_router.build(easy_model="gpt-4o-mini", hard_model="gpt-4o"))
+
+    reg = RunRegistration(run_id="b2", intent="demo", user_dims={"user_id": "alice"})
+    attr = build_attribution(reg, service="browser")
+    ledger.open_run("b2")
+    governed = wrap_complete(gov, controls, attr, provider="openai", model="gpt-4o-mini",
+                             dispatch=demo_browser_complete(), service="browser")
+    agent = NativeBrowserAgent(AgentServerConfig(max_steps=20, provider="openai", model="gpt-4o-mini"))
+
+    reset_session().begin_trace("b2")
+    with run_scope(reg, SpanContext(span_id="s", service="browser")):
+        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+            agent.run("gather the report", backend=_backend(), complete_fn=governed, service="browser")
+
+    models = [s.tags.get("model") for s in gov.ledger.window("b2") if s.node_type == "llm"]
+    # dense /hard page routed up to the strong model; the rest stayed on the cheap default
+    assert "gpt-4o" in models and "gpt-4o-mini" in models

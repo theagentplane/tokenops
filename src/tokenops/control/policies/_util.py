@@ -87,3 +87,16 @@ def simhash64(text: str) -> int:
 
 def hamming(a: int, b: int) -> int:
     return bin(a ^ b).count("1")
+
+
+_HARD_KW = ("summariz", "analyz", "reason", "explain", "compare", "evaluate",
+            "assess", "estimate", "reconcile", "synthesi", "justif")
+
+
+def classify_complexity(messages) -> str:
+    """Semantic-router-style heuristic: 'hard' if the prompt asks for reasoning/analysis,
+    else 'easy'. Deterministic, no model call. Used by model_router via CallRequest.route_hint."""
+    text = " ".join(
+        (m.get("content", "") if isinstance(m, dict) else str(m)) for m in (messages or [])
+    ).lower()
+    return "hard" if any(k in text for k in _HARD_KW) else "easy"
