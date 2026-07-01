@@ -12,6 +12,7 @@ class LiveScenario:
     description: str
     default_limit_usd: float
     default_max_steps: int
+    governance_preset: str = "steering"
 
 
 EXAMPLE_TIGHT_CAP = LiveScenario(
@@ -97,6 +98,72 @@ Before finishing, reload the page and re-read the same fields at least eight mor
 """.strip(),
 )
 
+BOOKS_COST_GUARD = LiveScenario(
+    id="books_cost_guard",
+    description="Multi-category browse under tight cap — cost_guard minimize at ~80% spend",
+    default_limit_usd=0.052,
+    default_max_steps=18,
+    governance_preset="cost_guard",
+    task="""
+On https://books.toscrape.com:
+1. Open the Travel category and note one book title and price.
+2. Open the Poetry category and note one book title and price.
+3. Find any book priced above £30 anywhere on the site and report its title and price.
+
+Finish with a short summary, then call done with success=true. Do not purchase anything.
+""".strip(),
+)
+
+BOOKS_TOOL_FIX = LiveScenario(
+    id="books_tool_fix",
+    description="Click-heavy browse — tool_fix steers off disallowed actions",
+    default_limit_usd=0.12,
+    default_max_steps=16,
+    governance_preset="tool_fix",
+    task="""
+Go to https://books.toscrape.com and find the book "A Light in the Attic".
+Report its price (with currency) and stock status.
+
+You will need to open the book detail page to read the price. Finish with done success=true.
+""".strip(),
+)
+
+EXAMPLE_TOOL_OUTPUT_CAP = LiveScenario(
+    id="example_tool_output_cap",
+    description="Synthetic huge evaluate payload — tool_output_cap avoids context bloat",
+    default_limit_usd=0.035,
+    default_max_steps=12,
+    governance_preset="tool_output_cap",
+    task="""
+Navigate to https://example.com.
+
+1. Use the evaluate action with JavaScript:
+   document.body.innerText + ' ' + 'tokenops-bench-padding-'.repeat(3000)
+2. Report the character length of that result.
+3. Report the page title.
+
+Call done with success=true and a one-line summary.
+""".strip(),
+)
+
+BOOKS_HUGE_EVAL = LiveScenario(
+    id="books_huge_eval",
+    description="Full-page evaluate dump — tool_output_cap offloads oversized payload",
+    default_limit_usd=0.08,
+    default_max_steps=16,
+    governance_preset="tool_output_cap",
+    task="""
+Navigate to https://books.toscrape.com and wait for the catalogue to load.
+
+Then:
+1. Use the evaluate action with JavaScript: document.body.innerText
+2. Report an approximate word count from that text.
+3. Find "A Light in the Attic" and report its price.
+
+Call done with success=true and a one-line summary.
+""".strip(),
+)
+
 SCENARIOS: dict[str, LiveScenario] = {
     s.id: s
     for s in (
@@ -106,6 +173,10 @@ SCENARIOS: dict[str, LiveScenario] = {
         BOOKS_VERIFY_TRAP,
         BOOKS_PAGINATION_STRESS,
         EXAMPLE_VERIFY_TRAP,
+        BOOKS_COST_GUARD,
+        BOOKS_TOOL_FIX,
+        BOOKS_HUGE_EVAL,
+        EXAMPLE_TOOL_OUTPUT_CAP,
     )
 }
 
@@ -117,6 +188,21 @@ STRESS_SUITE: tuple[str, ...] = (
     "example_verify_trap",
     "books_verify_trap",
     "books_pagination_stress",
+)
+
+# Scenarios tuned to exercise steer actuators (cost_guard, tool_fix, tool_output_cap)
+STEER_SUITE: tuple[str, ...] = (
+    "books_cost_guard",
+    "books_tool_fix",
+    "books_huge_eval",
+)
+
+# Curated A/B set: each scenario highlights a different TokenOps cost strategy vs vanilla
+COST_SHOWCASE_SUITE: tuple[str, ...] = (
+    "example_verify_trap",     # progress_guard — breaks reload loops early
+    "books_verify_trap",       # progress_guard + cost_budget — stops verify-loop overspend
+    "books_cost_guard",        # cost_guard — minimize steer as budget threshold nears
+    "books_pagination_stress", # cost_budget — halts deep crawl before vanilla blowout
 )
 
 

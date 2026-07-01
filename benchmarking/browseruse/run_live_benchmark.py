@@ -25,7 +25,9 @@ from benchmarking.browseruse.integration import (  # noqa: E402
     run_ungoverned,
 )
 from benchmarking.browseruse.scenarios_live import (  # noqa: E402
+    COST_SHOWCASE_SUITE,
     POLICY_SUITE,
+    STEER_SUITE,
     STRESS_SUITE,
     LiveScenario,
     get_scenario,
@@ -199,6 +201,7 @@ async def _run_trial(
             limit_micros=limit_micros,
             live_pricing=True,
             max_steps=max_steps,
+            governance_preset=scenario.governance_preset,
         )
 
     m = result.metrics
@@ -343,13 +346,30 @@ async def _run_scenario_ab(
 
 async def async_main() -> int:
     load_env()
-    scenario_names = list(dict.fromkeys([*POLICY_SUITE, *STRESS_SUITE, "flight_sfo_india"]))
+    scenario_names = list(
+        dict.fromkeys([
+            *POLICY_SUITE,
+            *STRESS_SUITE,
+            *STEER_SUITE,
+            *COST_SHOWCASE_SUITE,
+            "flight_sfo_india",
+        ])
+    )
     parser = argparse.ArgumentParser(description="Live browser-use: vanilla vs TokenOps")
     parser.add_argument(
         "--scenario",
-        choices=[*scenario_names, "all", "policy_suite", "stress_suite"],
+        choices=[
+            *scenario_names,
+            "all",
+            "policy_suite",
+            "stress_suite",
+            "steer_suite",
+            "cost_showcase_suite",
+        ],
         default="policy_suite",
-        help="Task preset (default: policy_suite; stress_suite = verify/pagination traps)",
+        help=(
+            "Task preset (default: policy_suite; cost_showcase_suite = 4 cost-optimization A/B demos)"
+        ),
     )
     parser.add_argument("--limit-usd", type=float, default=None, help="Override scenario cap")
     parser.add_argument("--max-steps", type=int, default=None, help="Override scenario steps")
@@ -366,6 +386,10 @@ async def async_main() -> int:
         scenario_ids = list(POLICY_SUITE)
     elif args.scenario == "stress_suite":
         scenario_ids = list(STRESS_SUITE)
+    elif args.scenario == "steer_suite":
+        scenario_ids = list(STEER_SUITE)
+    elif args.scenario == "cost_showcase_suite":
+        scenario_ids = list(COST_SHOWCASE_SUITE)
     else:
         scenario_ids = [args.scenario]
 
@@ -379,6 +403,7 @@ async def async_main() -> int:
                 description=sc.description,
                 default_limit_usd=sc.default_limit_usd,
                 default_max_steps=sc.default_max_steps,
+                governance_preset=sc.governance_preset,
             )
         limit_usd = args.limit_usd if args.limit_usd is not None else sc.default_limit_usd
         max_steps = args.max_steps if args.max_steps is not None else sc.default_max_steps

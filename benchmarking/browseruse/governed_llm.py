@@ -11,35 +11,83 @@ from tokenops.control.core import CallRequest
 
 from benchmarking.browseruse.session import current_active_run
 
+_RETRY_BASE_CAP = 512
+_MAX_CALL_RETRIES = 3
 
-def _inject_carry_messages(messages, carry: list[str]):
-    """Prepend governance INJECT directives using browser-use message types."""
+
+def _tighten_cap(cap: int | None) -> int:
+    return max(64, (cap or _RETRY_BASE_CAP) // 2)
+
+
+def _msg_role(msg) -> str | None:
+    if isinstance(msg, dict):
+        return msg.get("role")
+    return getattr(msg, "role", None)
+
+
+def _msg_content(msg) -> str:
+    if isinstance(msg, dict):
+        return str(msg.get("content", ""))
+    content = getattr(msg, "content", msg)
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                parts.append(str(part.get("text", part)))
+            else:
+                parts.append(str(getattr(part, "text", part)))
+        return "".join(parts)
+    return str(content)
+
+
+def _compact_messages(messages):
+    """Drop duplicate non-system messages (context_compaction MUTATE)."""
+    seen: set[tuple[str | None, str]] = set()
+    out = []
+    for msg in messages:
+        role = _msg_role(msg)
+        content = _msg_content(msg)
+        if role == "system":
+            out.append(msg)
+            continue
+        key = (role, content)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(msg)
+    return out
+
+
+def _append_carry_messages(messages, carry: list[str]):
+    """Append governance INJECT directives as the final user/context slot."""
     if not carry:
         return messages
     try:
-        from browser_use.llm.messages import SystemMessage
+        from browser_use.llm.messages import UserMessage
     except ImportError:
-        SystemMessage = None  # type: ignore[misc, assignment]
-    prefix = (
-        [SystemMessage(content=c) for c in carry]
-        if SystemMessage is not None
-        else [{"role": "system", "content": c} for c in carry]
-    )
-    return prefix + list(messages)
+        UserMessage = None  # type: ignore[misc, assignment]
+    out = list(messages)
+    for text in carry:
+        if UserMessage is not None:
+            out.append(UserMessage(content=text))
+        else:
+            out.append({"role": "user", "content": text})
+    return out
 
 
 def _estimate_tokens(messages) -> int:
-    total = 0
-    for msg in messages or []:
-        if isinstance(msg, dict):
-            total += len(str(msg.get("content", "")))
-        else:
-            total += len(str(getattr(msg, "content", msg)))
+    total = sum(len(_msg_content(msg)) for msg in (messages or []))
     return max(1, total // 4)
 
 
 def fill_llm_ids(active, agent) -> None:
-    pass
+    llm = getattr(agent, "llm", None)
+    if llm is not None:
+        active.main_llm_id = id(llm)
+
+
+def _is_main_llm(active, llm) -> bool:
+    return active.main_llm_id is not None and id(llm) == active.main_llm_id
 
 
 def wrap_ainvoke(llm: Any) -> None:
@@ -66,26 +114,47 @@ def wrap_ainvoke(llm: Any) -> None:
                 max_output_tokens=active.controls.call.max_output_tokens,
             )
         )
+
+        use_model = active.controls.call.model_override or model
         dispatch_messages = list(messages)
-        if active.controls.carry:
-            dispatch_messages = _inject_carry_messages(dispatch_messages, active.controls.carry)
-            active.controls.carry.clear()
+        main_llm = _is_main_llm(active, llm)
+        if main_llm:
+            if active.controls.carry:
+                dispatch_messages = _append_carry_messages(dispatch_messages, active.controls.carry)
+                active.controls.carry.clear()
+            if active.controls.call.compact:
+                dispatch_messages = _compact_messages(dispatch_messages)
+
         seg = f"run:{attr.run_id}"
         active.governor.ledger.admit(seg)
         try:
-            raw = await orig(dispatch_messages, *args, **kwargs)
-            emit_observation(
-                observation_from_crossing(
-                    boundary_id="browseruse.chat",
-                    kind="llm",
-                    service="browseruse",
-                    input_state={"message_count": len(dispatch_messages)},
-                    result=raw,
-                    provider=provider,
-                    model=model,
+            cap = active.controls.call.max_output_tokens
+            penalties: dict[str, float] = {}
+            attempt = 0
+            while True:
+                active.controls.retry = False
+                call_kwargs = dict(kwargs)
+                if cap is not None:
+                    call_kwargs.setdefault("max_tokens", cap)
+                call_kwargs.update(penalties)
+                raw = await orig(dispatch_messages, *args, **call_kwargs)
+                emit_observation(
+                    observation_from_crossing(
+                        boundary_id="browseruse.chat",
+                        kind="llm",
+                        service="browseruse",
+                        input_state={"message_count": len(dispatch_messages)},
+                        result=raw,
+                        provider=provider,
+                        model=use_model,
+                    )
                 )
-            )
-            return raw
+                if active.controls.retry and attempt < _MAX_CALL_RETRIES and main_llm:
+                    attempt += 1
+                    cap = _tighten_cap(cap)
+                    penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}
+                    continue
+                return raw
         finally:
             active.governor.ledger.complete(seg)
 

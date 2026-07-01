@@ -19,6 +19,7 @@ class RunConfig:
     run_id: str | None = None
     user_id: str = "browseruse-bench"
     live_pricing: bool = False
+    governance_preset: str = "steering"
 
 
 @dataclass
@@ -29,6 +30,7 @@ class ActiveRun:
     registration: RunRegistration
     span: SpanContext
     task: str = ""
+    main_llm_id: int | None = None
 
 
 _run_config: ContextVar[RunConfig | None] = ContextVar("browseruse_run_config", default=None)

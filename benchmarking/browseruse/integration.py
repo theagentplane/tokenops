@@ -28,7 +28,8 @@ from benchmarking.browseruse.session import (
     set_run_config,
     take_last_metrics,
 )
-from benchmarking.common.configs import circuit_breaker_config, tokenops_config, tokenops_config_for_run
+from benchmarking.browseruse.configs import tokenops_config_for_run as browser_tokenops_config
+from benchmarking.common.configs import circuit_breaker_config
 from benchmarking.common.harness import BenchmarkMode, DEFAULT_LIMIT_MICROS
 from benchmarking.common.live_pricing import build_live_price_book
 from benchmarking.common.pricing import benchmark_price
@@ -41,10 +42,18 @@ def _store_patch(obj: Any, attr: str, original: Any) -> None:
     _patches.append((obj, attr, original))
 
 
-def _governance_dict(mode: BenchmarkMode, limit_micros: int, max_steps: int = 100) -> dict:
+def _governance_dict(
+    mode: BenchmarkMode,
+    limit_micros: int,
+    max_steps: int = 100,
+    *,
+    preset: str = "steering",
+) -> dict:
     if mode is BenchmarkMode.CIRCUIT_BREAKER:
         return circuit_breaker_config(limit_micros=limit_micros)
-    return tokenops_config_for_run(limit_micros=limit_micros, max_steps=max_steps)
+    return browser_tokenops_config(
+        limit_micros=limit_micros, max_steps=max_steps, preset=preset,
+    )
 
 
 def _build_active_run(config: RunConfig, *, task: str, max_steps: int = 100) -> ActiveRun:
@@ -52,7 +61,14 @@ def _build_active_run(config: RunConfig, *, task: str, max_steps: int = 100) -> 
     price = build_live_price_book() if config.live_pricing else benchmark_price
     controls = ApplyControls()
     governor = build_governor(
-        _governance_dict(config.mode, config.limit_micros, max_steps), price, controls,
+        _governance_dict(
+            config.mode,
+            config.limit_micros,
+            max_steps,
+            preset=config.governance_preset,
+        ),
+        price,
+        controls,
     )
     reg = RunRegistration(run_id=run_id, intent="browseruse", user_dims={"user_id": config.user_id})
     span = SpanContext(span_id=f"span-{uuid.uuid4().hex[:8]}", service="browseruse")
@@ -198,6 +214,7 @@ async def run_governed(
     user_id: str = "browseruse",
     live_pricing: bool = False,
     max_steps: int = 100,
+    governance_preset: str = "steering",
     on_step_start=None,
     on_step_end=None,
 ) -> GovernedRunResult:
@@ -210,6 +227,7 @@ async def run_governed(
         run_id=run_id,
         user_id=user_id,
         live_pricing=live_pricing,
+        governance_preset=governance_preset,
     )
     set_run_config(cfg)
     object.__setattr__(agent, "_tokenops_run_config", cfg)
