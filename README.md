@@ -89,6 +89,7 @@ See [`docs/code-navigation.md`](docs/code-navigation.md) for code navigation dia
 - [Customer outcomes](docs/customer-outcomes.md) — first-order metrics: cost, completion under budget, quality
 - [Run attribution](docs/run-attribution.md)
 - [Architecture](docs/architecture.md)
+- [Shared ledger comparison](docs/shared-ledger-comparison.md) — multi-agent run budget before/after
 - [Why Token Governance?](docs/why-token-governance.md)
 - [Agent Spec](docs/agent-spec.md)
 - [Code Navigation](docs/code-navigation.md)

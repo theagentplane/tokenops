@@ -40,6 +40,7 @@ python -m pytest -x                                # stop at first failure
 | `test_boundary.py` | `@boundary` → `Observation` with span + boundary_tags |
 | `test_chronicle_boundary.py` | Chronicle envelopes + govern ingest |
 | `test_attribution_ledger_policies_e2e.py` | register → ledger → `step_cap` HALT (in-process + HTTP) |
+| `test_cross_process_budget_gating.py` | in-memory ledgers isolated vs shared SQLite spend/halt across two Governor instances |
 | `test_server_enforcement.py` | Admin store config → live server → HALT → RunRecord |
 
 ## How the tests stay isolated

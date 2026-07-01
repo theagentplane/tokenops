@@ -3,8 +3,7 @@
 Source of truth for how workflow identity, trace dims, and boundary telemetry
 are separated and wired into the control plane.
 
-Related: `docs/instrumentation-contract.md` (ingest seam), GitHub #4 (cross-process
-halt), #5 (composite segment matchers).
+Related: `docs/instrumentation-contract.md` (ingest seam), `docs/shared-ledger-comparison.md` (cross-process spend), #5 (composite segment matchers).
 
 ---
 

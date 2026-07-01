@@ -161,5 +161,5 @@ halted run's total reflects the whole run. The flag set is idempotent.
 | Reconstruct agent context from window (§7) | ⛔ designed, not wired |
 | Capture partial work product at the halt boundary | ⛔ designed, not wired |
 | Continuation run seeding / re-grant cap-raise flow | ⛔ designed, not wired |
-| A2A shared-store backing of `halted` | ⛔ single-process only for now |
+| A2A shared-store backing of `halted` + spend | ✅ `ledger_halt` / `ledger_spent` in SQLite ([#4](https://github.com/theagentplane/tokenops/issues/4)) |
 | CANCEL (stream abort) / PAUSE (suspend) | ⛔ not built (output_runaway / greenfield) |

@@ -2,7 +2,7 @@
 
 Governance for the two-agent A2A test bench: **register → measure → record → detect → decide → act**.
 The agent (data plane) stays vanilla; the control plane taps boundary crossings and enforces on
-**cost** (micro-USD integers). **89 tests pass** (1 warning — Starlette/httpx deprecation).
+**cost** (micro-USD integers). **108 tests pass** (1 skipped, 1 warning — Starlette/httpx deprecation).
 
 ## What it does (jobs → status)
 
@@ -14,6 +14,7 @@ The agent (data plane) stays vanilla; the control plane taps boundary crossings 
 | Govern ingest from boundaries | ✅ | `control/boundary.py` → `Governor.observe` |
 | Provider wrap (pre_call) | ✅ | `control/integration.py` `wrap_complete` |
 | Ledger (spend, inflight, steps, window) | ✅ | `control/ledger.py` + `control/pricing.py` |
+| Cross-process ledger (spend + halt in SQLite) | ✅ | `control/store.py` `ledger_*` tables; `build_governor(..., store=store)` |
 | 10 policy templates + Governor harness | ✅ | `control/policies/*`, `control/engine.py` |
 | Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE) | ✅ | `ApplyControls`, `wrap_complete` |
 | Native server enforcement | ✅ | `agents/*/native/server.py` (LangChain: #6) |
@@ -30,7 +31,7 @@ The agent (data plane) stays vanilla; the control plane taps boundary crossings 
 ```
 POST /v1/runs  →  register run_id + intent + user_dims (SQLite)
 POST /v1/tasks + X-TokenOps-Run-Id
-  → build_governor(store.governance_config_for(agent))
+  → build_governor(store.governance_config_for(agent), store=store)
   → run_scope + governance_scope
   → agent loop:
        complete() ──▶ wrap_complete ──▶ pre_call ──▶ detect→decide→apply
@@ -72,7 +73,7 @@ make install
 make db-reset          # optional: clean DB + seed governance
 make run               # research + summarize + Streamlit (auto-frees ports 8001/8002/8501)
 
-python -m pytest -q    # 89 passed
+python -m pytest -q    # 108 passed
 ```
 
 Streamlit pages: **Test Bench** (live A2A) · **Run simulator** (in-process, demo mode OK) ·
@@ -83,13 +84,14 @@ Streamlit pages: **Test Bench** (live A2A) · **Run simulator** (in-process, dem
 - **Offline:** `tests/test_attribution_ledger_policies_e2e.py` — register → govern → HALT on `step_cap`.
 - **HTTP:** same file — `POST /v1/runs` → `POST /v1/tasks` with run header.
 - **Simulator:** `ui/simulator.py` — live timeline of pre_call / observe / signals / spans.
-- **Halt demo:** Admin → set `step_cap` `max_steps: 3` or lower `run_llm_cap` to ~$0.0004 → Run simulator.
+- **Halt demo:** Admin → set `step_cap` `max_steps: 3` or run `python scripts/prep_ledger_comparison.py` then **Run simulator** (shared-ledger budget demo).
+- **Shared ledger:** `tests/test_cross_process_budget_gating.py` · `docs/shared-ledger-comparison.md`
 
 ## Deferred
 
-Cross-process halt ([#4](https://github.com/theagentplane/tokenops/issues/4)) · LangChain governance ([#6](https://github.com/theagentplane/tokenops/issues/6)) · composite segment matchers ([#5](https://github.com/theagentplane/tokenops/issues/5)) · streaming CANCEL/RETRY.
+LangChain governance ([#6](https://github.com/theagentplane/tokenops/issues/6)) · composite segment matchers ([#5](https://github.com/theagentplane/tokenops/issues/5)) · streaming CANCEL/RETRY · cross-process step_cap sum.
 
 ## Docs
 
-`docs/run-attribution.md` · `docs/architecture.md` · `docs/testing.md` ·
+`docs/run-attribution.md` · `docs/architecture.md` · `docs/shared-ledger-comparison.md` · `docs/testing.md` ·
 `docs/instrumentation-contract.md` · `docs/governance-policy.md`

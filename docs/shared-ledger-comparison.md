@@ -44,27 +44,22 @@ Research spend is written to `ledger_spent` in SQLite. When summarize starts, `b
 
 ![New control plane](assets/shared-ledger-comparison/new-control-plane.png)
 
-## Reproduce side-by-side
+## Reproduce
 
 ```bash
-# Seed cap
 python scripts/prep_ledger_comparison.py
-
-# New code (shared ledger) — port 8501
-SEARCH_BACKEND=corpus PYTHONPATH=src streamlit run src/tokenops/ui/app.py --server.port 8501
-
-# Pre-fix worktree @ 789b9f0 — port 8502
-cd ../tokenops-old-ledger
-SEARCH_BACKEND=corpus PYTHONPATH=src streamlit run src/tokenops/ui/app.py --server.port 8502
+SEARCH_BACKEND=corpus make ui
 ```
 
-Open **Simulator → Start run** on each port with the same inputs.
+**Run simulator → Start run** (demo mode, healthy corpus). Use **Total run $** and **Run budget cap** in the summary bar.
 
-Automated check (no UI):
+Automated check:
 
 ```bash
 pytest tests/test_cross_process_budget_gating.py -q
 ```
+
+Public overview (screenshots + narrative): [TokenOps wiki — shared ledger](https://github.com/theagentplane/tokenops-wiki/blob/main/docs/shared-ledger.md).
 
 ## What changed
 
