@@ -182,6 +182,9 @@ def _compact_messages(messages):
         if role == "system":
             out.append(msg)
             continue
+        if isinstance(content, str) and content.startswith("[TokenOps trajectory hint"):
+            out.append(msg)
+            continue
         key = (role, content)
         if key in seen:
             continue

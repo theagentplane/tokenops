@@ -59,10 +59,12 @@ Most MetaGPT runs are **sub‑cent**. Good for proving the adapter and steer pat
 
 Browser-use runner has full trial tags and `showcase_pass`. MetaGPT runner reports spend, steps, and optional evaluation oracles — treat **`aspirational_failures`** in evaluation as hints, not requirements that a policy fired.
 
+Full protocol (multi-run sweeps, infra exclusion, aggregation): [../README.md#benchmarking-process](../README.md#benchmarking-process).
+
 For multi-trial comparison:
 
 ```bash
-python benchmarking/run_trials_sweep.py --framework metagpt --scenario pricing_quick_verify_trap --trial-counts 1,5,10 --cooldown-sec 120
+python benchmarking/run_trials_sweep.py --framework metagpt --scenario pricing_quick_verify_trap --trial-counts 1,3,5 --cooldown-sec 120
 ```
 
 ## What we claim in a demo

@@ -60,13 +60,15 @@ Vanilla often obeys and overspends. TokenOps should catch repetition and finish 
 
 ### Showcase suite
 
-Two **different task shapes**, not two “policy demos”:
+Primary demo task:
 
-1. **`books_verify_trap`** — reload loop under a very tight cap ($0.034)
+- **`books_verify_trap`** — reload loop under a very tight cap ($0.034)
 
 (`books_pagination_stress` remains in `cap_suite` only — skipped from showcase after repeated local crashes.)
 
 Run multiple trials (`--trials 5` or `run_trials_sweep.py`). Pick results where `showcase_pass` is true for slides — do not assume every iteration wins.
+
+Full protocol (multi-run sweeps, infra exclusion, aggregation): [../README.md#benchmarking-process](../README.md#benchmarking-process).
 
 ## Scoring
 

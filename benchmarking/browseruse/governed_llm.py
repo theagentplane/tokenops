@@ -50,6 +50,9 @@ def _compact_messages(messages):
         if role == "system":
             out.append(msg)
             continue
+        if isinstance(content, str) and content.startswith("[TokenOps trajectory hint"):
+            out.append(msg)
+            continue
         key = (role, content)
         if key in seen:
             continue
@@ -96,6 +99,9 @@ def wrap_ainvoke(llm: Any) -> None:
 
         attr = build_attribution(active.registration, service="browseruse")
         active.controls.begin_call()
+        main_llm = _is_main_llm(active, llm)
+        primary_turn = main_llm and active._main_llm_calls == 0
+        carry_before = len(active.controls.carry)
         active.governor.pre_call(
             CallRequest(
                 attr=attr,
@@ -103,13 +109,25 @@ def wrap_ainvoke(llm: Any) -> None:
                 model=model,
                 estimated_input_tokens=_estimate_tokens(messages),
                 max_output_tokens=active.controls.call.max_output_tokens,
+                primary_agent_turn=primary_turn,
             )
         )
 
         use_model = active.controls.call.model_override or model
         dispatch_messages = list(messages)
-        main_llm = _is_main_llm(active, llm)
         if main_llm:
+            if primary_turn:
+                for msg in active.controls.carry[carry_before:]:
+                    text = str(msg)
+                    if "trajectory hint" in text.lower():
+                        active.trajectory_hint_fired = True
+                        active.trajectory_hint_chars = len(text)
+                        low = text.lower()
+                        if "exact match" in low:
+                            active.trajectory_hint_match = "exact"
+                        elif "simhash match" in low:
+                            active.trajectory_hint_match = "simhash"
+            active._main_llm_calls += 1
             if active.controls.carry:
                 dispatch_messages = consume_carry(
                     active.controls,

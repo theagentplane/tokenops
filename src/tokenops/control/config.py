@@ -129,9 +129,17 @@ def build_governor(
     ctx = _Ctx(budgets=budgets, price=price)
 
     for name, params in (gov_cfg.get("policies") or {}).items():
-        if name not in _TEMPLATES:
+        if name not in _TEMPLATES and name != "trajectory_hint":
             raise ValueError(f"unknown policy {name!r}; known: {sorted(_TEMPLATES)}")
-        detector, policy = _TEMPLATES[name](params or {}, ctx)
+        if name == "trajectory_hint":
+            # Opt-in only: excluded from default.yaml; build() defaults enabled=False.
+            if store is None:
+                raise ValueError("trajectory_hint requires store=... in build_governor")
+            from tokenops.control.policies.trajectory_hint import build as build_trajectory_hint
+
+            detector, policy = build_trajectory_hint(store, **(params or {}))
+        else:
+            detector, policy = _TEMPLATES[name](params or {}, ctx)
         governor.register(detector, policy)
 
     return governor
