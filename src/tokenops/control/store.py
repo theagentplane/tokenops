@@ -17,9 +17,8 @@ import os
 import sqlite3
 import time
 import uuid
-from typing import Sequence
+from typing import Any, Sequence
 
-from tokenops.control.config import _TEMPLATES
 from tokenops.control.models import (
     BudgetSpec,
     PolicyInstance,
@@ -29,6 +28,12 @@ from tokenops.control.models import (
     RunRegistration,
     Segment,
 )
+
+def _known_policy_templates() -> frozenset[str]:
+    from tokenops.control.config import _TEMPLATES
+
+    return frozenset({*_TEMPLATES, "trajectory_hint"})
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS segments (
@@ -71,6 +76,39 @@ CREATE TABLE IF NOT EXISTS ledger_halt (
   run_id TEXT PRIMARY KEY,
   halted INTEGER NOT NULL DEFAULT 0,
   halt_reason TEXT
+);
+CREATE TABLE IF NOT EXISTS trajectory_index (
+  id TEXT PRIMARY KEY,
+  scope_key TEXT NOT NULL,
+  input_hash TEXT NOT NULL,
+  input_simhash INTEGER NOT NULL,
+  input_preview TEXT NOT NULL,
+  source_run_id TEXT NOT NULL,
+  step_summary TEXT NOT NULL,
+  tool_sequence TEXT NOT NULL,
+  cost_micros INTEGER NOT NULL,
+  step_count INTEGER NOT NULL,
+  quality_score REAL,
+  indexed_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_traj_scope_hash ON trajectory_index(scope_key, input_hash);
+CREATE INDEX IF NOT EXISTS idx_traj_scope_time ON trajectory_index(scope_key, indexed_at DESC);
+CREATE TABLE IF NOT EXISTS trajectory_build_queue (
+  run_id TEXT PRIMARY KEY,
+  scope_key TEXT NOT NULL,
+  input_hash TEXT NOT NULL,
+  input_simhash INTEGER NOT NULL,
+  input_preview TEXT NOT NULL,
+  task_text TEXT NOT NULL,
+  cost_micros INTEGER NOT NULL,
+  step_count INTEGER NOT NULL,
+  enqueued_at REAL NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS run_trajectory_snapshots (
+  run_id TEXT PRIMARY KEY,
+  window_json TEXT NOT NULL,
+  saved_at REAL NOT NULL
 );
 """
 
@@ -148,8 +186,10 @@ class Store:
     # ---- policy instances ------------------------------------------------- #
 
     def upsert_policy_instance(self, pi: PolicyInstance) -> PolicyInstance:
-        if pi.template not in _TEMPLATES:  # fail closed — same rule as build_governor
-            raise ValueError(f"unknown policy template {pi.template!r}; known: {sorted(_TEMPLATES)}")
+        if pi.template not in _known_policy_templates():  # fail closed — same rule as build_governor
+            raise ValueError(
+                f"unknown policy template {pi.template!r}; known: {sorted(_known_policy_templates())}"
+            )
         self._db.execute(
             "REPLACE INTO policy_instances(id, template, params, agent, budget_id, segment_id, enabled) "
             "VALUES (?,?,?,?,?,?,?)",
@@ -413,6 +453,198 @@ class Store:
             (run_id,),
         )
         self._db.commit()
+
+    # ---- trajectory hint index -------------------------------------------- #
+
+    def save_trajectory_snapshot(self, run_id: str, window_json: str) -> None:
+        self._db.execute(
+            "REPLACE INTO run_trajectory_snapshots(run_id, window_json, saved_at) VALUES (?,?,?)",
+            (run_id, window_json, time.time()),
+        )
+        self._db.commit()
+
+    def enqueue_trajectory_build(
+        self,
+        *,
+        run_id: str,
+        scope_key: str,
+        input_hash: str,
+        input_simhash: int,
+        input_preview: str,
+        task_text: str,
+        cost_micros: int,
+        step_count: int,
+    ) -> None:
+        self._db.execute(
+            "REPLACE INTO trajectory_build_queue("
+            "run_id, scope_key, input_hash, input_simhash, input_preview, task_text, "
+            "cost_micros, step_count, enqueued_at, attempts"
+            ") VALUES (?,?,?,?,?,?,?,?,?,0)",
+            (
+                run_id, scope_key, input_hash, input_simhash, input_preview, task_text,
+                cost_micros, step_count, time.time(),
+            ),
+        )
+        self._db.commit()
+
+    def drain_trajectory_build_queue(
+        self, *, limit: int = 8, max_age_days: int = 30, max_entries_per_scope: int = 500,
+    ) -> int:
+        from tokenops.control.trajectory.compress import compress_trajectory
+        from tokenops.control.trajectory.serialize import window_from_json
+
+        rows = self._db.execute(
+            "SELECT * FROM trajectory_build_queue ORDER BY enqueued_at ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        done = 0
+        for row in rows:
+            run_id = row["run_id"]
+            try:
+                snap = self._db.execute(
+                    "SELECT window_json FROM run_trajectory_snapshots WHERE run_id=?",
+                    (run_id,),
+                ).fetchone()
+                if not snap:
+                    self._db.execute("DELETE FROM trajectory_build_queue WHERE run_id=?", (run_id,))
+                    self._db.commit()
+                    continue
+                steps = window_from_json(snap["window_json"])
+                step_summary, tool_sequence = compress_trajectory(steps)
+                self._insert_trajectory_index(
+                    scope_key=row["scope_key"],
+                    input_hash=row["input_hash"],
+                    input_simhash=int(row["input_simhash"]),
+                    input_preview=row["input_preview"],
+                    source_run_id=run_id,
+                    step_summary=step_summary,
+                    tool_sequence=tool_sequence,
+                    cost_micros=int(row["cost_micros"]),
+                    step_count=int(row["step_count"]),
+                    max_age_days=max_age_days,
+                    max_entries_per_scope=max_entries_per_scope,
+                )
+                self._db.execute("DELETE FROM trajectory_build_queue WHERE run_id=?", (run_id,))
+                self._db.commit()
+                done += 1
+            except Exception:
+                self._db.execute(
+                    "UPDATE trajectory_build_queue SET attempts = attempts + 1 WHERE run_id=?",
+                    (run_id,),
+                )
+                self._db.commit()
+        return done
+
+    def _insert_trajectory_index(
+        self,
+        *,
+        scope_key: str,
+        input_hash: str,
+        input_simhash: int,
+        input_preview: str,
+        source_run_id: str,
+        step_summary: str,
+        tool_sequence: str,
+        cost_micros: int,
+        step_count: int,
+        quality_score: float | None = None,
+        max_age_days: int = 30,
+        max_entries_per_scope: int = 500,
+    ) -> None:
+        indexed_at = time.time()
+        row_id = new_id("traj")
+        self._db.execute(
+            "INSERT INTO trajectory_index("
+            "id, scope_key, input_hash, input_simhash, input_preview, source_run_id, "
+            "step_summary, tool_sequence, cost_micros, step_count, quality_score, indexed_at"
+            ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                row_id, scope_key, input_hash, input_simhash, input_preview, source_run_id,
+                step_summary, tool_sequence, cost_micros, step_count, quality_score, indexed_at,
+            ),
+        )
+        self._prune_trajectory_scope(scope_key, max_age_days=max_age_days, max_entries=max_entries_per_scope)
+        self._db.commit()
+
+    def _prune_trajectory_scope(
+        self, scope_key: str, *, max_age_days: int, max_entries: int,
+    ) -> None:
+        cutoff = time.time() - max_age_days * 86400
+        self._db.execute(
+            "DELETE FROM trajectory_index WHERE scope_key=? AND indexed_at < ?",
+            (scope_key, cutoff),
+        )
+        count = self._db.execute(
+            "SELECT COUNT(*) FROM trajectory_index WHERE scope_key=?", (scope_key,),
+        ).fetchone()[0]
+        overflow = int(count) - max_entries
+        if overflow > 0:
+            self._db.execute(
+                "DELETE FROM trajectory_index WHERE id IN ("
+                "  SELECT id FROM trajectory_index WHERE scope_key=?"
+                "  ORDER BY COALESCE(quality_score, 0) ASC, cost_micros DESC, indexed_at ASC"
+                "  LIMIT ?"
+                ")",
+                (scope_key, overflow),
+            )
+
+    def lookup_trajectory_index(
+        self,
+        *,
+        scope_key: str,
+        input_hash: str,
+        input_simhash: int,
+        max_age_days: int,
+        simhash_threshold: int,
+    ) -> dict[str, Any] | None:
+        from tokenops.control.policies._util import hamming
+        from tokenops.control.trajectory.scope import simhash_from_sqlite
+
+        cutoff = time.time() - max_age_days * 86400
+        query_fp = simhash_from_sqlite(input_simhash)
+        exact = self._db.execute(
+            "SELECT * FROM trajectory_index "
+            "WHERE scope_key=? AND input_hash=? AND indexed_at >= ? "
+            "ORDER BY COALESCE(quality_score, 0) DESC, cost_micros ASC, indexed_at DESC "
+            "LIMIT 1",
+            (scope_key, input_hash, cutoff),
+        ).fetchone()
+        if exact:
+            return self._trajectory_hit_row(exact, match="exact")
+
+        candidates = self._db.execute(
+            "SELECT * FROM trajectory_index WHERE scope_key=? AND indexed_at >= ? "
+            "ORDER BY indexed_at DESC LIMIT 500",
+            (scope_key, cutoff),
+        ).fetchall()
+        best = None
+        best_dist = simhash_threshold + 1
+        for row in candidates:
+            dist = hamming(query_fp, simhash_from_sqlite(int(row["input_simhash"])))
+            if dist <= simhash_threshold and dist < best_dist:
+                best = row
+                best_dist = dist
+        if best is None:
+            return None
+        return self._trajectory_hit_row(best, match="simhash")
+
+    @staticmethod
+    def _trajectory_hit_row(row: sqlite3.Row, *, match: str) -> dict[str, Any]:
+        return {
+            "source_run_id": row["source_run_id"],
+            "step_count": int(row["step_count"]),
+            "cost_micros": int(row["cost_micros"]),
+            "tool_sequence": row["tool_sequence"],
+            "step_summary": row["step_summary"],
+            "match": match,
+        }
+
+    def get_trajectory_index_by_run(self, source_run_id: str) -> dict[str, Any] | None:
+        row = self._db.execute(
+            "SELECT * FROM trajectory_index WHERE source_run_id=? ORDER BY indexed_at DESC LIMIT 1",
+            (source_run_id,),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 # ---- row -> model ---------------------------------------------------------- #

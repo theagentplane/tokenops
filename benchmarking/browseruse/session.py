@@ -20,6 +20,8 @@ class RunConfig:
     user_id: str = "browseruse-bench"
     live_pricing: bool = False
     governance_preset: str = "steering"
+    trajectory_db: str | None = None
+    sync_trajectory_index: bool = False
 
 
 @dataclass
@@ -31,6 +33,11 @@ class ActiveRun:
     span: SpanContext
     task: str = ""
     main_llm_id: int | None = None
+    store: object | None = None  # tokenops.control.store.Store when trajectory_hint enabled
+    trajectory_hint_fired: bool = False
+    trajectory_hint_match: str | None = None
+    trajectory_hint_chars: int = 0
+    _main_llm_calls: int = 0
 
 
 _run_config: ContextVar[RunConfig | None] = ContextVar("browseruse_run_config", default=None)
@@ -63,6 +70,9 @@ class GovernedRunMetrics:
     agent_steps: int
     agent_done: bool
     agent_success: bool | None
+    trajectory_hint_fired: bool = False
+    trajectory_hint_match: str | None = None
+    trajectory_hint_chars: int = 0
 
 
 _last_metrics: GovernedRunMetrics | None = None

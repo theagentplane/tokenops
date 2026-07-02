@@ -28,6 +28,7 @@ from tokenops.control.context import RUN_ID_HEADER, current_registration, curren
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
 from tokenops.control.models import RunNotRegisteredError, RunRecord
+from tokenops.control.trajectory import enqueue_completed_run, schedule_trajectory_drain
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
 from tokenops.providers import complete, stream_complete
@@ -146,6 +147,24 @@ def build_app():
                         steps=governor.ledger.step_count(run_id),
                         ended_at=time.time(),
                     )
+                    rec = store.get_run(run_id)
+                    if rec is not None:
+                        gov_cfg = store.governance_config_for(AGENT).get("governance", {})
+                        hint_params = (gov_cfg.get("policies") or {}).get("trajectory_hint")
+                        if enqueue_completed_run(
+                            store,
+                            rec=rec,
+                            registration=reg,
+                            agent=AGENT,
+                            window=governor.ledger.window(run_id),
+                            policy_params=hint_params,
+                        ):
+                            p = dict(hint_params or {})
+                            schedule_trajectory_drain(
+                                store,
+                                max_age_days=int(p.get("max_age_days", 30)),
+                                max_entries_per_scope=int(p.get("max_entries_per_scope", 500)),
+                            )
 
             result = RunResult(findings=findings, summary=summary, steps=steps, token_usage=token_usage)
             response = task_response(result)

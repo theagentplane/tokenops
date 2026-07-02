@@ -14,7 +14,9 @@ from tokenops.control import (
     governance_scope,
 )
 from tokenops.control.context import SpanContext, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import RunRecord, RunRegistration
+from tokenops.control.store import Store
+from tokenops.control.trajectory import enqueue_completed_run, schedule_trajectory_drain
 
 from benchmarking.browseruse.governed_llm import fill_llm_ids, wrap_ainvoke
 from benchmarking.browseruse.governed_tools import make_governed_act
@@ -36,6 +38,18 @@ from benchmarking.common.pricing import benchmark_price
 
 _installed = False
 _patches: list[tuple[Any, str, Any]] = []
+_trajectory_stores: dict[str, Store] = {}
+
+
+def _trajectory_store(path: str) -> Store:
+    if path not in _trajectory_stores:
+        _trajectory_stores[path] = Store(path, auto_seed=False)
+    return _trajectory_stores[path]
+
+
+def _uses_trajectory_hint(gov_dict: dict) -> bool:
+    hint = (gov_dict.get("policies") or {}).get("trajectory_hint") or {}
+    return bool(hint.get("enabled"))
 
 
 def _store_patch(obj: Any, attr: str, original: Any) -> None:
@@ -60,20 +74,35 @@ def _build_active_run(config: RunConfig, *, task: str, max_steps: int = 100) -> 
     run_id = config.run_id or f"bu-{uuid.uuid4().hex[:12]}"
     price = build_live_price_book() if config.live_pricing else benchmark_price
     controls = ApplyControls()
-    governor = build_governor(
-        _governance_dict(
-            config.mode,
-            config.limit_micros,
-            max_steps,
-            preset=config.governance_preset,
-        ),
-        price,
-        controls,
+    gov_dict = _governance_dict(
+        config.mode,
+        config.limit_micros,
+        max_steps,
+        preset=config.governance_preset,
     )
+    store: Store | None = None
+    if _uses_trajectory_hint(gov_dict):
+        db_path = config.trajectory_db or "benchmarking/browseruse/.trajectory_bench.db"
+        store = _trajectory_store(db_path)
+    governor = build_governor(gov_dict, price, controls, store=store)
     reg = RunRegistration(run_id=run_id, intent="browseruse", user_dims={"user_id": config.user_id})
     span = SpanContext(span_id=f"span-{uuid.uuid4().hex[:8]}", service="browseruse")
     governor.ledger.open_run(run_id)
-    return ActiveRun(config=config, governor=governor, controls=controls, registration=reg, span=span, task=task)
+    if store is not None:
+        store.create_run(
+            RunRecord(
+                run_id=run_id,
+                agent="browseruse",
+                status="running",
+                task=task,
+                started_at=__import__("time").time(),
+                dims={"intent": "browseruse", "user_id": config.user_id},
+            )
+        )
+    return ActiveRun(
+        config=config, governor=governor, controls=controls, registration=reg, span=span,
+        task=task, store=store,
+    )
 
 
 def _agent_llms(agent) -> list[Any]:
@@ -100,6 +129,63 @@ def _agent_llms(agent) -> list[Any]:
     return out
 
 
+def _finalize_trajectory_index(active: ActiveRun, history) -> None:
+    store = active.store
+    if store is None:
+        return
+    run_id = active.registration.run_id
+    import time
+
+    success = history is not None and bool(history.is_successful())
+    halted = active.governor.ledger.is_halted(run_id)
+    rs = active.governor.ledger.runs.get(run_id)
+    status = "completed" if success and not halted else ("halted" if halted else "error")
+    spend = active.governor.ledger.cost_micros(run_id)
+    if history is not None and spend == 0:
+        usage = getattr(history, "usage", None)
+        spend = int(round((getattr(usage, "total_cost", 0.0) or 0.0) * 1_000_000))
+    steps = history.number_of_steps() if history is not None else active.governor.ledger.step_count(run_id)
+    store.update_run(
+        run_id,
+        status=status,
+        halt_reason=rs.halt_reason if rs else None,
+        cost_micros=spend,
+        steps=steps,
+        ended_at=time.time(),
+    )
+    rec = store.get_run(run_id)
+    if rec is None:
+        return
+    hint_params = (_governance_dict(
+        active.config.mode,
+        active.config.limit_micros,
+        100,
+        preset=active.config.governance_preset,
+    ).get("policies") or {}).get("trajectory_hint")
+    if not enqueue_completed_run(
+        store,
+        rec=rec,
+        registration=active.registration,
+        agent="browseruse",
+        window=active.governor.ledger.window(run_id),
+        policy_params=hint_params,
+    ):
+        return
+    if active.config.sync_trajectory_index:
+        hint_params = dict(hint_params or {})
+        store.drain_trajectory_build_queue(
+            max_age_days=int(hint_params.get("max_age_days", 30)),
+            max_entries_per_scope=int(hint_params.get("max_entries_per_scope", 500)),
+        )
+    else:
+        hint_params = dict(hint_params or {})
+        schedule_trajectory_drain(
+            store,
+            max_age_days=int(hint_params.get("max_age_days", 30)),
+            max_entries_per_scope=int(hint_params.get("max_entries_per_scope", 500)),
+        )
+
+
 def _snapshot_metrics(active: ActiveRun, history) -> None:
     run_id = active.registration.run_id
     rs = active.governor.ledger.runs.get(run_id)
@@ -117,6 +203,9 @@ def _snapshot_metrics(active: ActiveRun, history) -> None:
             agent_steps=history.number_of_steps() if history is not None else 0,
             agent_done=history.is_done() if history is not None else False,
             agent_success=history.is_successful() if history is not None else None,
+            trajectory_hint_fired=active.trajectory_hint_fired,
+            trajectory_hint_match=active.trajectory_hint_match,
+            trajectory_hint_chars=active.trajectory_hint_chars,
         )
     )
 
@@ -174,6 +263,7 @@ def install() -> None:
                 history = getattr(self, "history", None)
             raise
         finally:
+            _finalize_trajectory_index(active, history)
             _snapshot_metrics(active, history)
             set_active_run(None)
 
@@ -215,6 +305,8 @@ async def run_governed(
     live_pricing: bool = False,
     max_steps: int = 100,
     governance_preset: str = "steering",
+    trajectory_db: str | None = None,
+    sync_trajectory_index: bool = False,
     on_step_start=None,
     on_step_end=None,
 ) -> GovernedRunResult:
@@ -228,6 +320,8 @@ async def run_governed(
         user_id=user_id,
         live_pricing=live_pricing,
         governance_preset=governance_preset,
+        trajectory_db=trajectory_db,
+        sync_trajectory_index=sync_trajectory_index,
     )
     set_run_config(cfg)
     object.__setattr__(agent, "_tokenops_run_config", cfg)

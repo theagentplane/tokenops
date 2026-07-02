@@ -36,21 +36,45 @@ def _base_budget(limit_micros: int) -> dict[str, Any]:
     }
 
 
+def _steering_policies(*, limit_micros: int) -> dict[str, Any]:
+    return {
+        "cost_budget": {"budget": "run_llm_cap"},
+        "progress_guard": {"window": 5, "repeats": 2, "max_corrections": 20},
+        "tool_fix": {"registry": list(BROWSERUSE_ACTION_REGISTRY), "k": 2},
+        "tool_output_cap": {"cap_tokens": 8000},
+        "output_runaway": {"repeats": 12, "domination": 0.9, "max_retries": 2},
+        "context_compaction": {"ctx_max": 100_000, "has_hook": True},
+        "cost_guard": {"budget": "run_llm_cap", "threshold": 0.8, "mode": "minimize"},
+    }
+
+
 def tokenops_config_steering(*, limit_micros: int, max_steps: int = 100) -> dict[str, Any]:
     """Full steer stack for live browser-use A/B."""
     del max_steps
     return {
         **_base_budget(limit_micros),
-        "policies": {
-            "cost_budget": {"budget": "run_llm_cap"},
-            "progress_guard": {"window": 5, "repeats": 2, "max_corrections": 20},
-            "tool_fix": {"registry": list(BROWSERUSE_ACTION_REGISTRY), "k": 2},
-            "tool_output_cap": {"cap_tokens": 8000},
-            "output_runaway": {"repeats": 12, "domination": 0.9, "max_retries": 2},
-            "context_compaction": {"ctx_max": 100_000, "has_hook": True},
-            "cost_guard": {"budget": "run_llm_cap", "threshold": 0.8, "mode": "minimize"},
-        },
+        "policies": _steering_policies(limit_micros=limit_micros),
     }
+
+
+def tokenops_config_steering_trajectory(*, limit_micros: int, max_steps: int = 100) -> dict[str, Any]:
+    """Steering stack + trajectory_hint (bench opt-in; requires Store in build_governor)."""
+    del max_steps
+    policies = _steering_policies(limit_micros=limit_micros)
+    policies["trajectory_hint"] = {
+        "enabled": True,
+        "scope_dims": ["intent", "agent"],
+        "max_age_days": 30,
+        "max_entries_per_scope": 500,
+        "simhash_threshold": 4,
+        "min_steps": 2,
+        "min_index_steps": 4,
+        "sequence_only_max_steps": 6,
+        "sequence_plus_pitfalls_max_steps": 12,
+        "min_input_chars": 10,
+        "hint_max_chars": 1600,
+    }
+    return {**_base_budget(limit_micros), "policies": policies}
 
 
 def tokenops_config_cost_guard(*, limit_micros: int, max_steps: int = 100) -> dict[str, Any]:
@@ -85,6 +109,7 @@ def tokenops_config_tool_output_cap(*, limit_micros: int, max_steps: int = 100) 
 
 PRESETS: dict[str, Callable[..., dict[str, Any]]] = {
     "steering": tokenops_config_steering,
+    "steering_trajectory": tokenops_config_steering_trajectory,
     "cost_guard": tokenops_config_cost_guard,
     "tool_fix": tokenops_config_tool_fix,
     "tool_output_cap": tokenops_config_tool_output_cap,
