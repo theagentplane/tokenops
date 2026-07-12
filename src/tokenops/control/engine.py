@@ -21,7 +21,7 @@ this is what makes HALT sticky and idempotent across A2A.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, Sequence, runtime_checkable
 
 from tokenops.control.core import (
     Action,
@@ -105,6 +105,7 @@ class ApplyControls:
     """
 
     carry: list[str] = field(default_factory=list)
+    event_log: list[Action] = field(default_factory=list)
     call: _ResolvedCall = field(default_factory=_ResolvedCall)
     retry: bool = False
     tool_result_override: str | None = None  # deep INJECT: substitute the last tool result
@@ -126,6 +127,7 @@ class ApplyControls:
         kind = action.kind
         if kind is ActionKind.ALLOW:
             return
+        self.event_log.append(action)
         if kind is ActionKind.HALT:
             raise Halt(action)
         if kind in (ActionKind.REJECT, ActionKind.QUEUE):
@@ -149,6 +151,68 @@ class ApplyControls:
         # CANCEL is stream-only; a synchronous wrap has nothing to tear down.
 
 
+@dataclass
+class PreviewControls(ApplyControls):
+    """OUT connector for preview mode — record detect/decide without enforcing."""
+
+    actions: list[Action] = field(default_factory=list)
+
+    def apply(self, action: Action) -> None:
+        # Preview mode is "detect + decide only": do not apply mutations/injections
+        # (so governance OFF can still exceed caps for the demo) and do not raise.
+        self.actions.append(action)
+
+    def preview_summary(self) -> dict[str, Any]:
+        return {
+            "action_count": len(self.actions),
+            "would_halt": any(a.kind is ActionKind.HALT for a in self.actions),
+            "actions": [
+                {"kind": a.kind.value, "reason": a.reason}
+                for a in self.actions
+            ],
+        }
+
+
+def policy_hint_from_reason(reason: str) -> str:
+  """Best-effort policy name for dashboard display."""
+  r = reason.lower()
+  if "worst-case" in r or "bounding to" in r or "output cap" in r:
+      return "pre_call_worst_case"
+  if "minimizing" in r or "budget pressure" in r:
+      return "cost_guard"
+  if "exhausted" in r or "no budget" in r:
+      return "cost_budget"
+  return "—"
+
+
+def governance_events_payload(controls: ApplyControls | PreviewControls) -> list[dict[str, Any]]:
+    """Serialize non-ALLOW governance actions for persistence and the dashboard."""
+    actions = controls.actions if isinstance(controls, PreviewControls) else controls.event_log
+    out: list[dict[str, Any]] = []
+    for action in actions:
+        if action.kind is ActionKind.ALLOW:
+            continue
+        row: dict[str, Any] = {
+            "kind": action.kind.value,
+            "reason": action.reason,
+            "policy": policy_hint_from_reason(action.reason),
+        }
+        if action.inject_message:
+            row["message"] = action.inject_message
+        if action.max_output_tokens is not None:
+            row["max_output_tokens"] = action.max_output_tokens
+        out.append(row)
+    return out
+
+
+def halt_detector_from_events(events: Sequence[dict[str, Any]]) -> str | None:
+    for ev in reversed(events):
+        if ev.get("kind") == "halt":
+            policy = ev.get("policy")
+            return policy if policy and policy != "—" else None
+    return None
+
+
 # =========================================================================== #
 # Governor — the harness                                                       #
 # =========================================================================== #
@@ -161,9 +225,16 @@ class Governor:
     detector. That keeps the LLD's per-policy ``(detect, fix)`` rows independent.
     """
 
-    def __init__(self, ledger: Ledger, controls: AgentControls | None = None) -> None:
+    def __init__(
+        self,
+        ledger: Ledger,
+        controls: AgentControls | None = None,
+        *,
+        enforce: bool = True,
+    ) -> None:
         self.ledger = ledger
         self.controls: AgentControls = controls or RaiseControls()
+        self.enforce = enforce
         self._detectors: list[Detector] = []
         self._policy_by_name: dict[str, Policy] = {}
 
@@ -215,7 +286,7 @@ class Governor:
             if policy is None:
                 continue  # a detector with no paired policy is observe-only telemetry
             action = policy.decide(sig, self.ledger)
-            if action.kind is ActionKind.HALT:
+            if action.kind is ActionKind.HALT and self.enforce:
                 # set the durable flag BEFORE applying, so the kill switch survives a
                 # swallowed raise. Idempotent — marking twice is harmless.
                 self.ledger.mark_halted(action.run_id, action.reason)

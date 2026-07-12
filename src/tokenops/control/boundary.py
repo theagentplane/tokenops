@@ -1,6 +1,6 @@
 """TokenOps govern projection helpers for boundary crossings.
 
-Chronicle record/replay lives in ``tokenops.chronicle``; this module maps
+Chronicle record/replay lives in the ``chronicle`` package; this module maps
 crossings to :class:`Observation` for the control-plane ledger.
 """
 

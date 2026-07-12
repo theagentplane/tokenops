@@ -15,8 +15,7 @@ from typing import Any, Literal
 from tokenops.agents.research.native.agent import NativeResearchAgent
 from tokenops.agents.summarize.native.agent import NativeSummarizeAgent
 from tokenops.agents.types import Finding, RunResult, StepEvent, TokenUsage
-from tokenops.chronicle import reset_session
-from tokenops.chronicle.session import RecordedEnvelope
+from tokenops.chronicle import Envelope, reset_session
 from tokenops.config.schema import AgentServerConfig
 from tokenops.control.attribution import build_attribution
 from tokenops.control.context import (
@@ -38,7 +37,7 @@ from tokenops.control import (
     wrap_complete,
 )
 from tokenops.control.core import Action, BoundaryStep, CallRequest, Observation, Signal
-from tokenops.control.engine import Governor, Throttled
+from tokenops.control.engine import Governor, Throttled, governance_events_payload, halt_detector_from_events
 from tokenops.control.models import GovernanceMode, RunRegistration, RunRecord
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -74,7 +73,7 @@ class SimulationResult:
     steps: list[StepEvent]
     token_usage: TokenUsage
     events: list[TraceEvent]
-    envelopes: list[RecordedEnvelope]
+    envelopes: list[Envelope]
     research_window: list[BoundaryStep]
     summarize_window: list[BoundaryStep]
     research_cost_micros: int
@@ -212,6 +211,20 @@ def _demo_research_complete(call_n: list[int]):
     return complete
 
 
+def _demo_search_loop_complete(call_n: list[int], *, repeat: int = 6):
+    """Stub LLM that issues the same search query repeatedly — trips progress_guard."""
+
+    def complete(provider, model, messages, max_output_tokens=None, **kwargs):
+        call_n[0] += 1
+        if call_n[0] <= repeat:
+            content = '{"action": "search", "query": "enterprise SaaS pricing"}'
+        else:
+            content = '{"action": "finish"}'
+        return ModelResponse(content=content, input_tokens=820, output_tokens=45)
+
+    return complete
+
+
 def _demo_summarize_complete(_call_n: list[int]):
     def complete(provider, model, messages, max_output_tokens=None, **kwargs):
         _call_n[0] += 1
@@ -225,7 +238,7 @@ def _demo_summarize_complete(_call_n: list[int]):
     return complete
 
 
-def _envelope_row(env: RecordedEnvelope, *, service: str) -> dict[str, Any]:
+def _envelope_row(env: Envelope, *, service: str) -> dict[str, Any]:
     return {
         "envelope_id": env.envelope_id[:8] + "…",
         "trace_id": env.trace_id[:8] + "…",
@@ -258,6 +271,7 @@ def run_simulation(
     research_cfg: AgentServerConfig | None = None,
     summarize_cfg: AgentServerConfig | None = None,
     demo_mode: bool = True,
+    demo_scenario: str = "default",
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
     on_event: EventCallback | None = None,
 ) -> SimulationResult:
@@ -310,7 +324,13 @@ def run_simulation(
     )
 
     attr_research = build_attribution(reg, service="research")
-    research_dispatch = _demo_research_complete([0]) if demo_mode else None
+    if demo_mode:
+        if demo_scenario == "search_loop_trap":
+            research_dispatch = _demo_search_loop_complete([0])
+        else:
+            research_dispatch = _demo_research_complete([0])
+    else:
+        research_dispatch = None
     if research_dispatch is None:
         from tokenops.providers import complete as live_complete
 
@@ -458,13 +478,17 @@ def run_simulation(
                 status, halt_reason = "throttled", thr.action.reason
                 log.emit("throttle", halt_reason or "throttled", agent="research", run_id=run_id)
             finally:
+                gov_events = governance_events_payload(research_gov.controls)
+                detector = halt_detector_from_events(gov_events) if status == "halted" else None
                 store.update_run(
                     run_id,
                     status=status,
                     halt_reason=halt_reason,
+                    detector=detector,
                     cost_micros=research_gov.ledger.cost_micros(run_id),
                     steps=research_gov.ledger.step_count(run_id),
                     ended_at=time.time(),
+                    governance_events=gov_events,
                 )
 
     for env in session.recorded_envelopes:
@@ -532,7 +556,7 @@ def _make_trace_governor(
     return gov
 
 
-def envelope_rows(envelopes: list[RecordedEnvelope]) -> list[dict[str, Any]]:
+def envelope_rows(envelopes: list[Envelope]) -> list[dict[str, Any]]:
     """Flat rows for span/envelope tables."""
     rows = []
     for env in envelopes:

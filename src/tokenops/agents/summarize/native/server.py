@@ -12,6 +12,7 @@ from tokenops.agents.types import StepEvent, TokenUsage
 from tokenops.config import load_config
 from tokenops.control import (
     ApplyControls,
+    PreviewControls,
     Halt,
     build_attribution,
     build_governor,
@@ -19,6 +20,7 @@ from tokenops.control import (
     wrap_complete,
 )
 from tokenops.control.context import current_registration, governance_scope
+from tokenops.control.models import GovernanceMode
 from tokenops.control.engine import Throttled
 from tokenops.control.models import RunRecord
 from tokenops.control.pricing import build_price_book
@@ -40,13 +42,19 @@ def build_app():
             assert reg is not None
             run_id = reg.run_id
             attr = build_attribution(reg, service=AGENT)
+            mode = reg.mode
 
             task = str(payload.get("task", ""))
             findings = parse_findings(payload.get("findings", []))
             parent_span = headers.get("X-TokenOps-Parent-Span-Id") or payload.get("parent_run")
 
+            controls = PreviewControls() if mode is GovernanceMode.PREVIEW else ApplyControls()
             governor = build_governor(
-                store.governance_config_for(AGENT), price, ApplyControls(), store=store,
+                store.governance_config_for(AGENT),
+                price,
+                controls,
+                store=store,
+                enforce=(mode is not GovernanceMode.PREVIEW),
             )
             controls = governor.controls
             governor.ledger.open_run(run_id)

@@ -32,7 +32,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
 
-from tokenops.control.engine import AgentControls, Governor
+from tokenops.control.engine import AgentControls, ApplyControls, Governor, PreviewControls
+from tokenops.control.models import GovernanceMode
 from tokenops.control.ledger import Budget, Ledger, PriceFn
 from tokenops.control.policies import (
     concurrency_cap,
@@ -115,6 +116,7 @@ def build_governor(
     controls: AgentControls | None = None,
     *,
     store: Store | None = None,
+    enforce: bool = True,
 ) -> Governor:
     """Build a fully-registered Governor (and its Ledger, on ``governor.ledger``) from a
     declarative governance config. ``config`` is the ``governance:`` block (or a mapping
@@ -125,7 +127,7 @@ def build_governor(
     budgets = parse_budgets(gov_cfg.get("budgets"))
 
     ledger = Ledger(budgets=list(budgets.values()), price=price, store=store)
-    governor = Governor(ledger, controls)
+    governor = Governor(ledger, controls, enforce=enforce)
     ctx = _Ctx(budgets=budgets, price=price)
 
     for name, params in (gov_cfg.get("policies") or {}).items():
@@ -143,3 +145,18 @@ def build_governor(
         governor.register(detector, policy)
 
     return governor
+
+
+def build_governance_stack(
+    config: Mapping[str, Any],
+    price: PriceFn,
+    *,
+    store: Store | None = None,
+    mode: GovernanceMode = GovernanceMode.ENFORCE,
+) -> tuple[Governor, ApplyControls | PreviewControls]:
+    """Wire a Governor + OUT connector for enforce or preview mode."""
+    enforce = mode is not GovernanceMode.PREVIEW
+    controls: ApplyControls | PreviewControls
+    controls = ApplyControls() if enforce else PreviewControls()
+    governor = build_governor(config, price, controls, store=store, enforce=enforce)
+    return governor, controls

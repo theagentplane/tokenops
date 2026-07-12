@@ -14,13 +14,9 @@ from tokenops.control.config import _TEMPLATES
 from tokenops.control.models import BudgetSpec, PolicyInstance, Segment
 from tokenops.control.store import new_id
 from tokenops.ui.store_client import get_store
+from tokenops.ui.theme import page_shell
 
-st.set_page_config(page_title="TokenOps — Admin", layout="wide")
-st.title("Policy admin")
-st.caption(
-    "Edit governance here — the **Run dashboard** is read-only (runs & costs only). "
-    "Changes apply on the **next agent run** (no server restart)."
-)
+page_shell(subtitle="Segments, budgets, and policies — applies on the next agent run")
 
 store = get_store()
 
@@ -238,8 +234,8 @@ with policy_tab:
     ]
     st.dataframe(rows, use_container_width=True)
 
-# ---- Effective config preview -------------------------------------------- #
-st.subheader("Effective governance config")
+# ---- effective config preview -------------------------------------------- #
+st.markdown("#### Effective governance config")
 st.caption("What `build_governor` receives per agent on the next run.")
 preview_agent = st.selectbox("Preview for agent", ["research", "summarize"])
 effective = store.governance_config_for(preview_agent)

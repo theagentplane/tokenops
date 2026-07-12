@@ -15,23 +15,32 @@ from tokenops.ui.simulator import (
     window_rows,
 )
 from tokenops.ui.store_client import get_store
+from tokenops.ui.theme import page_shell
 
 load_env()
 
-st.set_page_config(page_title="TokenOps — Run Simulator", layout="wide")
-st.title("Run simulator")
-st.caption(
-    "In-process research → summarize with live trace, Chronicle envelopes, and control-plane events. "
-    "No A2A servers required in demo mode."
-)
+page_shell(subtitle="In-process governed run · live trace and control-plane events")
 
 cfg = load_config()
 store = get_store()
 
 with st.sidebar:
-    st.header("Run inputs")
+    st.markdown("### Run inputs")
     task = st.text_area("Task", cfg.task, height=80)
-    corpus_profile = st.selectbox("Corpus profile", ["healthy", "leak"], index=0)
+    demo_scenario = st.selectbox(
+        "Demo scenario",
+        ["default", "search_loop_trap", "shared_ledger_cap"],
+        format_func=lambda s: {
+            "default": "Default — two searches then finish",
+            "search_loop_trap": "Search loop trap — progress_guard",
+            "shared_ledger_cap": "Shared ledger cap — run prep_ledger_comparison.py first",
+        }[s],
+    )
+    if demo_scenario == "search_loop_trap":
+        corpus_profile = "leak"
+        st.caption("Corpus: **leak** (fixed for this scenario). Set `SEARCH_BACKEND=corpus` before starting UI.")
+    else:
+        corpus_profile = st.selectbox("Corpus profile", ["healthy", "leak"], index=0)
     demo_mode = st.toggle("Demo mode (stub LLM)", value=True, help="No API key needed.")
     preview_mode = st.toggle(
         "Preview mode (no enforcement)",
@@ -41,7 +50,7 @@ with st.sidebar:
     if not demo_mode:
         st.warning("Live mode calls real providers — ensure API keys are set.")
 
-    st.subheader("Registration")
+    st.markdown("#### Registration")
     intent = st.text_input("Intent", "simulator_demo")
     country = st.text_input("Country", "US")
     user_id = st.text_input("user_id", "simulator")
@@ -50,8 +59,11 @@ with st.sidebar:
         help="Segment runs by any tag — group/filter them on the Dashboard.",
     )
 
-    st.subheader("Agents")
-    max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=5)
+    st.markdown("#### Agents")
+    _default_steps = 12 if demo_scenario == "search_loop_trap" else 5
+    max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=_default_steps)
+    if demo_scenario == "search_loop_trap":
+        st.caption("Use **max steps ≥ 8** so the stub can repeat search enough times.")
 
 
 def _parse_tags(raw: str) -> dict[str, str]:
@@ -83,17 +95,23 @@ if start:
             from tokenops.config.schema import AgentServerConfig
             from tokenops.control.models import GovernanceMode
 
+            _sat = (
+                0.99
+                if demo_scenario == "search_loop_trap"
+                else cfg.research.satisfaction_threshold
+            )
             result = run_simulation(
                 store,
                 task=task,
                 corpus_profile=corpus_profile,
                 intent=intent,
                 user_dims={"Country": country, "user_id": user_id, **_parse_tags(custom_tags_raw)},
+                demo_scenario=demo_scenario,
                 research_cfg=AgentServerConfig(
                     provider=cfg.research.provider,
                     model=cfg.research.model,
                     max_steps=int(max_steps),
-                    satisfaction_threshold=cfg.research.satisfaction_threshold,
+                    satisfaction_threshold=_sat,
                 ),
                 summarize_cfg=AgentServerConfig(
                     provider=cfg.summarize.provider,

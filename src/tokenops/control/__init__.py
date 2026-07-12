@@ -28,8 +28,17 @@ from tokenops.control.core import (
     Signal,
     Usage,
 )
-from tokenops.control.config import build_governor
-from tokenops.control.engine import AgentControls, ApplyControls, Governor, RaiseControls, Throttled
+from tokenops.control.config import build_governor, build_governance_stack
+from tokenops.control.engine import (
+    AgentControls,
+    ApplyControls,
+    Governor,
+    PreviewControls,
+    RaiseControls,
+    Throttled,
+    governance_events_payload,
+    halt_detector_from_events,
+)
 from tokenops.control.integration import (
     apply_carry_to_messages,
     consume_carry,
@@ -56,7 +65,7 @@ from tokenops.control.context import (
     governance_scope,
 )
 from tokenops.control.boundary import emit_observation, observation_from_crossing
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 
 __all__ = [
     # vocabulary
@@ -66,14 +75,14 @@ __all__ = [
     # ledger
     "Budget", "Ledger", "RunState", "segment_key",
     # harness
-    "Governor", "RaiseControls", "AgentControls", "ApplyControls", "Throttled",
+    "Governor", "RaiseControls", "AgentControls", "ApplyControls", "PreviewControls", "Throttled",
     # config factory
-    "build_governor",
+    "build_governor", "build_governance_stack",
     # data-plane integration
     "make_on_step", "wrap_complete", "wrap_stream", "apply_carry_to_messages", "consume_carry",
     "step_to_observation", "observation_from_delegate",
     # attribution
-    "RunRegistration", "build_attribution", "begin_entry_run", "begin_downstream_run",
+    "RunRegistration", "GovernanceMode", "parse_governance_mode", "build_attribution", "begin_entry_run", "begin_downstream_run",
     "require_registration", "entry_run_scope", "downstream_run_scope",
     "RUN_ID_HEADER", "PARENT_SPAN_ID_HEADER", "SpanContext", "GovernanceContext",
     "governance_scope", "observation_from_crossing", "emit_observation",

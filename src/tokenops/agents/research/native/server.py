@@ -14,12 +14,15 @@ from tokenops.chronicle import reset_session
 from tokenops.config import load_config
 from tokenops.control import (
     ApplyControls,
+    PreviewControls,
     Halt,
     Action,
     ActionKind,
     build_attribution,
     build_governor,
     downstream_run_scope,
+    governance_events_payload,
+    halt_detector_from_events,
     observation_from_delegate,
     wrap_complete,
     wrap_stream,
@@ -27,7 +30,7 @@ from tokenops.control import (
 from tokenops.control.context import RUN_ID_HEADER, current_registration, current_span, governance_scope
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.models import RunNotRegisteredError, RunRecord
+from tokenops.control.models import GovernanceMode, RunNotRegisteredError, RunRecord
 from tokenops.control.trajectory import enqueue_completed_run, schedule_trajectory_drain
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -56,12 +59,18 @@ def build_app():
             run_id = reg.run_id
             reset_session().begin_trace(run_id)
             attr = build_attribution(reg, service=AGENT)
+            mode = reg.mode
 
             task = str(payload.get("task", ""))
             corpus_profile = bench_corpus_profile(payload)
 
+            controls = PreviewControls() if mode is GovernanceMode.PREVIEW else ApplyControls()
             governor = build_governor(
-                store.governance_config_for(AGENT), price, ApplyControls(), store=store,
+                store.governance_config_for(AGENT),
+                price,
+                controls,
+                store=store,
+                enforce=(mode is not GovernanceMode.PREVIEW),
             )
             controls = governor.controls
             governor.ledger.open_run(run_id)
@@ -139,13 +148,17 @@ def build_app():
                 except Throttled as thr:
                     status, halt_reason = "throttled", thr.action.reason
                 finally:
+                    gov_events = governance_events_payload(controls)
+                    detector = halt_detector_from_events(gov_events) if status == "halted" else None
                     store.update_run(
                         run_id,
                         status=status,
                         halt_reason=halt_reason,
+                        detector=detector,
                         cost_micros=governor.ledger.cost_micros(run_id),
                         steps=governor.ledger.step_count(run_id),
                         ended_at=time.time(),
+                        governance_events=gov_events,
                     )
                     rec = store.get_run(run_id)
                     if rec is not None:
@@ -171,6 +184,12 @@ def build_app():
             response.update(run_id=run_id, status=status, cost_micros=governor.ledger.cost_micros(run_id))
             if halt_reason:
                 response["halt_reason"] = halt_reason
+            gov_actions = (
+                controls.actions
+                if isinstance(controls, PreviewControls)
+                else controls.event_log
+            )
+            response["governance_events"] = governance_events_payload(controls)
             return response
 
     return create_a2a_app(

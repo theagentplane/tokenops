@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0A0A0A;
+    color: #E8E4D9;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .frame {
+    padding: 36px 40px 32px;
+    max-width: 1180px;
+  }
+  .title {
+    color: #C9A227;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 0 0 6px 0;
+  }
+  .subtitle {
+    color: #9A9588;
+    font-size: 13px;
+    margin: 0 0 22px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #121212;
+    border: 1px solid #2A2820;
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  .th {
+    text-align: left;
+    padding: 12px 14px;
+    color: #C9A227;
+    font-weight: 700;
+    background: rgba(201, 162, 39, 0.10);
+    border-bottom: 2px solid #C9A227;
+    white-space: nowrap;
+  }
+  .td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #2A2820;
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  tr:last-child .td { border-bottom: none; }
+  .td.highlight {
+    background: rgba(201, 162, 39, 0.08);
+    border-top: 1px solid rgba(201, 162, 39, 0.12);
+  }
+  .td.highlight:first-child {
+    border-left: 3px solid #C9A227;
+  }
+  .within-no { color: #E57373; font-weight: 600; }
+  .within-yes { color: #81C784; font-weight: 600; }
+  ul {
+    margin: 18px 0 0 0;
+    padding-left: 18px;
+    color: #9A9588;
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+</style></head>
+<body><div class="frame">
+  <div class="title">TokenOps Benchmark — Native Research → Summarize</div>
+  <div class="subtitle">gpt-4o-mini · corpus backend · live + simulator runs</div>
+  <table>
+    <thead><tr><th class="th">Benchmark</th><th class="th">Governance</th><th class="th">Budget cap</th><th class="th">Run spend</th><th class="th">Within cap?</th><th class="th">Outcome / policy</th></tr></thead>
+    <tbody><tr><td class="td">Shared ledger — before</td><td class="td">Separate ledgers</td><td class="td">$0.0010</td><td class="td">$0.0012</td><td class="td"><span class="within-no">No</span></td><td class="td">Completed over cap</td></tr><tr><td class="td highlight">Shared ledger — after</td><td class="td highlight">TokenOps enforce</td><td class="td highlight">$0.0010</td><td class="td highlight">$0.0008</td><td class="td highlight"><span class="within-yes">Yes</span></td><td class="td highlight">pre_call_worst_case HALT</td></tr><tr><td class="td">Live demo — spend exceed</td><td class="td">OFF (preview)</td><td class="td">$0.0001</td><td class="td">~$0.0002</td><td class="td"><span class="within-no">No</span></td><td class="td">Completed; policies detected, not enforced</td></tr><tr><td class="td highlight">Live demo — budget cap</td><td class="td highlight">ON (enforce)</td><td class="td highlight">$0.0001</td><td class="td highlight">$0.0000</td><td class="td highlight"><span class="within-yes">Yes</span></td><td class="td highlight">pre_call_worst_case HALT</td></tr><tr><td class="td highlight">Live demo — cost guard</td><td class="td highlight">ON (enforce)</td><td class="td highlight">$0.00018</td><td class="td highlight">~$0.00017</td><td class="td highlight"><span class="within-yes">Yes</span></td><td class="td highlight">cost_guard INJECT at ~80% budget</td></tr></tbody>
+  </table>
+  <ul><li>Shared ledger rows: reproducible simulator demo (prep_ledger_comparison.py).</li><li>Live demo rows: Chat chips with calibrated budgets (scripts/test_demo_scenarios.py).</li><li>Frame as architecture proof — not multi-trial production ROI.</li></ul>
+</div></body></html>

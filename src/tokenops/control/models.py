@@ -8,10 +8,29 @@ assembles ``governance_config_for(agent)`` into the exact dict ``build_governor`
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Literal
 
 Dimension = Literal["run", "user", "agent", "tenant", "tag"]
 RunStatus = Literal["running", "completed", "halted", "throttled", "error"]
+
+
+class GovernanceMode(str, Enum):
+    ENFORCE = "enforce"
+    PREVIEW = "preview"
+
+
+def parse_governance_mode(value: object) -> GovernanceMode:
+    """Parse API / config values into :class:`GovernanceMode`."""
+    if value is None or value == "":
+        return GovernanceMode.ENFORCE
+    if isinstance(value, GovernanceMode):
+        return value
+    key = str(value).strip().lower()
+    for mode in GovernanceMode:
+        if key == mode.value:
+            return mode
+    raise ValueError(f"unknown governance mode: {value!r}")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -25,6 +44,7 @@ class RunRegistration:
     run_id: str
     intent: str = ""
     user_dims: dict[str, str] = field(default_factory=dict)
+    mode: GovernanceMode = GovernanceMode.ENFORCE
 
 
 class RunNotRegisteredError(LookupError):
@@ -90,6 +110,7 @@ class RunRecord:
     ended_at: float | None = None
     task: str | None = None
     dims: dict[str, str] = field(default_factory=dict)  # segment dims (tags) for grouping/filtering
+    governance_events: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def problematic(self) -> bool:

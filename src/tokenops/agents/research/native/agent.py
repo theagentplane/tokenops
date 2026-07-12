@@ -11,8 +11,7 @@ from tokenops.agents.research import prompts
 from tokenops.agents.research.tools import core
 from tokenops.agents.types import CorpusProfile, Finding, StepCallback, StepEvent, TokenUsage
 from tokenops.config.schema import AgentServerConfig
-from tokenops.chronicle import boundary
-from tokenops.chronicle.schema import InputState
+from tokenops.chronicle import boundary, InputState
 from tokenops.providers import complete
 
 
@@ -36,7 +35,9 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: InputState(graph_state={"name": "search", "args": {"query": query}}),
+        extract_input=lambda query: InputState(
+            messages=[], graph_state={"name": "search", "args": {"query": query}}
+        ),
     )
     def invoke(query: str) -> core.SearchResult:
         result = core.search(query, profile)
