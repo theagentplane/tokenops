@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.chronicle import ReplayPlan, boundary, get_session, reset_session
-from tokenops.chronicle.schema import InputState
-from tokenops.chronicle.session import SessionMode
+from tokenops.chronicle import (
+    InputState,
+    ReplayPlan,
+    SessionMode,
+    boundary,
+    get_session,
+    reset_session,
+)
 from tokenops.control import ApplyControls, build_governor, build_attribution
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
@@ -37,21 +42,34 @@ def test_chronicle_live_records_envelope():
     reset_session()
 
 
-def test_chronicle_replay_stub_skips_execution():
+def test_chronicle_replay_stub_skips_execution(tmp_path):
+    trace_dir = tmp_path / "trace"
+
     reset_session()
     session = get_session()
+    session.begin_trace("trace-replay")
+
+    @boundary("search", kind="tool")
+    def search(q: str) -> dict:
+        return {"snippet": q, "status": "ok"}
+
+    search("record-me")
+    session.export_trace(trace_dir)
+    reset_session()
+
+    session = get_session()
     session.enable_replay(ReplayPlan().stub("search", 1))
-    session.load_fixture_returns({("search", 1): {"snippet": "fixture", "status": "ok"}})
+    session.load_trace(trace_dir)
 
     called = []
 
     @boundary("search", kind="tool")
-    def search(q: str) -> dict:
+    def search_replay(q: str) -> dict:
         called.append(q)
         return {"snippet": "live", "status": "ok"}
 
-    out = search("ignored")
-    assert out["snippet"] == "fixture"
+    out = search_replay("ignored")
+    assert out["snippet"] == "record-me"
     assert called == []
     reset_session()
 
@@ -74,7 +92,9 @@ def test_boundary_tokenops_observe_when_governed(store):
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(graph_state={"name": "search", "args": {"query": q}}),
+        extract_input=lambda q: InputState(
+            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        ),
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}

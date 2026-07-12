@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0A0A0A;
+    color: #E8E4D9;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .frame {
+    padding: 34px 36px 30px;
+    max-width: 1500px;
+  }
+  .title {
+    color: #C9A227;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    margin: 0 0 6px 0;
+  }
+  .subtitle {
+    color: #9A9588;
+    font-size: 13px;
+    margin: 0 0 18px 0;
+  }
+  .hero {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0 16px 0;
+  }
+  .hero .metric { flex: 1; }
+  .metric {
+    background: #121212;
+    border: 1px solid #2A2820;
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .metric .k {
+    color: #9A9588;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .metric .v {
+    color: #C9A227;
+    font-size: 18px;
+    font-weight: 900;
+    margin-top: 4px;
+  }
+  .metric .n {
+    color: #9A9588;
+    font-size: 11.5px;
+    margin-top: 4px;
+    line-height: 1.35;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #121212;
+    border: 1px solid #2A2820;
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .th {
+    text-align: left;
+    padding: 10px 12px;
+    color: #C9A227;
+    font-weight: 800;
+    background: rgba(201, 162, 39, 0.10);
+    border-bottom: 2px solid #C9A227;
+    white-space: nowrap;
+  }
+  .td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #2A2820;
+    vertical-align: top;
+    line-height: 1.35;
+  }
+  tr:last-child .td { border-bottom: none; }
+  .td.ok { color: #81C784; font-weight: 700; }
+  .td.muted { color: #9A9588; }
+  .repo-footer {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #2A2820;
+    max-width: 520px;
+  }
+  .repo-footer-label {
+    color: #9A9588;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .repo-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 11px;
+    line-height: 1.6;
+    flex-wrap: wrap;
+  }
+  .repo-name {
+    color: #E8E4D9;
+    font-weight: 700;
+    min-width: 88px;
+  }
+  .repo-path {
+    color: #9A9588;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 10.5px;
+  }
+  .repo-stars {
+    color: #C9A227;
+    font-weight: 800;
+    margin-left: auto;
+  }
+</style></head>
+<body><div class="frame">
+  <div class="title">TokenOps Benchmark — Overall (9 runs)</div>
+  <div class="subtitle">Archived A/B sweeps (ungoverned vs tokenops) — slide table (gold/black)</div>
+  <div class="hero">
+    <div class="metric">
+      <div class="k">Average spend</div>
+      <div class="v">↓ 78.9% · $0.068 → $0.014</div>
+      <div class="n">Total spend (weighted): $1.839 → $0.388 over N=27</div>
+    </div>
+    <div class="metric">
+      <div class="k">Completion under cap</div>
+      <div class="v">67% → 96%</div>
+      <div class="n">Within-cap success: 18/27 → 26/27 (+30 pp)</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th class="th">Framework</th><th class="th">Scenario</th><th class="th">N</th><th class="th">Cap</th><th class="th">Vanilla avg</th><th class="th">TokenOps avg</th><th class="th">Steps (V→T)</th><th class="th">Spend ↓</th><th class="th">Within cap (V/T)</th><th class="th">showcase_pass</th><th class="th">win_type</th></tr></thead>
+    <tbody><tr><td class="td">browser-use</td><td class="td">Runaway tab-reload loop (verify trap)</td><td class="td">1</td><td class="td">$0.034</td><td class="td">$0.176</td><td class="td">$0.025</td><td class="td">20 → 3</td><td class="td">−86.1%</td><td class="td">0/1 · 1/1</td><td class="td ok">✅</td><td class="td">fewer_steps</td></tr><tr><td class="td">browser-use</td><td class="td">Runaway tab-reload loop (verify trap)</td><td class="td">3</td><td class="td">$0.034</td><td class="td">$0.149</td><td class="td">$0.034</td><td class="td">16 → 4</td><td class="td">−77.6%</td><td class="td">0/3 · 2/3</td><td class="td ok">✅</td><td class="td">fewer_steps</td></tr><tr><td class="td">browser-use</td><td class="td">Runaway tab-reload loop (verify trap)</td><td class="td">5</td><td class="td">$0.034</td><td class="td">$0.136</td><td class="td">$0.025</td><td class="td">14 → 3</td><td class="td">−82.0%</td><td class="td">0/5 · 5/5</td><td class="td ok">✅</td><td class="td">fewer_steps</td></tr><tr><td class="td">MetaGPT</td><td class="td">Model routing overhead (multi-call planner)</td><td class="td">1</td><td class="td">$0.14</td><td class="td">$0.053</td><td class="td">$0.013</td><td class="td">8 → 8</td><td class="td">−75.1%</td><td class="td">1/1 · 1/1</td><td class="td muted">—</td><td class="td muted">—</td></tr><tr><td class="td">MetaGPT</td><td class="td">Model routing overhead (multi-call planner)</td><td class="td">3</td><td class="td">$0.14</td><td class="td">$0.061</td><td class="td">$0.014</td><td class="td">8 → 8</td><td class="td">−76.4%</td><td class="td">3/3 · 3/3</td><td class="td muted">—</td><td class="td muted">—</td></tr><tr><td class="td">MetaGPT</td><td class="td">Model routing overhead (multi-call planner)</td><td class="td">5</td><td class="td">$0.14</td><td class="td">$0.057</td><td class="td">$0.015</td><td class="td">8 → 8</td><td class="td">−74.0%</td><td class="td">5/5 · 5/5</td><td class="td muted">—</td><td class="td muted">—</td></tr><tr><td class="td">MetaGPT</td><td class="td">Quick verify loop (re-check trap)</td><td class="td">1</td><td class="td">$0.06</td><td class="td">$0.0016</td><td class="td">$0.0007</td><td class="td">12 → 12</td><td class="td">−55.4%</td><td class="td">1/1 · 1/1</td><td class="td muted">—</td><td class="td muted">—</td></tr><tr><td class="td">MetaGPT</td><td class="td">Quick verify loop (re-check trap)</td><td class="td">3</td><td class="td">$0.06</td><td class="td">$0.0016</td><td class="td">$0.0007</td><td class="td">12 → 12</td><td class="td">−54.0%</td><td class="td">3/3 · 3/3</td><td class="td muted">—</td><td class="td muted">—</td></tr><tr><td class="td">MetaGPT</td><td class="td">Quick verify loop (re-check trap)</td><td class="td">5</td><td class="td">$0.06</td><td class="td">$0.0017</td><td class="td">$0.0007</td><td class="td">12 → 12</td><td class="td">−55.0%</td><td class="td">5/5 · 5/5</td><td class="td muted">—</td><td class="td muted">—</td></tr></tbody>
+  </table>
+  <div class="repo-footer"><div class="repo-footer-label">Agents benchmarked</div><div class="repo-row"><span class="repo-name">browser-use</span><span class="repo-path">github.com/browser-use/browser-use</span><span class="repo-stars">★ 102.1k</span></div><div class="repo-row"><span class="repo-name">MetaGPT</span><span class="repo-path">github.com/FoundationAgents/MetaGPT</span><span class="repo-stars">★ 69.1k</span></div></div>
+</div></body></html>

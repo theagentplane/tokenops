@@ -1,4 +1,4 @@
-"""Unified boundary decorator for record and replay (+ TokenOps govern ingest)."""
+"""Boundary decorator: Chronicle record/replay + TokenOps govern ingest."""
 
 from __future__ import annotations
 
@@ -6,12 +6,9 @@ import functools
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from tokenops.chronicle.schema import InputState
-from tokenops.chronicle.session import (
-    SessionMode,
-    get_session,
-    result_to_action_result,
-)
+from chronicle.envelope.schema import ActionResult, InputState, ToolCall
+from chronicle.session import SessionMode, get_session
+
 from tokenops.control.context import current_span
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -115,6 +112,60 @@ def _input_state_to_dict(input_state: InputState) -> dict[str, object]:
     return d
 
 
+def _to_raw_dict(result: Any) -> dict[str, Any] | None:
+    if isinstance(result, dict):
+        return result
+    to_dict = getattr(result, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+    model_dump = getattr(result, "model_dump", None)
+    if callable(model_dump):
+        return model_dump()
+    try:
+        from dataclasses import asdict, is_dataclass
+
+        if is_dataclass(result) and not isinstance(result, type):
+            return asdict(result)
+    except TypeError:
+        pass
+    return None
+
+
+def _result_to_action_result(result: Any, kind: str) -> ActionResult:
+    """Extended conversion for TokenOps agent result types (SearchResult, ModelResponse)."""
+    if kind == "tool" and isinstance(result, dict):
+        return ActionResult(completion=result.get("status", str(result)), raw_response=result)
+    if kind == "llm" and isinstance(result, dict):
+        tool_calls = [
+            ToolCall(
+                id=tc.get("id"),
+                name=tc.get("name", ""),
+                arguments=tc.get("arguments", {}),
+            )
+            for tc in result.get("tool_calls", [])
+        ]
+        return ActionResult(
+            tool_calls=tool_calls,
+            completion=result.get("completion"),
+            finish_reason=result.get("finish_reason"),
+        )
+    if hasattr(result, "content"):
+        return ActionResult(
+            completion=str(getattr(result, "content", "")),
+            raw_response={
+                "input_tokens": getattr(result, "input_tokens", 0),
+                "output_tokens": getattr(result, "output_tokens", 0),
+            },
+        )
+    if hasattr(result, "snippet"):
+        return ActionResult(
+            completion=getattr(result, "snippet", str(result))[:200],
+            raw_response=_to_raw_dict(result),
+        )
+    raw = _to_raw_dict(result)
+    return ActionResult(completion=str(result), raw_response=raw)
+
+
 def _record_call(session, fn, boundary_id, kind, args, kwargs, extract_input, extract_result):
     input_state = (
         extract_input(*args, **kwargs)
@@ -124,7 +175,7 @@ def _record_call(session, fn, boundary_id, kind, args, kwargs, extract_input, ex
     result = fn(*args, **kwargs)
     if extract_result:
         result = extract_result(result)
-    action_result = result_to_action_result(result, kind)
+    action_result = _result_to_action_result(result, kind)
     session.record_envelope(boundary_id, kind, input_state, action_result)
     _tokenops_observe(boundary_id, kind, input_state, result)
     return result

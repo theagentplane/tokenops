@@ -9,7 +9,7 @@ agents:
     provider: openai
     model: gpt-4o-mini
     port: 8001
-    max_steps: 20
+    max_steps: 5
     satisfaction_threshold: 0.7
   summarize:
     url: http://localhost:8002

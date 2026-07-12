@@ -9,6 +9,7 @@ description = "Two-agent A2A test bench for research and summarize pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "chronicle @ git+https://github.com/theagentplane/chronicle.git",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",

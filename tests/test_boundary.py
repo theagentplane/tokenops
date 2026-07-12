@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.chronicle import boundary, reset_session
-from tokenops.chronicle.schema import InputState
+from tokenops.chronicle import InputState, boundary, reset_session
 from tokenops.control import ApplyControls, build_governor, build_attribution
 from tokenops.control.context import SpanContext, clear, governance_scope, run_scope
 from tokenops.control.models import RunRegistration
@@ -37,7 +36,9 @@ def test_boundary_emits_observation_when_governed(store):
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(graph_state={"name": "search", "args": {"query": q}}),
+        extract_input=lambda q: InputState(
+            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        ),
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}

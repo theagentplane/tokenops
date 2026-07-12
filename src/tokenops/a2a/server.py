@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from tokenops.a2a.cards import agent_card
-from tokenops.chronicle.session import reset_session
+from tokenops.chronicle import reset_session
 from tokenops.control import Halt
 from tokenops.control.engine import Throttled
 from tokenops.control.models import RunAlreadyRegisteredError, RunRegistration, parse_governance_mode
