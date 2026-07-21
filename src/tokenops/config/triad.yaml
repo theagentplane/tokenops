@@ -56,7 +56,7 @@ governance:
     concurrency_cap:
       max_concurrent: 4
       mode: reject
-    tool_reject:
+    tool_fix:
       registry: [search, fetch]
       k: 4
     tool_output_cap:
