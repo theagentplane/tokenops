@@ -1,0 +1,70 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          # pyproject pins chronicle (git) + runtime deps; pytest for CI
+          python -m pip install -e .
+          python -m pip install pytest
+
+      - name: Default suite (exclude metagpt / browseruse / trial)
+        run: |
+          python -m pytest -q \
+            --ignore=tests/test_metagpt_integration.py \
+            --ignore=tests/test_metagpt_live_scenarios.py \
+            --ignore=tests/test_browseruse_suites.py \
+            --ignore=tests/test_trials_sweep.py \
+            --ignore=tests/test_trial_status.py
+
+      - name: Policy / governance suite
+        run: |
+          python -m pytest -q \
+            tests/test_cost_budget.py \
+            tests/test_step_cap.py \
+            tests/test_tool_fix.py \
+            tests/test_cost_guard.py \
+            tests/test_concurrency_cap.py \
+            tests/test_pre_call_worst_case.py \
+            tests/test_trajectory_hint.py \
+            tests/test_trajectory_hint_e2e.py \
+            tests/test_preview_mode.py \
+            tests/test_actuators.py \
+            tests/test_attribution.py \
+            tests/test_attribution_ledger_policies_e2e.py \
+            tests/test_boundary.py \
+            tests/test_chronicle_boundary.py \
+            tests/test_crossing_hook.py \
+            tests/test_triad_e2e.py \
+            tests/test_apply.py \
+            tests/test_output_runaway.py \
+            tests/test_progress_guard.py \
+            tests/test_context_compaction.py \
+            tests/test_tool_output_cap.py \
+            tests/test_cross_process_budget_gating.py \
+            tests/test_server_enforcement.py \
+            tests/test_control_plane_client.py \
+            tests/test_control_plane_app.py \
+            tests/test_ledger.py \
+            tests/test_config.py \
+            tests/test_store.py \
+            tests/test_pricing.py \
+            tests/test_integration.py
