@@ -8,7 +8,7 @@ The agent (data plane) stays vanilla; the control plane taps boundary crossings 
 
 | Job | Status | Where |
 |---|---|---|
-| Run registration (`intent`, `user_dims`) | ✅ | `POST /v1/runs` via `control/http.py` `mount_run_registration`; `control/store.py` `run_registrations` |
+| Run registration (`intent`, `user_dims`) | ✅ | Plane `POST /v1/runs` (`server/app.py` + `mount_run_registration`); SDK `ControlPlaneClient`; `control/store.py` `run_registrations` |
 | Attribution + span propagation | ✅ | `control/attribution.py`, `control/context.py`, A2A headers |
 | Chronicle `@boundary` record/replay | ✅ | Chronicle package (`boundary`, `session`) |
 | Govern ingest from boundaries | ✅ | `control/crossing.py` hook → `control/boundary.py` → `Governor.observe` |
@@ -72,13 +72,14 @@ Per-policy docs: `docs/policies/`.
 ```bash
 make install
 make db-reset          # optional: clean DB + seed governance
-make run               # research + summarize + Streamlit (auto-frees ports 8001/8002/8501)
+make run               # plane + agents + Admin/Dashboard (auto-frees ports 7700/8001/8002/8501)
+make bench-ui          # optional: Chat + Simulator bench demos
 
 python -m pytest -q    # 108 passed
 ```
 
-Streamlit pages: **Test Bench** (live A2A) · **Run simulator** (in-process, demo mode OK) ·
-**Policy admin** (edit budgets/policies) · **Dashboard** (runs + cost).
+Product UI (`make ui` / compose `--profile ui`): **Policy admin** · **Dashboard**.
+Bench-only (`make bench-ui`): **Test Bench** (live A2A) · **Run simulator** (in-process, demo mode OK).
 
 ## Proof loops
 
@@ -90,9 +91,9 @@ Streamlit pages: **Test Bench** (live A2A) · **Run simulator** (in-process, dem
 
 ## Deferred
 
-LangChain governance ([#6](https://github.com/theagentplane/tokenops/issues/6)) · composite segment matchers ([#5](https://github.com/theagentplane/tokenops/issues/5)) · streaming CANCEL/RETRY · cross-process step_cap sum · **control-plane API layer** — route agents, UIs, and scripts through a service or `Store` abstraction instead of direct SQLite (`Store`) access in every process.
+LangChain governance ([#6](https://github.com/theagentplane/tokenops/issues/6)) · composite segment matchers ([#5](https://github.com/theagentplane/tokenops/issues/5)) · streaming CANCEL/RETRY · cross-process step_cap sum · remote observe / governance admin over HTTP (registration + plane service + SDK client + compose are live; see `docs/control-plane-deploy.md`).
 
 ## Docs
 
-`docs/run-attribution.md` · `docs/architecture.md` · `docs/shared-ledger-comparison.md` · `docs/testing.md` ·
+`docs/run-attribution.md` · `docs/architecture.md` · `docs/control-plane-deploy.md` · `docs/shared-ledger-comparison.md` · `docs/testing.md` ·
 `docs/instrumentation-contract.md` · `docs/governance-policy.md`

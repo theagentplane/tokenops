@@ -10,7 +10,9 @@ boundaries, and three Streamlit UIs; state shared via one SQLite file.
 
 | Entry point | Module | Purpose |
 |-------------|--------|---------|
-| `POST /v1/runs` | `control/http.py` `mount_run_registration` | register run dims (entry agent) |
+| `POST /v1/runs` | `control/http.py` `mount_run_registration` (plane app) | register run dims |
+| `ControlPlaneClient` | `control/client.py` | SDK register_run (HTTP or embedded Store) |
+| `python -m tokenops.server` | `server/app.py` | standalone control plane (:7700) |
 | `POST /v1/tasks` | `bench/a2a/server.py` | task requires `X-TokenOps-Run-Id` |
 | `build_attribution(reg, service=…)` | `attribution.py` | registration → ledger `Attribution` |
 | `@boundary` + crossing hook | Chronicle + `control/crossing.py` | record crossing + govern ingest |

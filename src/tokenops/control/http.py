@@ -104,6 +104,7 @@ async def post_run(
     *,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
+    """POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
     base = url.rstrip("/")
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(f"{base}/v1/runs", json=payload)
@@ -117,6 +118,7 @@ def post_run_sync(
     *,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
+    """Sync POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
     base = url.rstrip("/")
     with httpx.Client(timeout=timeout) as client:
         response = client.post(f"{base}/v1/runs", json=payload)

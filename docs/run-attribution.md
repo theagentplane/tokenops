@@ -164,8 +164,10 @@ X-TokenOps-Run-Id: <run_id>
 { "task": "...", "bench": { "corpus_profile": "healthy" } }
 ```
 
-Implemented in `control/http.py` (`mount_run_registration`); research native
-`build_app()` mounts it on the A2A app. Task handlers resolve registration only.
+Implemented in `control/http.py` (`mount_run_registration`) on the plane app
+(`tokenops.server`); research mounts the same route only when ``TOKENOPS_URL`` is
+unset. Clients use ``ControlPlaneClient.register_run``. Task handlers resolve
+registration only.
 
 ## Cross-process ledger (spend + halt)
 

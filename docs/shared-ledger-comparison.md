@@ -8,7 +8,7 @@ The shared SQLite ledger (`ledger_spent` in `tokenops.db`) makes spend and halt 
 
 ```bash
 python scripts/prep_ledger_comparison.py   # sets run_llm_cap to $0.001
-SEARCH_BACKEND=corpus make ui              # reproducible stub search (no network)
+SEARCH_BACKEND=corpus make bench-ui        # Chat + Simulator (reproducible stub search)
 ```
 
 Simulator defaults: **healthy** corpus, **demo mode** on, task *Research enterprise SaaS pricing*.  
@@ -48,7 +48,7 @@ Research spend is written to `ledger_spent` in SQLite. When summarize starts, `b
 
 ```bash
 python scripts/prep_ledger_comparison.py
-SEARCH_BACKEND=corpus make ui
+SEARCH_BACKEND=corpus make bench-ui
 ```
 
 **Run simulator → Start run** (demo mode, healthy corpus). Use **Total run $** and **Run budget cap** in the summary bar.

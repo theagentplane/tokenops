@@ -13,36 +13,53 @@ make install
 cp .env.example .env   # add your API keys (optional for simulator demo mode)
 
 make db-reset          # optional: clean SQLite + seed governance from default.yaml
-make run               # starts both agents + UI (Ctrl+C stops all; frees stale ports)
+make run               # control plane :7700 + agents + Admin/Dashboard (Ctrl+C stops all; frees stale ports)
 ```
+
+**Docker (same shape as cloud):** plane + research + summarize sharing a DB volume —
+
+```bash
+docker compose up --build
+# optional product UI (Admin + Dashboard): docker compose --profile ui up --build
+```
+
+See [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
 
 Or run each process separately:
 
 ```bash
-# Terminal 1
-make research-server
+# Terminal 1 — control plane (POST /v1/runs)
+make control-plane
+export TOKENOPS_URL=http://localhost:7700
 
 # Terminal 2
-make summarize-server
+make research-server
 
 # Terminal 3
+make summarize-server
+
+# Terminal 4 — plane product UI (Admin + Dashboard)
 make ui
+
+# Optional — bench Chat + Simulator demos
+make bench-ui
 ```
 
 Open http://localhost:8501.
 
-| Page | Purpose |
-|------|---------|
-| **Test Bench** | Live A2A pipeline (research → summarize) |
-| **Run simulator** | In-process run with trace, spans, control-plane timeline (demo mode = no API key) |
-| **Policy admin** | Edit budgets, policies, segments (SQLite) |
-| **Dashboard** | Run history, cost, halt reasons |
+| Page | Entry | Purpose |
+|------|-------|---------|
+| **Policy admin** | `make ui` / compose `--profile ui` | Edit budgets, policies, segments (SQLite) |
+| **Dashboard** | same | Run history, cost, halt reasons |
+| **Test Bench (Chat)** | `make bench-ui` only | Live A2A pipeline (research → summarize) |
+| **Run simulator** | `make bench-ui` only | In-process run with trace, spans (demo mode = no API key) |
 
-Configure agents in the Test Bench sidebar, or use **Run simulator** for governance debugging.
+Configure agents in the Test Bench sidebar (`make bench-ui`), or use **Run simulator** for governance debugging.
 
 ### Governance / DB
 
 - Config lives in **`tokenops.db`** (env `TOKENOPS_DB`), seeded from `default.yaml` `governance:` on first open.
+- Control plane URL: **`TOKENOPS_URL`** (e.g. `http://localhost:7700`). Agents register via `ControlPlaneClient`; set `TOKENOPS_EMBEDDED=1` for in-process Store (tests).
 - Edit budgets/policies in **Policy admin** — changes apply on the next run.
 - Reset: `make db-reset` · see `CONTROL_PLANE.md`
 
@@ -78,19 +95,20 @@ make research-server
 ## Architecture
 
 ```
-src/tokenops/   # core control plane (ledger, policies, Admin/Dashboard, providers)
+src/tokenops/   # control plane SDK + standalone plane (server/) + Admin/Dashboard
 bench/          # two-agent A2A test bench (agents, a2a, chat + simulator, demo-assets)
 ```
 
-- UI sends task to **research server** only
-- Research server completes research, then calls **summarize server** via A2A HTTP
+- UI / clients register runs on the **control plane** (`ControlPlaneClient` → `TOKENOPS_URL`)
+- Research completes research, then calls summarize via A2A HTTP
 - Summarize returns summary to research; research returns full result to UI
 
-See [`docs/code-navigation.md`](docs/code-navigation.md) for code navigation diagrams.
+See [`docs/code-navigation.md`](docs/code-navigation.md) and [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
 
 ## Documentation
 
 - [Control plane status](CONTROL_PLANE.md)
+- [Control plane deploy](docs/control-plane-deploy.md) — compose vs SDK, `TOKENOPS_URL`, `register_run`
 - [Customer outcomes](docs/customer-outcomes.md) — first-order metrics: cost, completion under budget, quality
 - [Run attribution](docs/run-attribution.md)
 - [Architecture](docs/architecture.md)

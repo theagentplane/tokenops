@@ -27,6 +27,7 @@ from tokenops.control import (
     install_crossing_hook,
     mount_run_registration,
     observation_from_delegate,
+    should_mount_run_registration,
     with_governance_errors,
     wrap_complete,
     wrap_stream,
@@ -54,7 +55,8 @@ def build_app():
             k.lower() == RUN_ID_HEADER.lower() for k in headers
         ):
             raise RunNotRegisteredError(
-                f"missing {RUN_ID_HEADER} — register via POST /v1/runs first"
+                f"missing {RUN_ID_HEADER} — register via ControlPlaneClient "
+                "or POST /v1/runs on the control plane first"
             )
 
         with downstream_run_scope(store, headers=headers, service=AGENT):
@@ -203,7 +205,11 @@ def build_app():
         skills=["research"],
         handler=with_governance_errors(handler),
     )
-    mount_run_registration(app, store)
+    # When TOKENOPS_URL points at the standalone plane, registration lives there —
+    # do not double-mount /v1/runs on the agent. Embedded / no-URL keeps local mount
+    # for pytest TestClient and single-process local runs.
+    if should_mount_run_registration():
+        mount_run_registration(app, store)
     install_crossing_hook()
     return app
 

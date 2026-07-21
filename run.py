@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start research server, summarize server, and Streamlit UI."""
+"""Start control plane, agents, and product UI (Admin + Dashboard)."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ load_env()
 
 PYTHON = sys.executable
 UI_PORT = 8501
+CONTROL_PLANE_URL = "http://localhost:7700"
 RESEARCH_URL = "http://localhost:8001"
 SUMMARIZE_URL = "http://localhost:8002"
 
@@ -121,16 +122,22 @@ def main() -> int:
     from tokenops.config import load_config
 
     cfg = load_config()
-    for port in {cfg.research.port, cfg.summarize.port, UI_PORT}:
+    for port in {7700, cfg.research.port, cfg.summarize.port, UI_PORT}:
         _free_port(port)
 
+    # Local shape matches compose: plane first, agents register via TOKENOPS_URL.
+    os.environ.setdefault("TOKENOPS_URL", CONTROL_PLANE_URL)
+
+    print("Starting control plane...")
+    _start_server("tokenops.server")
     print("Starting summarize server...")
     _start_server("bench.servers.summarize")
     print("Starting research server...")
     _start_server("bench.servers.research")
 
-    print("Waiting for agents...")
+    print("Waiting for services...")
     try:
+        _wait_for_health(CONTROL_PLANE_URL, "Control plane")
         _wait_for_health(SUMMARIZE_URL, "Summarize")
         _wait_for_health(RESEARCH_URL, "Research")
     except RuntimeError as exc:
@@ -138,14 +145,14 @@ def main() -> int:
         _shutdown()
         return 1
 
-    print(f"Starting UI at http://localhost:{UI_PORT}")
+    print(f"Starting product UI (Admin + Dashboard) at http://localhost:{UI_PORT}")
     ui = subprocess.run(
         [
             PYTHON,
             "-m",
             "streamlit",
             "run",
-            "bench/ui/app.py",
+            "src/tokenops/ui/app.py",
             f"--server.port={UI_PORT}",
         ],
         cwd=ROOT,
