@@ -26,7 +26,6 @@ from tokenops.control import (
     halt_detector_from_events,
     install_crossing_hook,
     mount_run_registration,
-    observation_from_delegate,
     should_mount_run_registration,
     with_governance_errors,
     wrap_complete,
@@ -124,7 +123,7 @@ def build_app():
                             kind=ActionKind.HALT, run_id=run_id,
                             reason="no budget remaining; refusing to delegate",
                         ))
-                    summary, sum_tokens, sum_steps, sum_cost = await delegate_summarize(
+                    summary, sum_tokens, sum_steps, _sum_cost = await delegate_summarize(
                         cfg.summarize_url,
                         task,
                         findings,
@@ -133,15 +132,8 @@ def build_app():
                     )
                     token_usage = token_usage.merge(sum_tokens)
                     steps.extend(sum_steps)
-                    governor.observe(
-                        observation_from_delegate(
-                            attr,
-                            boundary_id="delegate_summarize",
-                            rolled_up_cost_micros=sum_cost,
-                            ts=time.time(),
-                            service=AGENT,
-                        )
-                    )
+                    # Child spend is already in the shared ledger for this run_id;
+                    # do not re-add via observation_from_delegate.
                 except Halt as halt:
                     status, halt_reason = "halted", halt.action.reason
                 except Throttled as thr:

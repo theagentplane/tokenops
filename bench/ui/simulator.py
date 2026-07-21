@@ -36,7 +36,6 @@ from tokenops.control import (
     build_governor,
     build_governance_stack,
     downstream_run_scope,
-    observation_from_delegate,
     wrap_complete,
 )
 from tokenops.control.core import Action, BoundaryStep, CallRequest, Observation, Signal
@@ -466,15 +465,7 @@ def run_simulation(
                         ended_at=time.time(),
                     )
 
-                research_gov.observe(
-                    observation_from_delegate(
-                        attr_research,
-                        boundary_id="delegate_summarize",
-                        rolled_up_cost_micros=summarize_cost,
-                        ts=time.time(),
-                        service="research",
-                    )
-                )
+                # Child spend already recorded in the shared ledger for this run_id.
             except Halt as halt:
                 status, halt_reason = "halted", halt.action.reason
                 log.emit("halt", halt_reason or "halted", agent="research", run_id=run_id)

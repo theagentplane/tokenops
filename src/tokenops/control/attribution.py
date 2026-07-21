@@ -101,6 +101,46 @@ def begin_downstream_run(
     return BoundRun(registration=reg, span=span)
 
 
+def begin_entry_task_run(
+    store: Store,
+    *,
+    headers: Mapping[str, str],
+    payload: Mapping[str, object] | None,
+    service: str,
+) -> BoundRun:
+    """Entry agent: reuse inbound ``run_id`` or register a new run via the control plane.
+
+    UI / clients call the entry agent's ``POST /v1/tasks`` without registering first.
+    The entry agent opens the run (``ControlPlaneClient.register_run`` → plane
+    ``POST /v1/runs`` or embedded Store), then binds context for this task.
+    """
+    from tokenops.control.client import ControlPlaneClient
+    from tokenops.control.context import RUN_ID_HEADER
+
+    rid = header_run_id(headers)
+    if rid:
+        return begin_downstream_run(store, headers=headers, service=service)
+
+    body = dict(payload or {})
+    intent = str(body.get("intent", "") or "")
+    user_dims = _coerce_user_dims(body.get("user_dims"))
+    mode = body.get("mode") or body.get("governance_mode")
+
+    client = ControlPlaneClient.from_env()
+    # Prefer the agent Store when embedded so registration is visible immediately.
+    if client.embedded:
+        client = ControlPlaneClient(store=store)
+    registered = client.register_run(intent=intent, user_dims=user_dims, mode=mode)
+    merged = {str(k): str(v) for k, v in headers.items()}
+    merged[RUN_ID_HEADER] = str(registered["run_id"])
+    logger.info(
+        "tokenops.entry_registered service=%s run_id=%s",
+        service,
+        registered["run_id"],
+    )
+    return begin_downstream_run(store, headers=merged, service=service)
+
+
 def require_registration() -> RunRegistration:
     """Fail closed when boundaries run outside a bound request context."""
     reg = current_registration()
@@ -119,6 +159,18 @@ def entry_run_scope(
 ):
     """Context manager: register, bind span, clear on exit."""
     bound = begin_entry_run(store, headers=headers, payload=payload, service=service, run_id=run_id)
+    return run_scope(bound.registration, bound.span)
+
+
+def entry_task_run_scope(
+    store: Store,
+    *,
+    headers: Mapping[str, str],
+    payload: Mapping[str, object] | None,
+    service: str,
+):
+    """Context manager for entry agents handling ``POST /v1/tasks`` (auto-register)."""
+    bound = begin_entry_task_run(store, headers=headers, payload=payload, service=service)
     return run_scope(bound.registration, bound.span)
 
 

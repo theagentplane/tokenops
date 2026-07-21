@@ -52,9 +52,11 @@ from tokenops.control.ledger import Budget, Ledger, RunState, segment_key
 from tokenops.control.attribution import (
     begin_downstream_run,
     begin_entry_run,
+    begin_entry_task_run,
     build_attribution,
     downstream_run_scope,
     entry_run_scope,
+    entry_task_run_scope,
     require_registration,
 )
 from tokenops.control.context import (
@@ -96,7 +98,8 @@ __all__ = [
     "step_to_observation", "observation_from_delegate",
     # attribution
     "RunRegistration", "GovernanceMode", "parse_governance_mode", "build_attribution", "begin_entry_run", "begin_downstream_run",
-    "require_registration", "entry_run_scope", "downstream_run_scope",
+    "begin_entry_task_run",
+    "require_registration", "entry_run_scope", "entry_task_run_scope", "downstream_run_scope",
     "RUN_ID_HEADER", "PARENT_SPAN_ID_HEADER", "SpanContext", "GovernanceContext",
     "governance_scope", "observation_from_crossing", "emit_observation",
     # Chronicle crossing hook
