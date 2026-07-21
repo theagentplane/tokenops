@@ -1,4 +1,4 @@
-.PHONY: install research-server summarize-server ui run dev stop db-clear db-reseed db-reset
+.PHONY: install research-server summarize-server control-plane ui run dev stop db-clear db-reseed db-reset
 
 PYTHON ?= python3
 export PYTHONPATH := src:.$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -7,6 +7,9 @@ export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
 	$(PYTHON) -m pip install -r requirements.txt
+
+control-plane:
+	$(PYTHON) -m tokenops.server
 
 research-server:
 	$(PYTHON) -m bench.servers.research
@@ -22,7 +25,7 @@ run: stop
 	$(PYTHON) run.py
 
 stop:
-	@for port in 8001 8002 8501; do \
+	@for port in 7700 8001 8002 8501; do \
 		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
 		if [ -n "$$pids" ]; then \
 			echo "Stopping listener on port $$port ($$pids)"; \

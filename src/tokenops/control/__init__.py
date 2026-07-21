@@ -76,6 +76,7 @@ from tokenops.control.http import (
     post_run_sync,
     with_governance_errors,
 )
+from tokenops.control.client import ControlPlaneClient, should_mount_run_registration
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 
 __all__ = [
@@ -101,4 +102,5 @@ __all__ = [
     "install_crossing_hook", "on_crossing",
     # HTTP (A2A mount + clients)
     "mount_run_registration", "with_governance_errors", "post_run", "post_run_sync",
+    "ControlPlaneClient", "should_mount_run_registration",
 ]

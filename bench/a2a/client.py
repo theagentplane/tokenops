@@ -1,12 +1,50 @@
 from __future__ import annotations
 
+import os
+
 from bench.a2a import messages
 from bench.a2a.server import fetch_agent_card, fetch_agent_card_sync, post_task, post_task_sync
 from bench.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from bench.a2a.messages import parse_findings, parse_token_usage, summarize_request, parse_steps
+from tokenops.control.client import ControlPlaneClient
 from tokenops.control.context import PARENT_SPAN_ID_HEADER, RUN_ID_HEADER
 from tokenops.control.http import post_run, post_run_sync
 from tokenops.control.models import GovernanceMode
+
+
+def _register_via_plane_or_agent(
+    research_url: str,
+    *,
+    intent: str = "",
+    user_dims: dict[str, str] | None = None,
+    mode: GovernanceMode | str | None = None,
+) -> dict:
+    """Register on the control plane when configured; else POST to the research agent."""
+    if (os.environ.get("TOKENOPS_URL") or "").strip() or os.environ.get("TOKENOPS_EMBEDDED") == "1":
+        return ControlPlaneClient.from_env().register_run(
+            intent=intent, user_dims=user_dims or {}, mode=mode,
+        )
+    payload: dict = {"intent": intent, "user_dims": user_dims or {}}
+    if mode is not None:
+        payload["mode"] = mode.value if isinstance(mode, GovernanceMode) else mode
+    return post_run_sync(research_url, payload)
+
+
+async def _register_via_plane_or_agent_async(
+    research_url: str,
+    *,
+    intent: str = "",
+    user_dims: dict[str, str] | None = None,
+    mode: GovernanceMode | str | None = None,
+) -> dict:
+    if (os.environ.get("TOKENOPS_URL") or "").strip() or os.environ.get("TOKENOPS_EMBEDDED") == "1":
+        return await ControlPlaneClient.from_env().register_run_async(
+            intent=intent, user_dims=user_dims or {}, mode=mode,
+        )
+    payload: dict = {"intent": intent, "user_dims": user_dims or {}}
+    if mode is not None:
+        payload["mode"] = mode.value if isinstance(mode, GovernanceMode) else mode
+    return await post_run(research_url, payload)
 
 
 def _parse_run_result(data: dict) -> RunResult:
@@ -28,9 +66,8 @@ def submit_task_sync(
     intent: str = "",
     user_dims: dict[str, str] | None = None,
 ) -> RunResult:
-    reg = post_run_sync(
-        research_url,
-        {"intent": intent, "user_dims": user_dims or {}},
+    reg = _register_via_plane_or_agent(
+        research_url, intent=intent, user_dims=user_dims,
     )
     run_id = reg["run_id"]
     payload = messages.task_request(task=task, bench={"corpus_profile": corpus_profile})
@@ -48,9 +85,11 @@ def submit_task_sync_with_meta(
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[RunResult, dict[str, object]]:
     """Like :func:`submit_task_sync`, but also returns run metadata (status, cost, halt reason)."""
-    reg = post_run_sync(
+    reg = _register_via_plane_or_agent(
         research_url,
-        {"intent": intent, "user_dims": user_dims or {}, "mode": governance_mode.value},
+        intent=intent,
+        user_dims=user_dims,
+        mode=governance_mode,
     )
     run_id = reg["run_id"]
     payload = messages.task_request(task=task, bench={"corpus_profile": corpus_profile})
@@ -74,7 +113,9 @@ async def submit_task(
     intent: str = "",
     user_dims: dict[str, str] | None = None,
 ) -> RunResult:
-    reg = await post_run(research_url, {"intent": intent, "user_dims": user_dims or {}})
+    reg = await _register_via_plane_or_agent_async(
+        research_url, intent=intent, user_dims=user_dims,
+    )
     run_id = reg["run_id"]
     payload = messages.task_request(task=task, bench={"corpus_profile": corpus_profile})
     data = await post_task(research_url, payload, headers={RUN_ID_HEADER: run_id})

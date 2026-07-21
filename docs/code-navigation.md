@@ -13,16 +13,17 @@ How to find your way around TokenOps (core) and the two-agent bench.
 
 | Command | Start reading at |
 |---------|------------------|
+| `make control-plane` | `tokenops.server` → `src/tokenops/server/app.py` |
 | `make research-server` | `bench/servers/research.py` → `bench/agents/research/{native,langchain}/server.py` |
 | `make summarize-server` | `bench/servers/summarize.py` → `bench/agents/summarize/{native,langchain}/server.py` |
 | `make ui` | `bench/ui/app.py` (chat + simulator + core Admin/Dashboard) |
-| `make run` | `run.py` (agents + UI; frees ports first) |
+| `make run` | `run.py` (plane + agents + UI; frees ports first) |
 | `make db-reset` | `scripts/db_clear.py` + `scripts/db_reseed.py` |
 
 ## Trace a governed run (native path)
 
 ```text
-POST /v1/runs  →  control/http.py  (mount_run_registration; intent + user_dims)
+ControlPlaneClient.register_run / POST /v1/runs  →  plane (or agent mount if no TOKENOPS_URL)
 POST /v1/tasks + X-TokenOps-Run-Id
   → bench/agents/research/native/server.py
   → store.governance_config_for → build_governor(..., store=store)
