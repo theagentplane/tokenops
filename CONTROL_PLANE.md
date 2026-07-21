@@ -37,7 +37,7 @@ POST /v1/tasks + X-TokenOps-Run-Id
   → agent loop:
        complete() ──▶ wrap_complete ──▶ pre_call ──▶ detect→decide→apply
        @boundary  ──▶ chronicle envelope + crossing hook ──▶ observe ──▶ ledger.record
-       delegate   ──▶ child agent (same run_id, parent span header) ──▶ rollup observe
+       delegate   ──▶ child agent (same run_id, parent span header) ──▶ shared ledger
   → store.update_run(RunRecord) ──▶ Dashboard
 ```
 

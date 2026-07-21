@@ -28,8 +28,10 @@ Rules:
 
 - **Registration is preferred** before boundary telemetry so cross-agent budgets share one `run_id`.
 - **Duplicate register** for the same `run_id` → error.
-- **Missing `X-TokenOps-Run-Id` on a task** → soft path: auto-register an `unattributed` run, log
-  `tokenops.missing_run_id` / `cross_agent_attribution_broken`, and still govern locally.
+- **Entry agent missing `X-TokenOps-Run-Id`** → `entry_task_run_scope` registers via
+  `ControlPlaneClient` (plane `POST /v1/runs` or embedded Store).
+- **Downstream missing `X-TokenOps-Run-Id`** → soft path: auto-register an `unattributed` run,
+  log `tokenops.missing_run_id` / `cross_agent_attribution_broken`, and still govern locally.
 - **Unknown `run_id` on resolve** → fail closed (`RunNotRegisteredError`).
 - No `triggered_by` first-class field — use `user_dims["user_id"]` if needed.
 - **`corpus_profile` is not a control-plane dim** — test-bench agent config only.
@@ -74,15 +76,16 @@ Code: `control/context.py`, `control/attribution.py`.
 ## Flow
 
 ```
-1. Entry (research)
-     register_run(run_id, intent, user_dims)
-     span s1: service=research, parent=null
+1. Entry (research / planner)
+     entry_task_run_scope → ControlPlaneClient.register_run (if UI omitted run_id)
+     span s1: service=entry, parent=null
      boundaries → Observation → governor.observe
 
 2. Delegate
-     headers: X-TokenOps-Run-Id, X-TokenOps-Parent-Span-Id=s1
-     summarize resolves run_id (no register)
-     span s2: service=summarize, parent=s1
+     headers: X-TokenOps-Run-Id, X-TokenOps-Parent-Span-Id=s1 (ambient merge)
+     child resolves run_id (no register)
+     span s2: service=child, parent=s1
+     child LLM/tool spend → shared ledger (no parent cost rollup)
 
 3. Unregistered run_id at boundary
      resolve_run → RunNotRegisteredError → fail closed
@@ -150,7 +153,7 @@ with governance_scope(governor, attr):    # TokenOps → governor.observe via ho
 
 ## Run registration API (#2)
 
-**Register first** (entry only):
+**Register first** (entry agent via plane — UI may omit and let the entry agent do this):
 
 ```
 POST /v1/runs
@@ -158,18 +161,18 @@ POST /v1/runs
 → 201 { "run_id": "...", "status": "registered" }
 ```
 
-**Then execute** (all agents):
+**Then execute** (entry may register itself when the header is absent):
 
 ```
 POST /v1/tasks
-X-TokenOps-Run-Id: <run_id>
+# X-TokenOps-Run-Id optional on entry; required (propagated) on downstream hops
 { "task": "...", "bench": { "corpus_profile": "healthy" } }
 ```
 
 Implemented in `control/http.py` (`mount_run_registration`) on the plane app
-(`tokenops.server`); research mounts the same route only when ``TOKENOPS_URL`` is
-unset. Clients use ``ControlPlaneClient.register_run``. Task handlers resolve
-registration only.
+(`tokenops.server`); agents mount the same route only when ``TOKENOPS_URL`` is
+unset. Entry agents use ``entry_task_run_scope`` → ``ControlPlaneClient.register_run``.
+Downstream handlers resolve registration only.
 
 ## Cross-process ledger (spend + halt)
 

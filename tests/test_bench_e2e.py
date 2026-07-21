@@ -1,6 +1,6 @@
 """End-to-end on the real A2A research bench (FastAPI TestClient).
 
-Drives the full live path — register run → POST task → per-run governor → actuators →
+Drives the full live path — entry registers run on task → per-run governor → actuators →
 RunRecord — for four policies. Only the model call and the search tool are faked (no API
 key, no network); the server, governor, ledger, store, and agent loop are all real.
 """
@@ -23,18 +23,23 @@ def _search(query, profile="healthy"):
     return SearchResult(query=query, snippet="small snippet", completeness=0.2, source="test")
 
 
-def _run(client, headers_extra=None):
-    reg = client.post("/v1/runs", json={"intent": "demo", "user_dims": {"user_id": "alice"}})
-    assert reg.status_code == 201
-    run_id = reg.json()["run_id"]
-    resp = client.post("/v1/tasks", json={"task": "research pricing", "bench": {"corpus_profile": "healthy"}},
-                       headers={"X-TokenOps-Run-Id": run_id})
+def _run(client, *, intent="demo", user_dims=None):
+    """UI path: POST /v1/tasks without run_id — research registers the run."""
+    payload = {
+        "task": "research pricing",
+        "intent": intent,
+        "user_dims": user_dims or {"user_id": "alice"},
+        "bench": {"corpus_profile": "healthy"},
+    }
+    resp = client.post("/v1/tasks", json=payload)
     return resp.json()
 
 
 def _client(monkeypatch, tmp_path, policies, budgets=(), model=None):
     db = str(tmp_path / "bench.db")
     monkeypatch.setenv("TOKENOPS_DB", db)
+    monkeypatch.delenv("TOKENOPS_URL", raising=False)
+    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
     s = Store(db)
     for b in budgets:
         s.upsert_budget(b)
@@ -134,10 +139,8 @@ def test_run_dims_persisted_for_segmentation(monkeypatch, tmp_path):
     srv, client = _client(monkeypatch, tmp_path,
                           [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
                           model=_always_search)
-    reg = client.post("/v1/runs", json={"intent": "demo", "user_dims": {"user_id": "alice", "team": "growth"}})
-    run_id = reg.json()["run_id"]
-    client.post("/v1/tasks", json={"task": "x", "bench": {"corpus_profile": "healthy"}},
-                headers={"X-TokenOps-Run-Id": run_id})
+    body = _run(client, user_dims={"user_id": "alice", "team": "growth"})
+    run_id = body["run_id"]
     s = Store(os.environ["TOKENOPS_DB"], auto_seed=False)
     rec = s.get_run(run_id)
     assert rec.dims.get("team") == "growth"          # custom tag persisted on the run

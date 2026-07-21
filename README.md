@@ -8,7 +8,7 @@
 **Control plane + SDK** for agent token governance, plus a multi-agent A2A **test bench**.
 The default stack is the **two-agent** pipeline (**Research** → **Summarize**). A **three-agent
 triad** (**Planner** → **Researcher** → **Writer**) is the reference for shared-run ledger,
-tool boundaries, and delegate rollups.
+tool boundaries, and span-propagated A2A hops (no parent cost rollup).
 
 | Piece | What |
 |-------|------|
@@ -82,9 +82,9 @@ Three-process A2A stack with the same control plane / shared `TOKENOPS_DB`:
 
 | Agent | Port | Seams |
 |-------|------|--------|
-| Planner (entry) | 8011 | `register_run` → `wrap_complete` → delegates |
-| Researcher | 8012 | `wrap_complete` + `@boundary` tools + crossing hook |
-| Writer | 8013 | `wrap_complete`; parent observes delegate rollup |
+| Planner (entry) | 8011 | `entry_task_run_scope` → `wrap_complete` → delegates |
+| Researcher | 8012 | `downstream_run_scope` → `wrap_complete` + `@boundary` + crossing hook |
+| Writer | 8013 | `downstream_run_scope` → `wrap_complete` |
 
 ```bash
 # Seed demo-friendly cost_budget / step_cap, then start plane + 3 agents + UI
@@ -188,8 +188,9 @@ bench/          # A2A test benches
 .cursor/skills/integrate-tokenops/  # copilot integration skill
 ```
 
-- UI / clients register runs on the **control plane** (`ControlPlaneClient` → `TOKENOPS_URL`)
-- Research completes research, then calls summarize via A2A HTTP
+- Entry agents register runs on the **control plane** when the UI omits `run_id`
+  (`entry_task_run_scope` → `ControlPlaneClient` → `TOKENOPS_URL`)
+- Research completes research, then calls summarize via A2A HTTP (ambient headers)
 - Triad: Planner plans, delegates to Researcher, then Writer; same `run_id` + shared ledger
 
 See [`docs/code-navigation.md`](docs/code-navigation.md) and [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).

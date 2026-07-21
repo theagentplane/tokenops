@@ -1,11 +1,11 @@
 ---
 name: integrate-tokenops
 description: >-
-  Integrate TokenOps governance into multi-agent systems: ControlPlaneClient.register_run,
-  governance_scope, wrap_complete, Chronicle @boundary, install_crossing_hook, TOKENOPS_URL
-  vs embedded Store, and plane vs agent split. Use when adding TokenOps to an agent stack,
-  wiring the triad bench pattern, or when the user mentions register_run, wrap_complete,
-  crossing hooks, control plane, or TOKENOPS_URL.
+  Integrate TokenOps governance into multi-agent systems: entry_task_run_scope /
+  ControlPlaneClient.register_run, governance_scope, wrap_complete, Chronicle @boundary,
+  install_crossing_hook, TOKENOPS_URL vs embedded Store, and plane vs agent split. Use when
+  adding TokenOps to an agent stack, wiring the triad bench pattern, or when the user
+  mentions register_run, wrap_complete, crossing hooks, control plane, or TOKENOPS_URL.
 ---
 
 # Integrate TokenOps
@@ -21,8 +21,11 @@ Full walkthrough: [`docs/field-guide-add-tokenops.md`](../../../docs/field-guide
 | **Control plane** (`python -m tokenops.server`, `:7700`) | `POST /v1/runs`, shared SQLite (`TOKENOPS_DB`), Admin/Dashboard | Agent loops, LLM calls, tools |
 | **Agent process** (TokenOps SDK in-process) | `wrap_complete`, ledger/policies, Chronicle boundaries, A2A tasks | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
 
-Clients register via `ControlPlaneClient`, then send `X-TokenOps-Run-Id` on every A2A hop.
-Agents share one ledger file so **cost_budget** / **step_cap** apply across processes.
+**UI path:** client calls the **entry** agent `POST /v1/tasks` **without** `run_id`.
+The entry agent opens the run via `entry_task_run_scope` → `ControlPlaneClient.register_run`
+→ plane `POST /v1/runs` (or embedded Store). Downstream hops inherit headers via
+`merge_propagation_headers`. Agents share one ledger file so **cost_budget** / **step_cap**
+apply across processes. Child spend hits that ledger once — **no parent cost rollup**.
 
 ## Env
 
@@ -40,42 +43,46 @@ Agents share one ledger file so **cost_budget** / **step_cap** apply across proc
 
 ```
 TokenOps integration:
-- [ ] 1. Client: ControlPlaneClient.register_run → run_id
-- [ ] 2. Propagate X-TokenOps-Run-Id (+ parent span) on every A2A call
-- [ ] 3. Server: downstream_run_scope → build_governor(..., store=store) → governance_scope
+- [ ] 1. Entry agent: entry_task_run_scope (UI omits run_id)
+- [ ] 2. Propagate X-TokenOps-Run-Id (+ parent span) on every A2A hop
+- [ ] 3. Downstream: downstream_run_scope → build_governor(..., store=store) → governance_scope
 - [ ] 4. LLM: wrap_complete(..., dispatch=complete) as complete_fn
 - [ ] 5. Tools: Chronicle @boundary + install_crossing_hook() once per process
-- [ ] 6. Parent: observation_from_delegate for child cost_micros
+- [ ] 6. Do NOT observation_from_delegate / parent cost rollup (shared ledger)
 - [ ] 7. Keep agent.py vanilla (injectable complete_fn / tools)
 ```
 
-## Step 1 — Register the run
+## Step 1 — Entry agent registers the run
 
 ```python
-from tokenops.control.client import ControlPlaneClient
-# or: from tokenops import ControlPlaneClient
+from tokenops.control import entry_task_run_scope
+from tokenops.control.context import current_registration
 
-reg = ControlPlaneClient.from_env().register_run(
-    intent="my-intent",
-    user_dims={"user_id": "alice"},
-)
-run_id = reg["run_id"]
+# Inside entry agent handler (Planner / Research):
+with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
+    reg = current_registration()
+    run_id = reg.run_id
+    ...
 ```
 
-See `bench/triad/client.py` (`submit_goal_sync_with_meta`).
+UI / bench clients should **not** call `/v1/runs` for the default flow — see
+`bench/triad/client.py` (`submit_goal_sync_with_meta`) and `bench/a2a/client.py`
+(`submit_task_sync_with_meta`).
 
 ## Step 2 — Propagate run_id
+
+Prefer ambient headers: A2A `post_task` merges `propagation_headers()` from context.
 
 ```python
 from tokenops.control.context import RUN_ID_HEADER, PARENT_SPAN_ID_HEADER
 
+# Explicit override only when needed:
 headers = {RUN_ID_HEADER: run_id}
 if parent_span_id:
     headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-# POST /v1/tasks with these headers
 ```
 
-Entry agent: require the header (fail closed). Downstream: `downstream_run_scope(store, headers=..., service=...)`.
+Entry: `entry_task_run_scope`. Downstream: `downstream_run_scope(store, headers=..., service=...)`.
 
 ## Step 3 — Governance scope + governor
 
@@ -96,6 +103,7 @@ with downstream_run_scope(store, headers=headers, service=AGENT):
 ```
 
 `store=store` is required for cross-process budget/step caps.
+`governance_config_for(AGENT)` loads per-agent policies (`agent=None` = global).
 
 ## Step 4 — Wrap the LLM
 
@@ -135,21 +143,10 @@ install_crossing_hook()  # Chronicle on_crossing → Governor.observe
 
 Reference: `bench/triad/researcher/tools.py`, `bench/triad/researcher/server.py`.
 
-## Step 6 — Delegate rollup
+## Step 6 — Delegates: spans only (no parent cost rollup)
 
-```python
-from tokenops.control import observation_from_delegate
-
-governor.observe(
-    observation_from_delegate(
-        attr,
-        boundary_id="delegate_researcher",  # or delegate_writer
-        rolled_up_cost_micros=child_cost,
-        ts=time.time(),
-        service="planner",
-    )
-)
-```
+Child LLM/tool spend is already in the **shared ledger** for the same `run_id`.
+Do **not** call `observation_from_delegate` to re-add `cost_micros` (double-counts).
 
 Refuse outbound delegates when `ledger.budget_left("run_llm_cap", ...)` is exhausted.
 

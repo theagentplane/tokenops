@@ -39,17 +39,15 @@ def run(goal: str, complete_fn):
     ),
     (
         "02-register-run",
-        "Step 1 — ControlPlaneClient.register_run",
+        "Step 1 — entry_task_run_scope (entry agent)",
         '''\
-from tokenops.control.client import ControlPlaneClient
+from tokenops.control import entry_task_run_scope
+from tokenops.control.context import current_registration
 
-reg = ControlPlaneClient.from_env().register_run(
-    intent="triad-demo",
-    user_dims={"user_id": "alice"},
-)
-run_id = reg["run_id"]
-# TOKENOPS_URL → POST /v1/runs on the plane
-# TOKENOPS_EMBEDDED=1 → in-process Store
+# UI POST /v1/tasks with no run_id → entry registers via plane
+with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
+    reg = current_registration()
+    run_id = reg.run_id  # ControlPlaneClient → POST /v1/runs
 ''',
     ),
     (

@@ -21,7 +21,7 @@ from tokenops.control import (
     ActionKind,
     build_attribution,
     build_governor,
-    downstream_run_scope,
+    entry_task_run_scope,
     governance_events_payload,
     halt_detector_from_events,
     install_crossing_hook,
@@ -31,7 +31,7 @@ from tokenops.control import (
     wrap_complete,
     wrap_stream,
 )
-from tokenops.control.context import current_registration, current_span, governance_scope
+from tokenops.control.context import current_registration, governance_scope
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
 from tokenops.control.models import GovernanceMode, RunRecord
@@ -50,8 +50,8 @@ def build_app():
     price = build_price_book()
 
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-        # Missing run_id soft-registers inside downstream_run_scope (logs warning).
-        with downstream_run_scope(store, headers=headers, service=AGENT):
+        # Entry agent: UI may omit run_id — register via ControlPlaneClient / plane.
+        with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
             reg = current_registration()
             assert reg is not None
             run_id = reg.run_id
@@ -100,7 +100,6 @@ def build_app():
                 )
 
             status, halt_reason, summary, findings = "completed", None, "", []
-            span = current_span()
             with governance_scope(governor, attr, provider=cfg.provider, model=cfg.model):
                 try:
                     findings = await asyncio.to_thread(
@@ -127,8 +126,6 @@ def build_app():
                         cfg.summarize_url,
                         task,
                         findings,
-                        run_id=run_id,
-                        parent_span_id=span.span_id if span else None,
                     )
                     token_usage = token_usage.merge(sum_tokens)
                     steps.extend(sum_steps)
