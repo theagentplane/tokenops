@@ -242,7 +242,7 @@ def tool_signature(name: str, args: Mapping[str, object]) -> str:
 
 @dataclass
 class _StepEventLike:
-    """Stand-in for tokenops.agents.types.StepEvent (so this file runs standalone)."""
+    """Stand-in for bench.agents.types.StepEvent (so this file runs standalone)."""
     agent: str
     action: str            # "model" | "search" | "delegate"
     query: str = ""

@@ -1,7 +1,7 @@
 .PHONY: install research-server summarize-server ui run dev stop db-clear db-reseed db-reset
 
 PYTHON ?= python3
-export PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH),)
+export PYTHONPATH := src:.$(if $(PYTHONPATH),:$(PYTHONPATH),)
 export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 
 install:
@@ -9,14 +9,14 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 research-server:
-	$(PYTHON) -m tokenops.servers.research
+	$(PYTHON) -m bench.servers.research
 
 summarize-server:
-	$(PYTHON) -m tokenops.servers.summarize
+	$(PYTHON) -m bench.servers.summarize
 
 ui:
 	@$(MAKE) stop
-	streamlit run src/tokenops/ui/app.py --server.port 8501
+	streamlit run bench/ui/app.py --server.port 8501
 
 run: stop
 	$(PYTHON) run.py

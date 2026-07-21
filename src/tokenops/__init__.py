@@ -1,4 +1,4 @@
-"""Two-agent A2A test bench."""
+"""TokenOps control plane (+ optional two-agent bench)."""
 
 from tokenops.env import load_env
 

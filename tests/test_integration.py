@@ -14,7 +14,7 @@ from conftest import make_attr, toy_price
 
 
 def test_budget_halts_live_native_agent(monkeypatch):
-    from tokenops.agents.research.native import agent as agent_mod
+    from bench.agents.research.native import agent as agent_mod
     from tokenops.config.schema import AgentServerConfig
     from tokenops.providers.types import ModelResponse
 

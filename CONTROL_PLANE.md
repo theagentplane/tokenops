@@ -2,27 +2,27 @@
 
 Governance for the two-agent A2A test bench: **register → measure → record → detect → decide → act**.
 The agent (data plane) stays vanilla; the control plane taps boundary crossings and enforces on
-**cost** (micro-USD integers). **108 tests pass** (1 skipped, 1 warning — Starlette/httpx deprecation).
+**cost** (micro-USD integers). **128+ tests pass** on the main suite (metagpt/browseruse suites may FPE in some local numpy envs).
 
 ## What it does (jobs → status)
 
 | Job | Status | Where |
 |---|---|---|
-| Run registration (`intent`, `user_dims`) | ✅ | `POST /v1/runs`, `control/store.py` `run_registrations` |
+| Run registration (`intent`, `user_dims`) | ✅ | `POST /v1/runs` via `control/http.py` `mount_run_registration`; `control/store.py` `run_registrations` |
 | Attribution + span propagation | ✅ | `control/attribution.py`, `control/context.py`, A2A headers |
-| Chronicle `@boundary` record/replay | ✅ | `chronicle/boundary.py`, `chronicle/session.py` |
-| Govern ingest from boundaries | ✅ | `control/boundary.py` → `Governor.observe` |
+| Chronicle `@boundary` record/replay | ✅ | Chronicle package (`boundary`, `session`) |
+| Govern ingest from boundaries | ✅ | `control/crossing.py` hook → `control/boundary.py` → `Governor.observe` |
 | Provider wrap (pre_call) | ✅ | `control/integration.py` `wrap_complete` |
 | Ledger (spend, inflight, steps, window) | ✅ | `control/ledger.py` + `control/pricing.py` |
 | Cross-process ledger (spend + halt in SQLite) | ✅ | `control/store.py` `ledger_*` tables; `build_governor(..., store=store)` |
 | 10 policy templates + Governor harness | ✅ | `control/policies/*`, `control/engine.py` |
 | Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE) | ✅ | `ApplyControls`, `wrap_complete` |
 | Preview mode (detect + decide, no push) | ✅ | `GovernanceMode.PREVIEW`, `PreviewControls`, `POST /v1/runs` `mode` |
-| Native server enforcement | ✅ | `agents/*/native/server.py` (LangChain: #6) |
+| Native server enforcement | ✅ | `bench/agents/*/native/server.py` (LangChain: #6) |
 | SQLite store + auto-seed from YAML | ✅ | `control/store.py`, `config/default.yaml` `governance:` |
-| Admin UI (edit budgets/policies) | ✅ | `ui/pages/1_Admin.py` |
-| Dashboard (runs, cost, read-only gov preview) | ✅ | `ui/pages/2_Dashboard.py` |
-| Run simulator (in-process trace + control plane) | ✅ | `ui/pages/3_Simulator.py`, `ui/simulator.py` |
+| Admin UI (edit budgets/policies) | ✅ | `tokenops/ui/views/admin.py` |
+| Dashboard (runs, cost, read-only gov preview) | ✅ | `tokenops/ui/views/dashboard.py` |
+| Run simulator (in-process trace + control plane) | ✅ | `bench/ui/views/simulator_view.py`, `bench/ui/simulator.py` |
 | DB reset / reseed scripts | ✅ | `scripts/db_clear.py`, `scripts/db_reseed.py`, `make db-reset` |
 | User/tag segment-scoped budgets (config) | ⏳ | machinery in `segment_key_for`; seed is run-only ([#8](https://github.com/theagentplane/tokenops/issues/8)) |
 | Composite segment matchers (AND) | ⏳ | [#5](https://github.com/theagentplane/tokenops/issues/5) |
@@ -36,13 +36,13 @@ POST /v1/tasks + X-TokenOps-Run-Id
   → run_scope + governance_scope
   → agent loop:
        complete() ──▶ wrap_complete ──▶ pre_call ──▶ detect→decide→apply
-       @boundary  ──▶ chronicle envelope + emit_observation ──▶ observe ──▶ ledger.record
+       @boundary  ──▶ chronicle envelope + crossing hook ──▶ observe ──▶ ledger.record
        delegate   ──▶ child agent (same run_id, parent span header) ──▶ rollup observe
   → store.update_run(RunRecord) ──▶ Dashboard
 ```
 
 Layers: `core` → `ledger` → `policies` → `engine` → `config`/`store` → `integration` /
-`boundary` / `attribution` / `chronicle`. See `docs/architecture.md` and `docs/run-attribution.md`.
+`boundary` / `crossing` / `attribution`. See `docs/architecture.md` and `docs/run-attribution.md`.
 
 ## Governance config (SQLite)
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
-from tokenops.agents.types import CorpusProfile, Framework
+# Kept in core so config does not depend on the bench package.
+CorpusProfile = Literal["healthy", "leak"]
+Framework = Literal["native", "langchain"]
 
 
 @dataclass

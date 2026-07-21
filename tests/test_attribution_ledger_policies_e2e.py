@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tokenops.chronicle import reset_session
+import chronicle.session as chronicle_session
 from tokenops.control import ApplyControls, build_governor, build_attribution, Halt, wrap_complete
 from tokenops.control.context import SpanContext, governance_scope, run_scope
 from tokenops.control.ledger import RUN_TOTAL_BUDGET, LIFETIME, segment_key_for
@@ -47,7 +47,7 @@ def store(tmp_path):
 
 def test_attribution_ledger_and_policy_e2e_in_process(store):
     """Register → govern agent → assert attribution on ledger, spend, and HALT."""
-    from tokenops.agents.research.native.agent import NativeResearchAgent
+    from bench.agents.research.native.agent import NativeResearchAgent
     from tokenops.config.schema import AgentServerConfig
 
     reg = store.register_run(
@@ -80,7 +80,7 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     )
     agent = NativeResearchAgent(AgentServerConfig(max_steps=20, satisfaction_threshold=2.0))
 
-    reset_session().begin_trace("e2e-run-1")
+    chronicle_session.reset_session().begin_trace("e2e-run-1")
     with run_scope(reg, SpanContext(span_id="span-root", service="research")):
         with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt) as exc:
@@ -119,7 +119,7 @@ def test_attribution_ledger_policy_via_http(store, monkeypatch, tmp_path):
     )
     s.close()
 
-    from tokenops.agents.research.native import server as srv
+    from bench.agents.research.native import server as srv
 
     with patch.object(srv, "complete", _fake_complete):
         client = TestClient(srv.build_app())

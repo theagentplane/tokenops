@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
+import chronicle.session as chronicle_session
+from chronicle import InputState, boundary
 
-from tokenops.chronicle import boundary, reset_session
-from tokenops.chronicle.schema import InputState
-from tokenops.control import ApplyControls, build_governor, build_attribution
+from tokenops.control import ApplyControls, build_attribution, build_governor, install_crossing_hook
 from tokenops.control.context import SpanContext, clear, governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
@@ -18,6 +18,11 @@ def store(tmp_path):
     s = Store(str(tmp_path / "attr.db"))
     yield s
     s.close()
+
+
+@pytest.fixture(autouse=True)
+def _crossing_hook():
+    install_crossing_hook()
 
 
 def test_boundary_emits_observation_when_governed(store):
@@ -32,12 +37,14 @@ def test_boundary_emits_observation_when_governed(store):
     gov = build_governor(config, toy_price, ApplyControls())
     attr = build_attribution(reg, service="research")
     gov.ledger.open_run("r1")
-    reset_session().begin_trace("r1")
+    chronicle_session.reset_session().begin_trace("r1")
 
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(graph_state={"name": "search", "args": {"query": q}}),
+        extract_input=lambda q: InputState(
+            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        ),
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}
@@ -46,6 +53,6 @@ def test_boundary_emits_observation_when_governed(store):
         with governance_scope(gov, attr):
             search("pricing")
     clear()
-    reset_session()
+    chronicle_session.reset_session()
 
     assert gov.ledger.step_count("r1") == 1

@@ -16,9 +16,10 @@ import httpx
 ROOT = Path(__file__).resolve().parent
 
 os.chdir(ROOT)
-os.environ.setdefault("PYTHONPATH", str(ROOT / "src"))
+os.environ.setdefault("PYTHONPATH", f"{ROOT / 'src'}{os.pathsep}{ROOT}")
 os.environ.setdefault("TOKENOPS_CONFIG", "src/tokenops/config/default.yaml")
 
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 from tokenops.env import load_env  # noqa: E402
 
@@ -124,9 +125,9 @@ def main() -> int:
         _free_port(port)
 
     print("Starting summarize server...")
-    _start_server("tokenops.servers.summarize")
+    _start_server("bench.servers.summarize")
     print("Starting research server...")
-    _start_server("tokenops.servers.research")
+    _start_server("bench.servers.research")
 
     print("Waiting for agents...")
     try:
@@ -144,7 +145,7 @@ def main() -> int:
             "-m",
             "streamlit",
             "run",
-            "src/tokenops/ui/app.py",
+            "bench/ui/app.py",
             f"--server.port={UI_PORT}",
         ],
         cwd=ROOT,

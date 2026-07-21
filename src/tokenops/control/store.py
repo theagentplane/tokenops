@@ -21,12 +21,14 @@ from typing import Any, Sequence
 
 from tokenops.control.models import (
     BudgetSpec,
+    GovernanceMode,
     PolicyInstance,
     RunAlreadyRegisteredError,
     RunNotRegisteredError,
     RunRecord,
     RunRegistration,
     Segment,
+    parse_governance_mode,
 )
 
 def _known_policy_templates() -> frozenset[str]:
@@ -137,6 +139,19 @@ class Store:
             self._db.execute("ALTER TABLE runs ADD COLUMN dims TEXT NOT NULL DEFAULT '{}'")
         if "parent_span" not in cols:
             self._db.execute("ALTER TABLE runs ADD COLUMN parent_span TEXT")
+        reg_cols = {row[1] for row in self._db.execute("PRAGMA table_info(run_registrations)")}
+        if "mode" not in reg_cols:
+            self._db.execute(
+                "ALTER TABLE run_registrations ADD COLUMN mode TEXT NOT NULL DEFAULT 'enforce'"
+            )
+        if "governance_events" not in cols:
+            try:
+                self._db.execute(
+                    "ALTER TABLE runs ADD COLUMN governance_events TEXT NOT NULL DEFAULT '[]'"
+                )
+            except sqlite3.OperationalError as exc:
+                if "duplicate column" not in str(exc).lower():
+                    raise
 
     def close(self) -> None:
         self._db.close()
@@ -280,8 +295,8 @@ class Store:
         if self.get_run_registration(reg.run_id) is not None:
             raise RunAlreadyRegisteredError(f"run {reg.run_id!r} is already registered")
         self._db.execute(
-            "INSERT INTO run_registrations(run_id, intent, user_dims, registered_at) VALUES (?,?,?,?)",
-            (reg.run_id, reg.intent, json.dumps(reg.user_dims), time.time()),
+            "INSERT INTO run_registrations(run_id, intent, user_dims, mode, registered_at) VALUES (?,?,?,?,?)",
+            (reg.run_id, reg.intent, json.dumps(reg.user_dims), reg.mode.value, time.time()),
         )
         self._db.commit()
         return reg
@@ -344,6 +359,8 @@ class Store:
     def update_run(self, run_id: str, **fields) -> None:
         if not fields:
             return
+        if "governance_events" in fields and not isinstance(fields["governance_events"], str):
+            fields["governance_events"] = json.dumps(fields["governance_events"])
         cols = ", ".join(f"{k}=?" for k in fields)
         self._db.execute(f"UPDATE runs SET {cols} WHERE run_id=?", (*fields.values(), run_id))
         self._db.commit()
@@ -654,6 +671,7 @@ def _registration(r: sqlite3.Row) -> RunRegistration:
         run_id=r["run_id"],
         intent=r["intent"] or "",
         user_dims=json.loads(r["user_dims"] or "{}"),
+        mode=parse_governance_mode(r["mode"] if "mode" in r.keys() else None),
     )
 
 
@@ -683,6 +701,11 @@ def _policy(r: sqlite3.Row) -> PolicyInstance:
 def _run(r: sqlite3.Row) -> RunRecord:
     dims = json.loads((r["dims"] if "dims" in r.keys() else None) or "{}")
     keys = r.keys()
+    gov_raw = r["governance_events"] if "governance_events" in keys else "[]"
+    try:
+        governance_events = json.loads(gov_raw or "[]")
+    except json.JSONDecodeError:
+        governance_events = []
     return RunRecord(
         run_id=r["run_id"], agent=r["agent"], status=r["status"],
         parent_run=r["parent_run"],
@@ -690,4 +713,5 @@ def _run(r: sqlite3.Row) -> RunRecord:
         halt_reason=r["halt_reason"], detector=r["detector"],
         cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
         ended_at=r["ended_at"], task=r["task"], dims=dims,
+        governance_events=governance_events,
     )

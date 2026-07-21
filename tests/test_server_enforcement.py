@@ -28,7 +28,7 @@ def _fake_complete(provider, model, messages, max_output_tokens=None):
 
 
 def test_store_policy_halts_governed_agent(tmp_path):
-    from tokenops.agents.research.native.agent import NativeResearchAgent
+    from bench.agents.research.native.agent import NativeResearchAgent
     from tokenops.config.schema import AgentServerConfig
 
     s = Store(str(tmp_path / "t.db"))
@@ -68,7 +68,7 @@ def test_research_server_http_boundary(tmp_path, monkeypatch):
                                             params={"max_steps": 2}, agent="research"))
     s.close()
 
-    from tokenops.agents.research.native import server as srv
+    from bench.agents.research.native import server as srv
     monkeypatch.setattr(srv, "complete", _fake_complete)
 
     app = srv.build_app()

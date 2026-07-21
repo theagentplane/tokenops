@@ -12,8 +12,8 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from tokenops.agents.research.tools import core as search_core
-from tokenops.agents.research.tools.core import SearchResult
+from bench.agents.research.tools import core as search_core
+from bench.agents.research.tools.core import SearchResult
 from tokenops.control.models import BudgetSpec, PolicyInstance
 from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
@@ -42,12 +42,12 @@ def _client(monkeypatch, tmp_path, policies, budgets=(), model=None):
         s.upsert_policy_instance(pi)
     s.close()
     monkeypatch.setattr(search_core, "search", _search)
-    from tokenops.agents.research.native import server as srv
+    from bench.agents.research.native import server as srv
     if model is not None:
         monkeypatch.setattr(srv, "complete", model)
 
     async def _fake_delegate(*a, **k):  # summarize server isn't running in-test
-        from tokenops.agents.types import TokenUsage
+        from bench.agents.types import TokenUsage
         return ("summary", TokenUsage(), [], 0)
 
     monkeypatch.setattr(srv, "delegate_summarize", _fake_delegate)
