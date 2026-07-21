@@ -1,6 +1,6 @@
 # tool_output_cap — keep a giant tool payload out of context
 
-Companion to the policies LLD and `halt.md`. Strong, always-on.
+Companion to `halt.md`. Strong, always-on.
 
 Code: `tokenops-dev/src/tokenops/control/policies/tool_output_cap.py`
 Tests: `tokenops-dev/tests/test_tool_output_cap.py`

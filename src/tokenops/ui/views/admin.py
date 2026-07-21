@@ -1,6 +1,6 @@
-"""Admin — create, edit, and delete segments, budgets, and policy instances (goal 3).
+"""Admin — create, edit, and delete segments, budgets, and policy instances.
 
-Writes to the shared SQLite store; the A2A servers pick up changes on the next run via
+Writes to the shared SQLite store; agents pick up changes on the next run via
 ``store.governance_config_for(agent)``.
 """
 
@@ -21,7 +21,7 @@ page_shell(subtitle="Segments, budgets, and policies — applies on the next age
 store = get_store()
 
 DIMENSIONS = ["run", "user", "agent", "tenant", "tag"]
-AGENTS = ["(all)", "research", "summarize", "planner", "researcher", "writer"]
+# Policy agent scope: empty = all agents; otherwise free-text agent name.
 
 # Template-specific param hints for the policy form
 _TEMPLATE_DEFAULTS: dict[str, str] = {
@@ -183,12 +183,12 @@ with policy_tab:
             help="Budget-linked templates: leave `{}` here — pick the Budget below.",
         )
         agent_val = pol_prefill.agent if pol_prefill else None
-        agent = st.selectbox(
-            "Agent",
-            AGENTS,
-            index=0 if not agent_val else AGENTS.index(agent_val),
+        agent = st.text_input(
+            "Agent (blank = all)",
+            value=agent_val or "",
             key=f"policy_agent_{_pol_key}",
-        )
+            placeholder="e.g. research",
+        ).strip()
         bud_default = pol_prefill.budget_id if pol_prefill and pol_prefill.budget_id in budget_options else "(none)"
         budget_id = st.selectbox("Budget", budget_options, index=budget_options.index(bud_default))
         seg_default = pol_prefill.segment_id if pol_prefill and pol_prefill.segment_id in segment_options else "(none)"
@@ -205,7 +205,7 @@ with policy_tab:
                         id=pid,
                         template=template,
                         params=params,
-                        agent=None if agent == "(all)" else agent,
+                        agent=agent or None,
                         budget_id=None if budget_id == "(none)" else budget_id,
                         segment_id=None if segment_id == "(none)" else segment_id,
                         enabled=enabled,
@@ -237,11 +237,8 @@ with policy_tab:
 # ---- effective config preview -------------------------------------------- #
 st.markdown("#### Effective governance config")
 st.caption("What `build_governor` receives per agent on the next run.")
-preview_agent = st.selectbox(
-    "Preview for agent",
-    ["research", "summarize", "planner", "researcher", "writer"],
-)
-effective = store.governance_config_for(preview_agent)
+preview_agent = st.text_input("Preview for agent", value="", placeholder="leave blank for global")
+effective = store.governance_config_for(preview_agent or None)
 st.json(effective)
 
 with st.expander("Which policies use a budget?"):

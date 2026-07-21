@@ -1,6 +1,6 @@
 # context_compaction — keep the prompt lean and cache-friendly
 
-Companion to the policies LLD, `halt.md`, and `controls.md`. Default; needs a hook.
+Companion to `halt.md`. Default; needs a hook.
 
 Code: `tokenops-dev/src/tokenops/control/policies/context_compaction.py`
 Tests: `tokenops-dev/tests/test_context_compaction.py`

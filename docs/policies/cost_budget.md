@@ -1,6 +1,6 @@
 # cost_budget — the guarantee
 
-Companion to the policies LLD and `halt.md`. Documents the governance action this policy
+Companion to `halt.md`. Documents the governance action this policy
 takes. Default, always-on.
 
 Code: `tokenops-dev/src/tokenops/control/policies/cost_budget.py`

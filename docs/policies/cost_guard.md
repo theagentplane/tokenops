@@ -1,6 +1,6 @@
 # cost_guard — POC: instruction-based minimization
 
-Companion to the policies LLD, `halt.md`, and `controls.md`.
+Companion to `halt.md`.
 
 Code: `tokenops-dev/src/tokenops/control/policies/cost_guard.py`
 Tests: `tokenops-dev/tests/test_cost_guard.py`

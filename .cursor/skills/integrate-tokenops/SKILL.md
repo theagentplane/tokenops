@@ -50,7 +50,7 @@ TokenOps integration:
 - [ ] 3. Downstream: downstream_run_scope → build_governor(..., store=store) → governance_scope
 - [ ] 4. LLM: wrap_complete(..., dispatch=complete) as complete_fn
 - [ ] 5. Tools: Chronicle @boundary + install_crossing_hook() once per process
-- [ ] 6. Do NOT observation_from_delegate / parent cost rollup (shared ledger)
+- [ ] 6. Do NOT re-bill child spend on the parent (shared ledger already has it)
 - [ ] 7. Keep agent.py vanilla (injectable complete_fn / tools)
 ```
 
@@ -140,7 +140,7 @@ Reference: wiki `examples/triad/researcher/tools.py`.
 ## Step 6 — Delegates: spans only (no parent cost rollup)
 
 Child LLM/tool spend is already in the **shared ledger** for the same `run_id`.
-Do **not** call `observation_from_delegate` to re-add `cost_micros`.
+Propagate run/span headers on hops; do **not** re-add child `cost_micros` on the parent.
 
 ## Step 7 — HTTP surface
 

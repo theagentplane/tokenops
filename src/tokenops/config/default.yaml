@@ -1,47 +1,5 @@
-task: "Research enterprise SaaS pricing"
-corpus_profile: healthy
-
-agents:
-  research:
-    url: http://localhost:8001
-    summarize_url: http://localhost:8002
-    framework: native
-    provider: openai
-    model: gpt-4o-mini
-    port: 8001
-    max_steps: 5
-    satisfaction_threshold: 0.7
-  summarize:
-    url: http://localhost:8002
-    framework: native
-    provider: openai
-    model: gpt-4o-mini
-    port: 8002
-  # Triad bench (Planner → Researcher → Writer). Optional; see triad.yaml / make run-triad.
-  planner:
-    url: http://localhost:8011
-    provider: openai
-    model: gpt-4o-mini
-    port: 8011
-    max_questions: 3
-    researcher_url: http://localhost:8012
-    writer_url: http://localhost:8013
-  researcher:
-    url: http://localhost:8012
-    provider: openai
-    model: gpt-4o-mini
-    port: 8012
-    max_steps: 5
-    satisfaction_threshold: 0.7
-  writer:
-    url: http://localhost:8013
-    provider: openai
-    model: gpt-4o-mini
-    port: 8013
-
-# TokenOps control plane. Consumed by tokenops.control.build_governor(...).
+# TokenOps control plane seed. Consumed by tokenops.control.build_governor / Store auto-seed.
 # Budgets are spend caps bound to a segment; policies are the (detect, fix) templates.
-# Applies to all agents (research/summarize and triad) when agent scope is unset.
 governance:
   budgets:
     - id: run_llm_cap

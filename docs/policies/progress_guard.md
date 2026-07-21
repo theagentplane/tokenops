@@ -1,6 +1,6 @@
 # progress_guard — the last-resort unstick
 
-Companion to the policies LLD, `halt.md`, and `controls.md`. Default.
+Companion to `halt.md`. Default.
 
 Code: `tokenops-dev/src/tokenops/control/policies/progress_guard.py`
 Tests: `tokenops-dev/tests/test_progress_guard.py`

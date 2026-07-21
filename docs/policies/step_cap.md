@@ -1,6 +1,6 @@
 # step_cap — opt-in step ceiling
 
-Companion to the policies LLD and `halt.md`. Optional / opt-in (not a default).
+Companion to `halt.md`. Optional / opt-in (not a default).
 
 Code: `tokenops-dev/src/tokenops/control/policies/step_cap.py`
 Tests: `tokenops-dev/tests/test_step_cap.py`

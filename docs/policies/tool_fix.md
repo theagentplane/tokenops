@@ -1,6 +1,6 @@
 # tool_fix — cheap defensive check for hallucinated tool calls
 
-Companion to the policies LLD and `halt.md`.
+Companion to `halt.md`.
 
 Code: `tokenops-dev/src/tokenops/control/policies/tool_fix.py`
 Tests: `tokenops-dev/tests/test_tool_fix.py`

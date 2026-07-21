@@ -3,7 +3,7 @@
 Source of truth for how workflow identity, trace dims, and boundary telemetry
 are separated and wired into the control plane.
 
-Related: `docs/instrumentation-contract.md` (ingest seam), `docs/shared-ledger-comparison.md` (cross-process spend), #5 (composite segment matchers).
+Related: `docs/architecture.md`, `docs/governance-policy.md`, #5 (composite segment matchers).
 
 ---
 
@@ -176,11 +176,10 @@ Downstream handlers resolve registration only.
 
 ## Cross-process ledger (spend + halt)
 
-A2A servers pass the shared ``Store`` into ``build_governor(..., store=store)``. Spend,
-inflight, and halt accumulators live in SQLite ``ledger_*`` tables so research and summarize
-enforce the same ``run_llm_cap`` on one ``run_id``. Step windows stay per-process.
-
-Research refuses to delegate when ``run_llm_cap`` headroom is exhausted.
+Agents pass the shared ``Store`` into ``build_governor(..., store=store)`` (or use
+``TOKENOPS_URL`` + plane). Spend, inflight, and halt accumulators live in SQLite
+``ledger_*`` tables so every hop on one ``run_id`` enforces the same ``run_llm_cap``.
+Step windows stay per-process.
 
 ## Out of scope (this doc)
 

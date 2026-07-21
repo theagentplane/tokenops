@@ -1,6 +1,6 @@
 # pre_call_worst_case — preventive ceiling
 
-Companion to the policies LLD and `halt.md`. Default (preventive).
+Companion to `halt.md`. Default (preventive).
 
 Code: `tokenops-dev/src/tokenops/control/policies/pre_call_worst_case.py`
 Tests: `tokenops-dev/tests/test_pre_call_worst_case.py`
