@@ -1,12 +1,12 @@
 """Integration — the brownfield IN tap that drops into a vanilla agent.
 
 ``make_on_step`` returns a callback you pass straight into an existing agent's
-``on_step=...`` hook. It maps the agent's own step object to a contract ``Observation`` and
-feeds the Governor. If a policy HALTs, ``Halt`` propagates out of the agent's loop — which
-is exactly the brownfield control channel, with no change to agent logic.
+``on_step=...`` hook. It maps the agent's own step object to an ``Observation`` and feeds
+the Governor. If a policy HALTs, ``Halt`` propagates out of the agent's loop — which is
+exactly the brownfield control channel, with no change to agent logic.
 
 The adapter **duck-types** the step object (reads ``.action`` / ``.query`` / ``.tokens``),
-so ``tokenops.control`` never imports ``bench.agents`` — the dependency stays one-way.
+so ``tokenops.control`` never imports agent code — the dependency stays one-way.
 """
 
 from __future__ import annotations
@@ -373,24 +373,3 @@ def wrap_stream(
             governor.ledger.complete(seg)
 
     return governed
-
-
-def observation_from_delegate(
-    attr: Attribution,
-    *,
-    boundary_id: str,
-    rolled_up_cost_micros: int,
-    ts: float,
-    service: str = "",
-) -> Observation:
-    """Build a delegate rollup observation after an A2A child returns."""
-    span = _span_fields(service=service)
-    return Observation(
-        attr=attr,
-        node_type="delegate",
-        boundary_id=boundary_id,
-        ts=ts,
-        rolled_up_cost_micros=rolled_up_cost_micros,
-        boundary_tags={"node_type": "delegate"},
-        **span,
-    )

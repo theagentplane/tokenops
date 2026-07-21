@@ -1,6 +1,6 @@
 # concurrency_cap — infra shield (not a cost lever)
 
-Companion to the policies LLD and `halt.md`.
+Companion to `halt.md`.
 
 Code: `tokenops-dev/src/tokenops/control/policies/concurrency_cap.py`
 Tests: `tokenops-dev/tests/test_concurrency_cap.py`

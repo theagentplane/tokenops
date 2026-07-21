@@ -1,6 +1,6 @@
 # trajectory_hint — warm-start INJECT from prior successful runs
 
-Companion to the policies LLD and ``controls.md``. **Opt-in — disabled by default.**
+Companion to `halt.md`. **Opt-in — disabled by default.**
 
 Code: ``src/tokenops/control/policies/trajectory_hint.py``
 Tests: ``tests/test_trajectory_hint.py``

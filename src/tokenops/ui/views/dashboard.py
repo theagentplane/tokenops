@@ -14,7 +14,7 @@ store = get_store()
 
 runs = store.list_runs(limit=500)
 if not runs:
-    st.info("No runs yet. Start one from **Chat** or **Simulator**.")
+    st.info("No runs yet. Register a run via the plane (`POST /v1/runs`) or a wiki demo.")
     st.stop()
 
 
@@ -40,18 +40,20 @@ if focus_run:
 
 # ---- active governance (read-only) --------------------------------------- #
 with st.expander("Active governance (read-only)", expanded=False):
-    gov_agent = st.selectbox(
-        "Agent",
-        ["research", "summarize", "planner", "researcher", "writer"],
+    gov_agent = st.text_input(
+        "Agent (blank = global policies only)",
+        value="",
         key="dash_gov_agent",
-    )
-    cfg = store.governance_config_for(gov_agent)
+        placeholder="e.g. research",
+    ).strip()
+    cfg = store.governance_config_for(gov_agent or "")
     budgets = cfg["governance"].get("budgets", [])
     policies = cfg["governance"].get("policies", {})
     if not policies:
         st.warning("No policies configured — run `make db-reseed` or add them in Policy admin.")
     else:
-        st.markdown(f"**{len(budgets)}** budget(s), **{len(policies)}** policy template(s) for `{gov_agent}`")
+        label = gov_agent or "(global)"
+        st.markdown(f"**{len(budgets)}** budget(s), **{len(policies)}** policy template(s) for `{label}`")
         if budgets:
             st.markdown("**Budgets**")
             st.dataframe(

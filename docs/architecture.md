@@ -21,23 +21,20 @@ Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Sim
 | `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
 | `run_simulation(…)` | `examples/ui/simulator.py` (wiki) | in-process research→summarize with trace log |
 
-Native A2A servers wire these per request; Admin writes the store; Dashboard reads runs;
-Simulator runs in-process with full control-plane visibility.
+Native A2A servers (wiki) wire these per request; Admin writes the store; Dashboard reads runs.
 
 ## Dependency + data-flow graph
 
 ```mermaid
 graph TD
-    subgraph dataplane["data plane"]
-        agent["native A2A server\n(research / summarize)"]
+    subgraph dataplane["data plane (your agents / wiki demos)"]
+        agent["A2A / in-process agents"]
         chronicle["chronicle @boundary"]
     end
 
-    subgraph uis["Streamlit UIs"]
-        bench["app.py — Test Bench"]
-        sim["pages/3_Simulator"]
-        admin["pages/1_Admin"]
-        dash["pages/2_Dashboard"]
+    subgraph uis["Product UI"]
+        admin["Admin"]
+        dash["Dashboard"]
     end
 
     store[("SQLite tokenops.db\nregistrations · budgets · policies · runs")]
@@ -49,13 +46,13 @@ graph TD
         engine["engine.Governor"]
         policies["policies/* (10)"]
         ledger["ledger + pricing"]
+        plane["tokenops.server :7700"]
     end
 
-    bench -->|A2A| agent
-    sim -->|in-process| agent
+    plane -->|register_run| store
+    agent -->|TOKENOPS_URL / Store| plane
     admin -->|upsert| store
     store -->|governance_config_for| cfg
-    agent -->|register + resolve| store
     agent -->|write RunRecord| store
     store -->|list_runs| dash
     chronicle --> boundary

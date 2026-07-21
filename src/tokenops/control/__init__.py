@@ -9,8 +9,8 @@ cost_budget / pre_call_worst_case), evaluated by moment:
   stream   : output_runaway
   observe  : cost_budget, step_cap, tool_output_cap, progress_guard
 
-Source of truth: tokenops-lld/tokenops-policies-lld.md. The ``contract/`` folder was
-the design draft; ``core.py`` here is the promoted, canonical vocabulary.
+Source of truth: docs/policies/ and docs/governance-policy.md. ``core.py`` is the
+canonical vocabulary.
 """
 
 from tokenops.control.core import (
@@ -43,7 +43,6 @@ from tokenops.control.integration import (
     apply_carry_to_messages,
     consume_carry,
     make_on_step,
-    observation_from_delegate,
     step_to_observation,
     wrap_complete,
     wrap_stream,
@@ -95,7 +94,7 @@ __all__ = [
     "build_governor", "build_governance_stack",
     # data-plane integration
     "make_on_step", "wrap_complete", "wrap_stream", "apply_carry_to_messages", "consume_carry",
-    "step_to_observation", "observation_from_delegate",
+    "step_to_observation",
     # attribution
     "RunRegistration", "GovernanceMode", "parse_governance_mode", "build_attribution", "begin_entry_run", "begin_downstream_run",
     "begin_entry_task_run",

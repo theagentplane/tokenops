@@ -1,9 +1,9 @@
 """SQLite store — the shared backbone for admin config + run history.
 
-One ``tokenops.db`` is shared by four processes (research server, summarize server, the
-Admin UI, the Dashboard UI), so they must agree on policies, runs, and **ledger
-accumulators** (spend, inflight, halt). SQLite (WAL) gives ACID + concurrent readers as a
-single inspectable, deletable file — no daemon.
+One ``tokenops.db`` is shared by the control plane, product UI (Admin/Dashboard), and any
+agents that use the same ``TOKENOPS_DB`` (or talk to the plane over HTTP). They agree on
+policies, runs, and **ledger accumulators** (spend, inflight, halt). SQLite (WAL) gives
+ACID + concurrent readers as a single inspectable, deletable file — no daemon.
 
 The key method is :meth:`Store.governance_config_for`, which assembles exactly the dict
 ``control.config.build_governor`` already consumes — so the store drops in for static YAML

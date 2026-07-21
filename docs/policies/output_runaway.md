@@ -1,6 +1,6 @@
 # output_runaway — heals, never halts
 
-Companion to the policies LLD, `halt.md`, and `controls.md`. Default.
+Companion to `halt.md`. Default.
 
 Code: `tokenops-dev/src/tokenops/control/policies/output_runaway.py`
 Tests: `tokenops-dev/tests/test_output_runaway.py`

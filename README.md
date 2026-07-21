@@ -87,6 +87,5 @@ src/tokenops/
 - [Run attribution](docs/run-attribution.md)
 - [Architecture](docs/architecture.md)
 - [Wiki / examples](https://github.com/theagentplane/tokenops-wiki)
-- [Why Token Governance?](docs/why-token-governance.md)
 - [Code Navigation](docs/code-navigation.md)
 - [Testing](docs/testing.md)
