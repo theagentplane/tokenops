@@ -25,22 +25,14 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Core suite
-        run: |
-          python -m pytest -q \
-            --ignore=tests/test_metagpt_integration.py \
-            --ignore=tests/test_metagpt_live_scenarios.py \
-            --ignore=tests/test_browseruse_suites.py \
-            --ignore=tests/test_trials_sweep.py \
-            --ignore=tests/test_trial_status.py \
-            --ignore=tests/test_bench_e2e.py \
-            --ignore=tests/test_triad_e2e.py
+        run: python -m pytest -q
 
       - name: Policy / governance suite
         run: |
           python -m pytest -q \
             tests/test_cost_budget.py \
             tests/test_step_cap.py \
-            tests/test_tool_freq.py \
+            tests/test_tool_reject.py \
             tests/test_cost_guard.py \
             tests/test_concurrency_cap.py \
             tests/test_pre_call_worst_case.py \
