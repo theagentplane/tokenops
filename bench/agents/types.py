@@ -48,8 +48,8 @@ class TokenUsage:
 
 @dataclass
 class StepEvent:
-    agent: Literal["research", "summarize"]
-    action: Literal["model", "search", "delegate"]
+    agent: Literal["research", "summarize", "planner", "researcher", "writer"]
+    action: Literal["model", "search", "fetch", "delegate", "plan", "write"]
     detail: str = ""
     query: str = ""
     completeness: float | None = None
