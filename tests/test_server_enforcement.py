@@ -1,95 +1,51 @@
-"""S1+S3 (+S4/S7 over HTTP) — a store-defined policy enforces on a live governed agent.
-
-The first test proves the core loop (store config -> build_governor -> governed agent -> HALT)
-with no web stack. The second exercises the real FastAPI handler + persisted RunRecord, and
-is skipped where fastapi isn't installed.
-"""
+"""Store-defined policy enforces on a live governed complete loop (no agent bench)."""
 
 from __future__ import annotations
 
 import pytest
 
 from tokenops.control import (
-    Attribution,
     ApplyControls,
     Halt,
+    build_attribution,
     build_governor,
-    make_on_step,
     wrap_complete,
 )
-from tokenops.control.models import PolicyInstance
+from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control.models import PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
 
 
-def _fake_complete(provider, model, messages, max_output_tokens=None):
+def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
     from tokenops.providers.types import ModelResponse
     return ModelResponse(content='{"action": "search", "query": "x"}', input_tokens=10, output_tokens=2)
 
 
-def test_store_policy_halts_governed_agent(tmp_path):
-    from bench.agents.research.native.agent import NativeResearchAgent
-    from tokenops.config.schema import AgentServerConfig
-
+def test_store_policy_halts_governed_complete(tmp_path):
     s = Store(str(tmp_path / "t.db"))
-    s.upsert_policy_instance(PolicyInstance(id="pi", template="step_cap",
-                                            params={"max_steps": 2}, agent="research"))
+    s.upsert_policy_instance(PolicyInstance(
+        id="pi", template="step_cap", params={"max_steps": 2}, agent="research",
+    ))
+    reg = s.register_run(RunRegistration(run_id="run-1", intent="demo"))
     cfg = s.governance_config_for("research")
 
     gov = build_governor(cfg, build_price_book(), ApplyControls())
-    attr = Attribution(user="u", agent="research", run_id="run-1")
+    attr = build_attribution(reg, service="research")
     gov.ledger.open_run("run-1")
-    steps = []
-    record = make_on_step(gov, attr, provider="openai", model="gpt-4o-mini")
 
-    def on_step(event):
-        steps.append(event)
-        record(event)
+    governed = wrap_complete(
+        gov, gov.controls, attr,
+        provider="openai", model="gpt-4o-mini",
+        dispatch=_fake_complete,
+    )
 
-    governed = wrap_complete(gov, gov.controls, attr, provider="openai", model="gpt-4o-mini",
-                             dispatch=_fake_complete)
-    agent = NativeResearchAgent(AgentServerConfig(max_steps=20, satisfaction_threshold=2.0))
+    with run_scope(reg, SpanContext(span_id="s1", service="research")):
+        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+            with pytest.raises(Halt):
+                for _ in range(20):
+                    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "continue"}])
 
-    with pytest.raises(Halt):
-        agent.run("t", "healthy", on_step, governed)
     assert gov.ledger.is_halted("run-1")
     assert gov.ledger.step_count("run-1") >= 2
     s.close()
-
-
-def test_research_server_http_boundary(tmp_path, monkeypatch):
-    pytest.importorskip("fastapi")
-    from fastapi.testclient import TestClient
-
-    db = str(tmp_path / "t.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    s = Store(db)
-    s.upsert_policy_instance(PolicyInstance(id="pi", template="step_cap",
-                                            params={"max_steps": 2}, agent="research"))
-    s.close()
-
-    from bench.agents.research.native import server as srv
-    monkeypatch.setattr(srv, "complete", _fake_complete)
-
-    app = srv.build_app()
-    client = TestClient(app)
-    resp = client.post(
-        "/v1/runs",
-        json={"intent": "", "user_dims": {}},
-    )
-    assert resp.status_code == 201
-    run_id = resp.json()["run_id"]
-
-    resp = client.post(
-        "/v1/tasks",
-        json={"task": "t", "bench": {"corpus_profile": "healthy"}},
-        headers={"X-TokenOps-Run-Id": run_id},
-    )
-    body = resp.json()
-    assert resp.status_code == 200 and body["status"] == "halted"
-    assert "step" in body["halt_reason"].lower()
-
-    s2 = Store(db)
-    rec = s2.get_run(body["run_id"])
-    s2.close()
-    assert rec.status == "halted" and rec.steps >= 2

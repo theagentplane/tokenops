@@ -5,8 +5,11 @@ from __future__ import annotations
 import pytest
 
 pytest.importorskip("fastapi")
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tokenops.control.client import should_mount_run_registration
+from tokenops.control.http import mount_run_registration
 from tokenops.control.store import Store
 from tokenops.server.app import create_app
 
@@ -58,15 +61,35 @@ def test_post_v1_runs_conflict(plane_client):
     assert conflict.status_code == 409
 
 
-def test_research_skips_mount_when_tokenops_url(monkeypatch, tmp_path):
-    """With TOKENOPS_URL set, research must not expose POST /v1/runs."""
+def test_agent_skips_mount_when_tokenops_url(monkeypatch, tmp_path):
+    """With TOKENOPS_URL set, agents must not expose POST /v1/runs."""
     monkeypatch.setenv("TOKENOPS_DB", str(tmp_path / "r.db"))
     monkeypatch.setenv("TOKENOPS_URL", "http://tokenops:7700")
     monkeypatch.delenv("TOKENOPS_EMBEDDED", raising=False)
 
-    from bench.agents.research.native import server as srv
+    assert should_mount_run_registration() is False
 
-    app = srv.build_app()
+    store = Store(str(tmp_path / "r.db"))
+    app = FastAPI()
+    if should_mount_run_registration():
+        mount_run_registration(app, store)
     with TestClient(app) as client:
         resp = client.post("/v1/runs", json={"intent": "x", "user_dims": {}})
         assert resp.status_code == 404
+    store.close()
+
+
+def test_agent_mounts_when_embedded(monkeypatch, tmp_path):
+    monkeypatch.setenv("TOKENOPS_DB", str(tmp_path / "e.db"))
+    monkeypatch.delenv("TOKENOPS_URL", raising=False)
+    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
+
+    assert should_mount_run_registration() is True
+    store = Store(str(tmp_path / "e.db"))
+    app = FastAPI()
+    mount_run_registration(app, store)
+    with TestClient(app) as client:
+        resp = client.post("/v1/runs", json={"intent": "x", "user_dims": {}})
+        assert resp.status_code == 201
+        assert "run_id" in resp.json()
+    store.close()

@@ -1,4 +1,4 @@
-"""TokenOps control plane (+ optional two-agent bench)."""
+"""TokenOps control plane and SDK."""
 
 from tokenops.env import load_env
 

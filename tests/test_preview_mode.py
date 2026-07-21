@@ -43,9 +43,6 @@ def store(tmp_path):
 
 
 def test_preview_mode_records_actions_without_halting(store):
-    from bench.agents.research.native.agent import NativeResearchAgent
-    from tokenops.config.schema import AgentServerConfig
-
     reg = store.register_run(
         RunRegistration(run_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW),
     )
@@ -64,11 +61,11 @@ def test_preview_mode_records_actions_without_halting(store):
         provider="openai", model="gpt-4o-mini",
         dispatch=_fake_complete, service="research",
     )
-    agent = NativeResearchAgent(AgentServerConfig(max_steps=5))
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
         with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
-            agent.run("task", "healthy", lambda ev: None, governed, service="research")
+            for _ in range(5):
+                governed("openai", "gpt-4o-mini", [{"role": "user", "content": "task"}])
 
     assert not gov.ledger.is_halted("preview-run")
     assert any(a.kind is ActionKind.HALT for a in controls.actions)
@@ -76,9 +73,6 @@ def test_preview_mode_records_actions_without_halting(store):
 
 
 def test_enforce_mode_still_halts(store):
-    from bench.agents.research.native.agent import NativeResearchAgent
-    from tokenops.config.schema import AgentServerConfig
-
     reg = store.register_run(RunRegistration(run_id="enforce-run", intent="demo"))
     cfg = store.governance_config_for("research")
     gov, controls = build_governance_stack(
@@ -94,12 +88,12 @@ def test_enforce_mode_still_halts(store):
         provider="openai", model="gpt-4o-mini",
         dispatch=_fake_complete, service="research",
     )
-    agent = NativeResearchAgent(AgentServerConfig(max_steps=5))
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
         with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt):
-                agent.run("task", "healthy", lambda ev: None, governed, service="research")
+                for _ in range(10):
+                    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "task"}])
 
     assert gov.ledger.is_halted("enforce-run")
 
