@@ -1,11 +1,11 @@
 """Planner A2A server — TokenOps entry agent for the triad.
 
 Seams:
-  * ControlPlaneClient.register_run (client) / downstream_run_scope (header)
+  * entry_task_run_scope — register run on the plane if UI omitted run_id
   * governance_scope + wrap_complete around the planner LLM
-  * delegate_researcher / delegate_writer with run_id propagation
-  * observation_from_delegate rollups
+  * delegate_researcher / delegate_writer with auto header propagation
   * install_crossing_hook + with_governance_errors
+  * Child spend lands in the shared ledger (no parent cost rollup)
 """
 
 from __future__ import annotations
@@ -32,20 +32,19 @@ from tokenops.control import (
     ActionKind,
     build_attribution,
     build_governor,
-    downstream_run_scope,
+    entry_task_run_scope,
     governance_events_payload,
     halt_detector_from_events,
     install_crossing_hook,
     mount_run_registration,
-    observation_from_delegate,
     should_mount_run_registration,
     with_governance_errors,
     wrap_complete,
 )
-from tokenops.control.context import RUN_ID_HEADER, current_registration, current_span, governance_scope
+from tokenops.control.context import current_registration, governance_scope
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.models import GovernanceMode, RunNotRegisteredError, RunRecord
+from tokenops.control.models import GovernanceMode, RunRecord
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
 from tokenops.providers import complete
@@ -60,15 +59,8 @@ def build_app():
     price = build_price_book()
 
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-        if not headers.get(RUN_ID_HEADER) and not any(
-            k.lower() == RUN_ID_HEADER.lower() for k in headers
-        ):
-            raise RunNotRegisteredError(
-                f"missing {RUN_ID_HEADER} — register via ControlPlaneClient "
-                "or POST /v1/runs on the control plane first"
-            )
-
-        with downstream_run_scope(store, headers=headers, service=AGENT):
+        # Entry agent: UI may omit run_id — we register via ControlPlaneClient / plane.
+        with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
             reg = current_registration()
             assert reg is not None
             run_id = reg.run_id
@@ -118,7 +110,6 @@ def build_app():
             outline: list[str] = []
             findings = []
             answer = ""
-            span = current_span()
 
             with governance_scope(governor, attr, provider=cfg.provider, model=cfg.model):
                 try:
@@ -144,26 +135,15 @@ def build_app():
                             reason="no budget remaining; refusing to delegate",
                         ))
 
-                    findings, res_tokens, res_steps, res_cost = await delegate_researcher(
+                    findings, res_tokens, res_steps, _res_cost = await delegate_researcher(
                         cfg.researcher_url,
                         goal,
                         questions,
-                        run_id=run_id,
                         outline=outline,
                         corpus_profile=corpus_profile,
-                        parent_span_id=span.span_id if span else None,
                     )
                     token_usage = token_usage.merge(res_tokens)
                     steps.extend(res_steps)
-                    governor.observe(
-                        observation_from_delegate(
-                            attr,
-                            boundary_id="delegate_researcher",
-                            rolled_up_cost_micros=res_cost,
-                            ts=time.time(),
-                            service=AGENT,
-                        )
-                    )
 
                     steps.append(
                         StepEvent(
@@ -184,26 +164,15 @@ def build_app():
                             reason="no budget remaining; refusing to delegate to writer",
                         ))
 
-                    answer, wr_tokens, wr_steps, wr_cost = await delegate_writer(
+                    answer, wr_tokens, wr_steps, _wr_cost = await delegate_writer(
                         cfg.writer_url,
                         goal,
                         findings,
-                        run_id=run_id,
                         outline=outline,
                         questions=questions,
-                        parent_span_id=span.span_id if span else None,
                     )
                     token_usage = token_usage.merge(wr_tokens)
                     steps.extend(wr_steps)
-                    governor.observe(
-                        observation_from_delegate(
-                            attr,
-                            boundary_id="delegate_writer",
-                            rolled_up_cost_micros=wr_cost,
-                            ts=time.time(),
-                            service=AGENT,
-                        )
-                    )
                 except Halt as halt:
                     status, halt_reason = "halted", halt.action.reason
                 except Throttled as thr:

@@ -54,6 +54,8 @@ jobs:
             tests/test_chronicle_boundary.py \
             tests/test_crossing_hook.py \
             tests/test_triad_e2e.py \
+            tests/test_governance_per_agent.py \
+            tests/test_propagate.py \
             tests/test_apply.py \
             tests/test_output_runaway.py \
             tests/test_progress_guard.py \

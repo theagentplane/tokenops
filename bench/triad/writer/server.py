@@ -1,4 +1,4 @@
-"""Writer A2A server — wrap_complete; parent (planner) observes delegate rollup."""
+"""Writer A2A server — downstream_run_scope + wrap_complete (shared ledger)."""
 
 from __future__ import annotations
 

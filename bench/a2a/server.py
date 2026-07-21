@@ -56,11 +56,14 @@ async def post_task(
     headers: dict[str, str] | None = None,
     timeout: float = 300.0,
 ) -> dict[str, Any]:
+    from tokenops.control.propagate import merge_propagation_headers
+
     base = url.rstrip("/")
+    outbound = merge_propagation_headers(headers)
     async with httpx.AsyncClient(timeout=timeout) as client:
         health = await client.get(f"{base}/health")
         health.raise_for_status()
-        response = await client.post(f"{base}/v1/tasks", json=payload, headers=headers or {})
+        response = await client.post(f"{base}/v1/tasks", json=payload, headers=outbound)
         _raise_for_response(response)
         return response.json()
 
@@ -98,11 +101,14 @@ def post_task_sync(
     headers: dict[str, str] | None = None,
     timeout: float = 300.0,
 ) -> dict[str, Any]:
+    from tokenops.control.propagate import merge_propagation_headers
+
     base = url.rstrip("/")
+    outbound = merge_propagation_headers(headers)
     with httpx.Client(timeout=timeout) as client:
         health = client.get(f"{base}/health")
         health.raise_for_status()
-        response = client.post(f"{base}/v1/tasks", json=payload, headers=headers or {})
+        response = client.post(f"{base}/v1/tasks", json=payload, headers=outbound)
         _raise_for_response(response)
         return response.json()
 

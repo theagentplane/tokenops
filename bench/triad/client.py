@@ -60,21 +60,28 @@ def submit_goal_sync_with_meta(
     user_dims: dict[str, str] | None = None,
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[RunResult, dict[str, object]]:
-    """Register on the control plane, then POST the goal to the Planner entry agent."""
+    """POST the goal to the Planner entry agent (UI path).
+
+    The Planner registers the run on the control plane when ``X-TokenOps-Run-Id``
+    is absent — clients should not call ``/v1/runs`` themselves for the triad UI.
+    """
     if not (os.environ.get("TOKENOPS_URL") or "").strip() and os.environ.get("TOKENOPS_EMBEDDED") != "1":
-        # Prefer plane URL; embedded Store is fine for tests.
         os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
-    reg = _register(intent=intent, user_dims=user_dims, mode=governance_mode)
-    run_id = reg["run_id"]
     payload = task_request(task=goal, bench={"corpus_profile": corpus_profile}, intent=intent)
-    data = post_task_sync(planner_url, payload, headers={RUN_ID_HEADER: run_id})
+    if user_dims:
+        payload["user_dims"] = user_dims
+    payload["mode"] = (
+        governance_mode.value if isinstance(governance_mode, GovernanceMode) else governance_mode
+    )
+    # No run_id header — entry agent opens the run.
+    data = post_task_sync(planner_url, payload, headers=None)
     result = _parse_result(data)
     meta: dict[str, object] = {
         "status": data.get("status"),
         "halt_reason": data.get("halt_reason"),
         "cost_micros": int(data.get("cost_micros", 0)),
         "governance_events": data.get("governance_events") or [],
-        "run_id": run_id,
+        "run_id": data.get("run_id"),
         "questions": data.get("questions") or [],
         "outline": data.get("outline") or [],
     }
@@ -86,18 +93,22 @@ async def delegate_researcher(
     task: str,
     questions: list[str],
     *,
-    run_id: str,
+    run_id: str | None = None,
     outline: list[str] | None = None,
     corpus_profile: str = "healthy",
     parent_span_id: str | None = None,
 ) -> tuple[list[Finding], TokenUsage, list[StepEvent], int]:
+    """Delegate to researcher. Headers come from ambient context when omitted."""
     payload = research_request(
         task, questions, outline=outline, bench={"corpus_profile": corpus_profile},
     )
-    headers = {RUN_ID_HEADER: run_id}
+    headers: dict[str, str] = {}
+    if run_id:
+        headers[RUN_ID_HEADER] = run_id
     if parent_span_id:
         headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-    data = await post_task(researcher_url, payload, headers=headers)
+    # post_task merges ambient propagation (run_id + current span as parent).
+    data = await post_task(researcher_url, payload, headers=headers or None)
     return (
         parse_findings(data.get("findings", [])),
         parse_token_usage(data.get("token_usage")),
@@ -111,16 +122,19 @@ async def delegate_writer(
     task: str,
     findings: list[Finding],
     *,
-    run_id: str,
+    run_id: str | None = None,
     outline: list[str] | None = None,
     questions: list[str] | None = None,
     parent_span_id: str | None = None,
 ) -> tuple[str, TokenUsage, list[StepEvent], int]:
+    """Delegate to writer. Headers come from ambient context when omitted."""
     payload = write_request(task, findings, outline=outline, questions=questions)
-    headers = {RUN_ID_HEADER: run_id}
+    headers: dict[str, str] = {}
+    if run_id:
+        headers[RUN_ID_HEADER] = run_id
     if parent_span_id:
         headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-    data = await post_task(writer_url, payload, headers=headers)
+    data = await post_task(writer_url, payload, headers=headers or None)
     answer = str(data.get("answer") or data.get("summary", ""))
     return (
         answer,

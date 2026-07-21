@@ -89,6 +89,7 @@ def _wire_apps(monkeypatch):
     from bench.triad.planner import server as planner_srv
     from bench.triad.researcher import server as researcher_srv
     from bench.triad.writer import server as writer_srv
+    from tokenops.control.propagate import merge_propagation_headers
 
     monkeypatch.setattr(planner_srv, "complete", _plan_then_done)
     monkeypatch.setattr(researcher_srv, "complete", _research_search_then_finish)
@@ -109,7 +110,8 @@ def _wire_apps(monkeypatch):
         client = clients[base]
         health = client.get("/health")
         assert health.status_code == 200
-        resp = client.post("/v1/tasks", json=payload, headers=headers or {})
+        outbound = merge_propagation_headers(headers)
+        resp = client.post("/v1/tasks", json=payload, headers=outbound)
         assert resp.status_code == 200, resp.text
         return resp.json()
 
@@ -128,6 +130,7 @@ def _wire_apps(monkeypatch):
 
 
 def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
+    """UI path: POST /v1/tasks with no run_id — Planner registers the run."""
     _seed(
         tmp_path,
         monkeypatch,
@@ -144,19 +147,19 @@ def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
     _research_search_then_finish.n = 0
     planner, _researcher, _writer = _wire_apps(monkeypatch)
 
-    reg = ControlPlaneClient.from_env().register_run(
-        intent="triad-demo", user_dims={"user_id": "alice"},
-    )
-    run_id = reg["run_id"]
     resp = planner.post(
         "/v1/tasks",
-        json={"task": "Explain mid-market CRM pricing", "bench": {"corpus_profile": "healthy"}},
-        headers={RUN_ID_HEADER: run_id},
+        json={
+            "task": "Explain mid-market CRM pricing",
+            "intent": "triad-demo",
+            "user_dims": {"user_id": "alice"},
+            "bench": {"corpus_profile": "healthy"},
+        },
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["status"] == "completed"
-    assert body["run_id"] == run_id
+    assert body["run_id"]
     assert body["answer"]
     assert body["questions"]
     assert body["findings"]
@@ -165,11 +168,105 @@ def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
     assert any(s["agent"] == "writer" for s in body["steps"])
 
     store = Store(tmp_path / "triad.db", auto_seed=False)
-    rec = store.get_run(run_id)
+    rec = store.get_run(body["run_id"])
     assert rec is not None
     assert rec.status == "completed"
     assert rec.cost_micros > 0
+    reg = store.get_run_registration(body["run_id"]) if hasattr(store, "get_run_registration") else store.resolve_run(body["run_id"])
+    assert reg.intent == "triad-demo"
     store.close()
+
+
+def test_triad_cost_not_double_counted_without_parent_rollup(monkeypatch, tmp_path):
+    """Child LLM spend is in the shared ledger once — parent must not re-add rollup."""
+    _seed(
+        tmp_path,
+        monkeypatch,
+        [
+            PolicyInstance(id="p-step", template="step_cap", params={"max_steps": 40}),
+            PolicyInstance(
+                id="p-budget",
+                template="cost_budget",
+                budget_id="run_llm_cap",
+            ),
+        ],
+        budgets=[BudgetSpec(id="run_llm_cap", limit_micros=2_000_000, dimension="run")],
+    )
+    _research_search_then_finish.n = 0
+
+    # Deterministic pricing: 1 micro per token (patch each server module bind).
+    from bench.triad.planner import server as planner_srv
+    from bench.triad.researcher import server as researcher_srv
+    from bench.triad.writer import server as writer_srv
+
+    unit_price = lambda: (lambda provider, model, usage: int(usage.input) + int(usage.output))
+    monkeypatch.setattr(planner_srv, "build_price_book", unit_price)
+    monkeypatch.setattr(researcher_srv, "build_price_book", unit_price)
+    monkeypatch.setattr(writer_srv, "build_price_book", unit_price)
+
+    planner, _researcher, _writer = _wire_apps(monkeypatch)
+
+    resp = planner.post(
+        "/v1/tasks",
+        json={"task": "Explain mid-market CRM pricing", "bench": {"corpus_profile": "healthy"}},
+    )
+    body = resp.json()
+    assert body["status"] == "completed"
+    # plan 160 + research 210 + write 260 = 630 (search tool is not LLM-priced)
+    assert body["cost_micros"] == 630
+    # Same run_id must be shared (propagation + no soft orphan runs for children).
+    store = Store(tmp_path / "triad.db", auto_seed=False)
+    assert store.resolve_run(body["run_id"]).run_id == body["run_id"]
+    store.close()
+
+
+def test_triad_per_agent_step_cap_only_on_researcher(monkeypatch, tmp_path):
+    """Governor config is filtered by agent name — researcher-only step_cap."""
+    _seed(
+        tmp_path,
+        monkeypatch,
+        [
+            PolicyInstance(
+                id="p-res",
+                template="step_cap",
+                params={"max_steps": 2},
+                agent="researcher",
+            ),
+            PolicyInstance(
+                id="p-plan",
+                template="step_cap",
+                params={"max_steps": 100},
+                agent="planner",
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        search_core,
+        "search",
+        lambda q, profile="healthy": SearchResult(
+            query=q, snippet="tiny", completeness=0.2, source="test",
+        ),
+    )
+    from bench.triad.researcher import server as researcher_srv
+
+    monkeypatch.setattr(researcher_srv, "complete", _always_search)
+    researcher = TestClient(researcher_srv.build_app())
+
+    # Pre-register as if Planner already opened the run and propagated headers.
+    reg = ControlPlaneClient.from_env().register_run(intent="scoped")
+    run_id = reg["run_id"]
+    resp = researcher.post(
+        "/v1/tasks",
+        json={
+            "task": "pricing",
+            "questions": ["q1", "q2"],
+            "bench": {"corpus_profile": "healthy"},
+        },
+        headers={RUN_ID_HEADER: run_id},
+    )
+    body = resp.json()
+    assert body["status"] == "halted"
+    assert "step" in (body.get("halt_reason") or "").lower()
 
 
 def test_triad_step_cap_halts(monkeypatch, tmp_path):

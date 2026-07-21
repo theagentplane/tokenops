@@ -12,32 +12,32 @@ Copilot skill (same procedure): [`.cursor/skills/integrate-tokenops/SKILL.md`](.
 
 | Agent | Port | Role | TokenOps seams |
 |-------|------|------|----------------|
-| **Planner** | 8011 | Break goal into questions + outline; entry agent | `register_run` (client) → `downstream_run_scope` → `wrap_complete` → delegate rollups |
-| **Researcher** | 8012 | Tools (`search` / `fetch`) gather facts | `wrap_complete` + Chronicle `@boundary` on tools + `install_crossing_hook` |
-| **Writer** | 8013 | Final answer from findings | `wrap_complete`; planner observes `delegate_writer` rollup |
+| **Planner** | 8011 | Break goal into questions + outline; **entry** | `entry_task_run_scope` → `wrap_complete` → A2A hops (span headers) |
+| **Researcher** | 8012 | Tools (`search` / `fetch`) gather facts | `downstream_run_scope` → `wrap_complete` + `@boundary` + crossing hook |
+| **Writer** | 8013 | Final answer from findings | `downstream_run_scope` → `wrap_complete` |
 
 Naive agent logic lives in each `agent.py`. Instrumentation lives in each `server.py`
 (and `researcher/tools.py` for tool boundaries).
 
 ```
-ControlPlaneClient.register_run
+UI: POST /v1/tasks  (no run_id)
         │
         ▼
-POST /v1/tasks  +  X-TokenOps-Run-Id  ──▶  Planner
-                                              │ wrap_complete (plan LLM)
-                                              │ delegate_researcher (same run_id)
-                                              ▼
-                                         Researcher
-                                              │ wrap_complete + @boundary(search/fetch)
-                                              │ return findings + cost_micros
-                                              ▼
-                                         Planner observes rollup
-                                              │ delegate_writer
-                                              ▼
-                                           Writer
-                                              │ wrap_complete
-                                              ▼
-                                         Planner observes rollup → TaskResponse
+     Planner  entry_task_run_scope → ControlPlaneClient.register_run → plane POST /v1/runs
+              │ wrap_complete (plan LLM)
+              │ post_task → merge_propagation_headers (run_id + parent span)
+              ▼
+         Researcher
+              │ wrap_complete + @boundary(search/fetch)
+              │ child spend → shared ledger (same run_id)
+              ▼
+           Planner
+              │ post_task → Writer (same headers)
+              ▼
+            Writer
+              │ wrap_complete → shared ledger
+              ▼
+           Planner → TaskResponse (no parent cost rollup)
 ```
 
 ### Before: naive complete
@@ -53,33 +53,34 @@ Agent code stays injectable — no TokenOps imports in `agent.py`:
 
 </details>
 
-## Step 1 — Register the run (control plane)
+## Step 1 — Entry agent registers the run (not the UI)
 
-Before any agent work, the client registers once:
+The UI calls **Planner** `POST /v1/tasks` without a run id. The Planner (entry agent)
+opens the run via `ControlPlaneClient.register_run` → plane `POST /v1/runs` (or
+embedded Store), then executes the task under that `run_id`:
 
 ![register_run](field-guide/assets/02-register-run.png)
 
 ```python
-from tokenops.control.client import ControlPlaneClient
-
-reg = ControlPlaneClient.from_env().register_run(
-    intent="triad-demo",
-    user_dims={"user_id": "alice"},
-)
-run_id = reg["run_id"]
+# Inside Planner server (entry_task_run_scope):
+# if X-TokenOps-Run-Id missing → ControlPlaneClient.register_run(...)
+# then bind context and handle the task
 ```
 
-- With `TOKENOPS_URL=http://localhost:7700`, registration hits the standalone plane
-  (`POST /v1/runs`).
-- With `TOKENOPS_EMBEDDED=1` (tests), the client uses an in-process `Store` at `TOKENOPS_DB`.
+Downstream Researcher/Writer receive the same `run_id` via auto-injected headers
+(`merge_propagation_headers` on A2A `post_task`).
 
-See `bench/triad/client.py` (`submit_goal_sync_with_meta`).
+See `bench/triad/client.py` (`submit_goal_sync_with_meta` — UI path, no client register)
+and `tokenops.control.attribution.entry_task_run_scope`.
 
 ## Step 2 — Propagate `run_id` on every A2A hop
 
-Entry and delegates send the same header:
+Prefer ambient headers: A2A `post_task` / `post_task_sync` call
+`merge_propagation_headers`, so outbound hops inherit `X-TokenOps-Run-Id` and
+`X-TokenOps-Parent-Span-Id` from the current governance context.
 
 ```python
+# Optional explicit override (usually unnecessary inside a governed handler):
 from tokenops.control.context import RUN_ID_HEADER, PARENT_SPAN_ID_HEADER
 
 headers = {RUN_ID_HEADER: run_id}
@@ -87,8 +88,9 @@ if parent_span_id:
     headers[PARENT_SPAN_ID_HEADER] = parent_span_id
 ```
 
-Planner requires the header (raises `RunNotRegisteredError` if missing). Downstream agents
-resolve registration via `downstream_run_scope(store, headers=..., service=...)`.
+Downstream agents resolve via `downstream_run_scope`. Missing `run_id` on a **non-entry**
+hop soft-registers an `unattributed` run and logs `tokenops.missing_run_id` (do not rely
+on that for the happy path — always propagate from the entry agent).
 
 ## Step 3 — Open governance scope + build governor
 
@@ -173,29 +175,18 @@ install_crossing_hook()
 
 That wires Chronicle `on_crossing` → `Governor.observe` (see `tokenops.control.crossing`).
 
-`tool_reject` / `tool_output_cap` in the seed registry include `search` and `fetch`
+`tool_freq` / `tool_output_cap` in the seed registry include `search` and `fetch`
 (`src/tokenops/config/triad.yaml`).
 
-## Step 6 — Delegate rollup (parent observes child spend)
+## Step 6 — Delegates: spans only (no parent cost rollup)
 
-After each A2A delegate returns `cost_micros`, the Planner records a rollup observation:
-
-```python
-from tokenops.control import observation_from_delegate
-
-governor.observe(
-    observation_from_delegate(
-        attr,
-        boundary_id="delegate_researcher",  # or delegate_writer
-        rolled_up_cost_micros=child_cost,
-        ts=time.time(),
-        service="planner",
-    )
-)
-```
+A2A hops open a **new span** with `X-TokenOps-Parent-Span-Id` set from the caller
+(ambient propagation). Child LLM/tool spend is written to the **shared ledger** for the
+same `run_id`. The parent must **not** call `observation_from_delegate` to re-add
+`cost_micros` (that double-counted).
 
 Refuse to delegate when the shared run budget is already exhausted
-(`ledger.budget_left("run_llm_cap", ...)`), matching the two-agent research bench.
+(`ledger.budget_left("run_llm_cap", ...)`) — still allowed as a local check.
 
 ## Step 7 — Errors and HTTP surface
 
@@ -215,7 +206,7 @@ inspect (`status`, `halt_reason`, `cost_micros`).
 
 - **cost_budget** on `run_llm_cap` ($0.50 / run) — easier to trip than the $2 two-agent default
 - **step_cap** at 12 steps across the hoppy pipeline
-- **tool_reject** registry `[search, fetch]`
+- **tool_freq** registry `[search, fetch]`
 
 Reset / reseed:
 
@@ -255,9 +246,12 @@ python scripts/render_field_guide_snippets.py
 ## Checklist for a new agent
 
 1. Keep `agent.py` vanilla (injectable `complete_fn`).
-2. In `server.py`: `downstream_run_scope` → `build_governor(..., store=store)` →
-   `governance_scope` → `wrap_complete` → `with_governance_errors` → `install_crossing_hook`.
-3. Mark tools with Chronicle `@boundary`; rely on the crossing hook for observe.
-4. Propagate `X-TokenOps-Run-Id` (and parent span) on every outbound A2A call.
-5. Parent: `observation_from_delegate` for child `cost_micros`.
-6. Register runs via `ControlPlaneClient`, not ad-hoc IDs.
+2. **Entry** agent: `entry_task_run_scope` (registers when UI omits `run_id`).
+   **Downstream**: `downstream_run_scope`.
+3. In `server.py`: `build_governor(..., store=store)` → `governance_scope` →
+   `wrap_complete` → `with_governance_errors` → `install_crossing_hook`.
+4. Mark tools with Chronicle `@boundary`; rely on the crossing hook for observe.
+5. Propagate `X-TokenOps-Run-Id` (and parent span) on every outbound A2A call
+   (`merge_propagation_headers` / ambient context).
+6. Do **not** re-bill child `cost_micros` on the parent (`observation_from_delegate`
+   double-counts against the shared ledger).

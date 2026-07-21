@@ -35,7 +35,7 @@ def build_app():
         findings = await asyncio.to_thread(agent.run, task, corpus_profile, on_step)
         steps.append(StepEvent(agent="research", action="delegate", detail="calling summarize agent"))
         summary, sum_tokens, sum_steps, _sum_cost = await delegate_summarize(
-            cfg.summarize_url, task, findings, run_id="langchain-research",
+            cfg.summarize_url, task, findings,
         )
         token_usage = token_usage.merge(sum_tokens)
         steps.extend(sum_steps)

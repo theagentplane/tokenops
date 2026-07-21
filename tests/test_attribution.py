@@ -56,11 +56,16 @@ def test_begin_entry_run_binds_context(store):
     clear()
 
 
-def test_begin_downstream_requires_header(store):
-    store.register_run(RunRegistration(run_id="run-a", intent="x"))
+def test_begin_downstream_soft_registers_when_header_missing(store, caplog):
     clear()
-    with pytest.raises(RunNotRegisteredError, match="missing"):
-        begin_downstream_run(store, headers={}, service="summarize")
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="tokenops.attribution"):
+        bound = begin_downstream_run(store, headers={}, service="summarize")
+    assert bound.registration.intent == "unattributed"
+    assert bound.registration.user_dims.get("tokenops_soft_run") == "1"
+    assert bound.span.service == "summarize"
+    assert any("missing_run_id" in r.message for r in caplog.records)
     clear()
 
 
