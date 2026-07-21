@@ -40,7 +40,11 @@ if focus_run:
 
 # ---- active governance (read-only) --------------------------------------- #
 with st.expander("Active governance (read-only)", expanded=False):
-    gov_agent = st.selectbox("Agent", ["research", "summarize"], key="dash_gov_agent")
+    gov_agent = st.selectbox(
+        "Agent",
+        ["research", "summarize", "planner", "researcher", "writer"],
+        key="dash_gov_agent",
+    )
     cfg = store.governance_config_for(gov_agent)
     budgets = cfg["governance"].get("budgets", [])
     policies = cfg["governance"].get("policies", {})

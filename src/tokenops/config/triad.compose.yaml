@@ -1,10 +1,11 @@
-task: "Research enterprise SaaS pricing"
+# Docker Compose URLs for triad agents + demo-friendly governance seed.
+task: "Explain enterprise SaaS pricing for a mid-market CRM"
 corpus_profile: healthy
 
 agents:
   research:
-    url: http://localhost:8001
-    summarize_url: http://localhost:8002
+    url: http://research:8001
+    summarize_url: http://summarize:8002
     framework: native
     provider: openai
     model: gpt-4o-mini
@@ -12,40 +13,36 @@ agents:
     max_steps: 5
     satisfaction_threshold: 0.7
   summarize:
-    url: http://localhost:8002
+    url: http://summarize:8002
     framework: native
     provider: openai
     model: gpt-4o-mini
     port: 8002
-  # Triad bench (Planner → Researcher → Writer). Optional; see triad.yaml / make run-triad.
   planner:
-    url: http://localhost:8011
+    url: http://planner:8011
     provider: openai
     model: gpt-4o-mini
     port: 8011
     max_questions: 3
-    researcher_url: http://localhost:8012
-    writer_url: http://localhost:8013
+    researcher_url: http://researcher:8012
+    writer_url: http://writer:8013
   researcher:
-    url: http://localhost:8012
+    url: http://researcher:8012
     provider: openai
     model: gpt-4o-mini
     port: 8012
-    max_steps: 5
+    max_steps: 4
     satisfaction_threshold: 0.7
   writer:
-    url: http://localhost:8013
+    url: http://writer:8013
     provider: openai
     model: gpt-4o-mini
     port: 8013
 
-# TokenOps control plane. Consumed by tokenops.control.build_governor(...).
-# Budgets are spend caps bound to a segment; policies are the (detect, fix) templates.
-# Applies to all agents (research/summarize and triad) when agent scope is unset.
 governance:
   budgets:
     - id: run_llm_cap
-      limit_micros: 2000000          # $2.00 per run; null/omitted -> unlimited accumulator
+      limit_micros: 500000
       dimension: run
   policies:
     cost_budget:
@@ -54,13 +51,13 @@ governance:
       budget: run_llm_cap
       default_max_output: 1024
     step_cap:
-      max_steps: 20
+      max_steps: 12
     concurrency_cap:
       max_concurrent: 4
       mode: reject
-    tool_fix:
-      registry: [search]
-      k: 3
+    tool_reject:
+      registry: [search, fetch]
+      k: 4
     tool_output_cap:
       cap_tokens: 8000
     progress_guard:

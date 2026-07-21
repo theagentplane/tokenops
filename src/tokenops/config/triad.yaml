@@ -1,4 +1,6 @@
-task: "Research enterprise SaaS pricing"
+# Triad bench config: Planner → Researcher → Writer (ports 8011/8012/8013).
+# Governance seed is demo-friendly: cost_budget + step_cap can fire on multi-hop runs.
+task: "Explain enterprise SaaS pricing for a mid-market CRM"
 corpus_profile: healthy
 
 agents:
@@ -17,7 +19,6 @@ agents:
     provider: openai
     model: gpt-4o-mini
     port: 8002
-  # Triad bench (Planner → Researcher → Writer). Optional; see triad.yaml / make run-triad.
   planner:
     url: http://localhost:8011
     provider: openai
@@ -31,7 +32,7 @@ agents:
     provider: openai
     model: gpt-4o-mini
     port: 8012
-    max_steps: 5
+    max_steps: 4
     satisfaction_threshold: 0.7
   writer:
     url: http://localhost:8013
@@ -39,13 +40,10 @@ agents:
     model: gpt-4o-mini
     port: 8013
 
-# TokenOps control plane. Consumed by tokenops.control.build_governor(...).
-# Budgets are spend caps bound to a segment; policies are the (detect, fix) templates.
-# Applies to all agents (research/summarize and triad) when agent scope is unset.
 governance:
   budgets:
     - id: run_llm_cap
-      limit_micros: 2000000          # $2.00 per run; null/omitted -> unlimited accumulator
+      limit_micros: 500000          # $0.50 per run — easier to demo cost_budget than $2
       dimension: run
   policies:
     cost_budget:
@@ -54,13 +52,13 @@ governance:
       budget: run_llm_cap
       default_max_output: 1024
     step_cap:
-      max_steps: 20
+      max_steps: 12                 # planner + researcher loop + writer + tools
     concurrency_cap:
       max_concurrent: 4
       mode: reject
-    tool_fix:
-      registry: [search]
-      k: 3
+    tool_reject:
+      registry: [search, fetch]
+      k: 4
     tool_output_cap:
       cap_tokens: 8000
     progress_guard:

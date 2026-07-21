@@ -21,7 +21,7 @@ page_shell(subtitle="Segments, budgets, and policies — applies on the next age
 store = get_store()
 
 DIMENSIONS = ["run", "user", "agent", "tenant", "tag"]
-AGENTS = ["(all)", "research", "summarize"]
+AGENTS = ["(all)", "research", "summarize", "planner", "researcher", "writer"]
 
 # Template-specific param hints for the policy form
 _TEMPLATE_DEFAULTS: dict[str, str] = {
@@ -237,7 +237,10 @@ with policy_tab:
 # ---- effective config preview -------------------------------------------- #
 st.markdown("#### Effective governance config")
 st.caption("What `build_governor` receives per agent on the next run.")
-preview_agent = st.selectbox("Preview for agent", ["research", "summarize"])
+preview_agent = st.selectbox(
+    "Preview for agent",
+    ["research", "summarize", "planner", "researcher", "writer"],
+)
 effective = store.governance_config_for(preview_agent)
 st.json(effective)
 

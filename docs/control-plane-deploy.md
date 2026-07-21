@@ -11,6 +11,7 @@ service** owns run registration (and later observe/governance HTTP), while
 |---------|-----------|------|
 | `tokenops` | `python -m tokenops.server` | Plane: `POST /v1/runs`, `GET /health`, shared SQLite |
 | `research` / `summarize` | `python -m bench.servers.*` | Agents: A2A tasks; SDK + shared `TOKENOPS_DB` |
+| `planner` / `researcher` / `writer` | `bench.servers.*` (compose overlay) | Triad bench; same plane + DB (see below) |
 | `ui` (optional profile) | Streamlit `src/tokenops/ui/app.py` | **Plane product UI:** Admin + Dashboard (not agent-local) |
 
 Shared volume mounts `TOKENOPS_DB=/data/tokenops.db`. Agents set
@@ -74,6 +75,21 @@ make ui              # Admin + Dashboard on :8501
 ```
 
 Or `make run` starts the plane, sets `TOKENOPS_URL`, then agents + product UI.
+
+### Triad overlay (Planner → Researcher → Writer)
+
+```bash
+# Local
+TOKENOPS_CONFIG=src/tokenops/config/triad.yaml make db-reset
+make run-triad   # plane :7700 + :8011/:8012/:8013 + UI
+
+# Docker (keeps default research/summarize services; starts triad alongside plane)
+docker compose -f docker-compose.yml -f docker-compose.triad.yml up --build \
+  tokenops planner researcher writer
+```
+
+Entry client: `bench.triad.submit_goal_sync_with_meta("http://localhost:8011", goal)`.
+Field guide: [`field-guide-add-tokenops.md`](field-guide-add-tokenops.md).
 
 ## Out of scope (this MVP)
 
