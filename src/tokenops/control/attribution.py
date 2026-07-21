@@ -6,6 +6,7 @@ Entry services call :func:`begin_entry_run`; downstream services call
 
 from __future__ import annotations
 
+import logging
 from typing import Mapping
 
 from tokenops.control.context import (
@@ -21,6 +22,8 @@ from tokenops.control.context import (
 from tokenops.control.core import Attribution
 from tokenops.control.models import RunNotRegisteredError, RunRegistration
 from tokenops.control.store import Store, new_id
+
+logger = logging.getLogger("tokenops.attribution")
 
 
 def _coerce_user_dims(raw: object) -> dict[str, str]:
@@ -63,11 +66,31 @@ def begin_downstream_run(
     headers: Mapping[str, str],
     service: str,
 ) -> BoundRun:
-    """Resolve an existing registration and bind context. Downstream agents only."""
+    """Resolve registration and bind a *new* span for this agent hop.
+
+    Missing ``X-TokenOps-Run-Id`` no longer refuses work: we auto-register an
+    unattributed run and log so cross-agent stitching is visibly broken.
+    Each call still opens a fresh span (parent from the inbound header when set).
+    """
     rid = header_run_id(headers)
     if not rid:
-        raise RunNotRegisteredError("missing X-TokenOps-Run-Id header")
-    reg = store.resolve_run(rid)
+        rid = new_id("run")
+        logger.warning(
+            "tokenops.missing_run_id service=%s auto_run_id=%s "
+            "cross_agent_attribution_broken=1 — governing locally; "
+            "propagate X-TokenOps-Run-Id for shared-run budgets",
+            service,
+            rid,
+        )
+        reg = store.register_run(
+            RunRegistration(
+                run_id=rid,
+                intent="unattributed",
+                user_dims={"tokenops_soft_run": "1", "service": service},
+            )
+        )
+    else:
+        reg = store.resolve_run(rid)
     span = SpanContext(
         span_id=new_id("span"),
         service=service,

@@ -26,9 +26,11 @@ Frozen for the whole `run_id`:
 
 Rules:
 
-- **Registration is required** before any boundary emits telemetry.
+- **Registration is preferred** before boundary telemetry so cross-agent budgets share one `run_id`.
 - **Duplicate register** for the same `run_id` → error.
-- **Missing registration** on resolve → fail closed.
+- **Missing `X-TokenOps-Run-Id` on a task** → soft path: auto-register an `unattributed` run, log
+  `tokenops.missing_run_id` / `cross_agent_attribution_broken`, and still govern locally.
+- **Unknown `run_id` on resolve** → fail closed (`RunNotRegisteredError`).
 - No `triggered_by` first-class field — use `user_dims["user_id"]` if needed.
 - **`corpus_profile` is not a control-plane dim** — test-bench agent config only.
 

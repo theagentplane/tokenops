@@ -86,18 +86,22 @@ async def delegate_researcher(
     task: str,
     questions: list[str],
     *,
-    run_id: str,
+    run_id: str | None = None,
     outline: list[str] | None = None,
     corpus_profile: str = "healthy",
     parent_span_id: str | None = None,
 ) -> tuple[list[Finding], TokenUsage, list[StepEvent], int]:
+    """Delegate to researcher. Headers come from ambient context when omitted."""
     payload = research_request(
         task, questions, outline=outline, bench={"corpus_profile": corpus_profile},
     )
-    headers = {RUN_ID_HEADER: run_id}
+    headers: dict[str, str] = {}
+    if run_id:
+        headers[RUN_ID_HEADER] = run_id
     if parent_span_id:
         headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-    data = await post_task(researcher_url, payload, headers=headers)
+    # post_task merges ambient propagation (run_id + current span as parent).
+    data = await post_task(researcher_url, payload, headers=headers or None)
     return (
         parse_findings(data.get("findings", [])),
         parse_token_usage(data.get("token_usage")),
@@ -111,16 +115,19 @@ async def delegate_writer(
     task: str,
     findings: list[Finding],
     *,
-    run_id: str,
+    run_id: str | None = None,
     outline: list[str] | None = None,
     questions: list[str] | None = None,
     parent_span_id: str | None = None,
 ) -> tuple[str, TokenUsage, list[StepEvent], int]:
+    """Delegate to writer. Headers come from ambient context when omitted."""
     payload = write_request(task, findings, outline=outline, questions=questions)
-    headers = {RUN_ID_HEADER: run_id}
+    headers: dict[str, str] = {}
+    if run_id:
+        headers[RUN_ID_HEADER] = run_id
     if parent_span_id:
         headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-    data = await post_task(writer_url, payload, headers=headers)
+    data = await post_task(writer_url, payload, headers=headers or None)
     answer = str(data.get("answer") or data.get("summary", ""))
     return (
         answer,

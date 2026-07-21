@@ -42,10 +42,10 @@ from tokenops.control import (
     with_governance_errors,
     wrap_complete,
 )
-from tokenops.control.context import RUN_ID_HEADER, current_registration, current_span, governance_scope
+from tokenops.control.context import current_registration, current_span, governance_scope
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.models import GovernanceMode, RunNotRegisteredError, RunRecord
+from tokenops.control.models import GovernanceMode, RunRecord
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
 from tokenops.providers import complete
@@ -60,14 +60,7 @@ def build_app():
     price = build_price_book()
 
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-        if not headers.get(RUN_ID_HEADER) and not any(
-            k.lower() == RUN_ID_HEADER.lower() for k in headers
-        ):
-            raise RunNotRegisteredError(
-                f"missing {RUN_ID_HEADER} — register via ControlPlaneClient "
-                "or POST /v1/runs on the control plane first"
-            )
-
+        # Missing run_id soft-registers inside downstream_run_scope (logs warning).
         with downstream_run_scope(store, headers=headers, service=AGENT):
             reg = current_registration()
             assert reg is not None

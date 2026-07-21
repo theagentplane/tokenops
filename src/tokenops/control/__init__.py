@@ -78,6 +78,7 @@ from tokenops.control.http import (
 )
 from tokenops.control.client import ControlPlaneClient, should_mount_run_registration
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
+from tokenops.control.propagate import merge_propagation_headers, propagation_headers
 
 __all__ = [
     # vocabulary
@@ -103,4 +104,6 @@ __all__ = [
     # HTTP (A2A mount + clients)
     "mount_run_registration", "with_governance_errors", "post_run", "post_run_sync",
     "ControlPlaneClient", "should_mount_run_registration",
+    # HTTP propagation (auto run_id / parent span)
+    "propagation_headers", "merge_propagation_headers",
 ]
