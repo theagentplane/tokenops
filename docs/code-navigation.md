@@ -16,8 +16,9 @@ How to find your way around TokenOps (core) and the two-agent bench.
 | `make control-plane` | `tokenops.server` → `src/tokenops/server/app.py` |
 | `make research-server` | `bench/servers/research.py` → `bench/agents/research/{native,langchain}/server.py` |
 | `make summarize-server` | `bench/servers/summarize.py` → `bench/agents/summarize/{native,langchain}/server.py` |
-| `make ui` | `bench/ui/app.py` (chat + simulator + core Admin/Dashboard) |
-| `make run` | `run.py` (plane + agents + UI; frees ports first) |
+| `make ui` | `src/tokenops/ui/app.py` (product Admin + Dashboard; plane-side) |
+| `make bench-ui` | `bench/ui/app.py` (Chat + Simulator + embedded Admin/Dashboard) |
+| `make run` | `run.py` (plane + agents + product UI; frees ports first) |
 | `make db-reset` | `scripts/db_clear.py` + `scripts/db_reseed.py` |
 
 ## Trace a governed run (native path)
@@ -54,8 +55,8 @@ bench/ui/views/simulator_view.py
 | Run simulator | `bench/ui/views/simulator_view.py` |
 | Policy admin | `src/tokenops/ui/views/admin.py` |
 | Dashboard | `src/tokenops/ui/views/dashboard.py` |
+| Product entry (plane deploy) | `src/tokenops/ui/app.py` |
 | Bench entry | `bench/ui/app.py` |
-| Product-only entry | `src/tokenops/ui/app.py` |
 
 ## Layer cake (onboarding read order)
 
@@ -75,6 +76,7 @@ Only `bench/agents/factory.py` and `{native,langchain}/` folders differ by frame
 
 | Change… | Open… |
 |---------|--------|
+| Product Admin/Dashboard | `src/tokenops/ui/app.py`, `tokenops/ui/views/{admin,dashboard}.py` |
 | UI / Test Bench | `bench/ui/app.py`, `bench/ui/views/chat.py` |
 | Run simulator | `bench/ui/simulator.py`, `bench/ui/views/simulator_view.py` |
 | Shared-ledger demo | `scripts/prep_ledger_comparison.py`, `docs/shared-ledger-comparison.md` |

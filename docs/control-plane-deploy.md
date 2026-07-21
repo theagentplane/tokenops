@@ -11,11 +11,15 @@ service** owns run registration (and later observe/governance HTTP), while
 |---------|-----------|------|
 | `tokenops` | `python -m tokenops.server` | Plane: `POST /v1/runs`, `GET /health`, shared SQLite |
 | `research` / `summarize` | `python -m bench.servers.*` | Agents: A2A tasks; SDK + shared `TOKENOPS_DB` |
-| `ui` (optional profile) | Streamlit | Registers via `ControlPlaneClient` → plane |
+| `ui` (optional profile) | Streamlit `src/tokenops/ui/app.py` | **Plane product UI:** Admin + Dashboard (not agent-local) |
 
 Shared volume mounts `TOKENOPS_DB=/data/tokenops.db`. Agents set
 `TOKENOPS_URL=http://tokenops:7700` so they **do not** mount `/v1/runs`
 themselves (`should_mount_run_registration()`).
+
+**Bench-only UIs** (Chat / Simulator) live under `bench/ui/` and are **not**
+part of the plane deploy profile. Use `make bench-ui` locally when you need
+them; they are demos against the agents, not the cloud control-plane surface.
 
 ## Env vars
 
@@ -51,11 +55,12 @@ HTTP helpers.
 # Plane + research + summarize
 docker compose up --build
 
-# Also Streamlit UI
+# Also product UI (Admin + Dashboard)
 docker compose --profile ui up --build
 ```
 
-Plane: http://localhost:7700/health · Research: :8001 · Summarize: :8002 · UI: :8501
+Plane: http://localhost:7700/health · Research: :8001 · Summarize: :8002 ·
+UI (Admin/Dashboard): :8501
 
 Without Docker:
 
@@ -64,12 +69,15 @@ make control-plane   # :7700
 export TOKENOPS_URL=http://localhost:7700
 make research-server # :8001 (no /v1/runs mount)
 make summarize-server
+make ui              # Admin + Dashboard on :8501
+# optional bench demos: make bench-ui  (Chat + Simulator)
 ```
 
-Or `make run` starts the plane, sets `TOKENOPS_URL`, then agents + UI.
+Or `make run` starts the plane, sets `TOKENOPS_URL`, then agents + product UI.
 
 ## Out of scope (this MVP)
 
 Full remote observe / governance admin over HTTP is not wired yet — agents still
-open `Store` locally for ledger and policy config. Registration + plane service
-+ SDK client + compose is the split.
+open `Store` locally for ledger and policy config. The product UI reads/writes
+the shared SQLite (`TOKENOPS_DB`) beside the plane process. Registration + plane
+service + SDK client + compose is the split.

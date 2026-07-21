@@ -1,4 +1,4 @@
-.PHONY: install research-server summarize-server control-plane ui run dev stop db-clear db-reseed db-reset
+.PHONY: install research-server summarize-server control-plane ui bench-ui run dev stop db-clear db-reseed db-reset
 
 PYTHON ?= python3
 export PYTHONPATH := src:.$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -17,8 +17,12 @@ research-server:
 summarize-server:
 	$(PYTHON) -m bench.servers.summarize
 
+# Plane-side product UI (Admin + Dashboard). Not agent-local.
 ui:
-	@$(MAKE) stop
+	streamlit run src/tokenops/ui/app.py --server.port 8501
+
+# Bench-only Chat + Simulator (also embeds Admin/Dashboard for local demos).
+bench-ui:
 	streamlit run bench/ui/app.py --server.port 8501
 
 run: stop

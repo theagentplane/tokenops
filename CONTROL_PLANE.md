@@ -72,13 +72,14 @@ Per-policy docs: `docs/policies/`.
 ```bash
 make install
 make db-reset          # optional: clean DB + seed governance
-make run               # research + summarize + Streamlit (auto-frees ports 8001/8002/8501)
+make run               # plane + agents + Admin/Dashboard (auto-frees ports 7700/8001/8002/8501)
+make bench-ui          # optional: Chat + Simulator bench demos
 
 python -m pytest -q    # 108 passed
 ```
 
-Streamlit pages: **Test Bench** (live A2A) · **Run simulator** (in-process, demo mode OK) ·
-**Policy admin** (edit budgets/policies) · **Dashboard** (runs + cost).
+Product UI (`make ui` / compose `--profile ui`): **Policy admin** · **Dashboard**.
+Bench-only (`make bench-ui`): **Test Bench** (live A2A) · **Run simulator** (in-process, demo mode OK).
 
 ## Proof loops
 

@@ -55,6 +55,7 @@ services:
       tokenops:
         condition: service_healthy
 
+  # Product Admin + Dashboard (plane-side). Chat/Simulator stay in bench/ui (make bench-ui).
   ui:
     profiles: ["ui"]
     build: .
@@ -62,7 +63,7 @@ services:
       [
         "streamlit",
         "run",
-        "bench/ui/app.py",
+        "src/tokenops/ui/app.py",
         "--server.port=8501",
         "--server.address=0.0.0.0",
       ]
@@ -72,14 +73,11 @@ services:
       TOKENOPS_DB: /data/tokenops.db
       TOKENOPS_URL: http://tokenops:7700
       TOKENOPS_CONFIG: src/tokenops/config/compose.yaml
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - tokenops-data:/data
     depends_on:
-      - tokenops
-      - research
-      - summarize
+      tokenops:
+        condition: service_healthy
 
 volumes:
   tokenops-data:

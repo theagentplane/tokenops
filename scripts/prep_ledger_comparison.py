@@ -3,7 +3,7 @@
 
 Usage:
     python scripts/prep_ledger_comparison.py
-    SEARCH_BACKEND=corpus make ui
+    SEARCH_BACKEND=corpus make bench-ui
     # Simulator → Start run (demo mode) → capture screenshots
 
 Sets run_llm_cap to $0.001 so demo research (~972 µ$) + summarize (~222 µ$)

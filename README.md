@@ -13,14 +13,14 @@ make install
 cp .env.example .env   # add your API keys (optional for simulator demo mode)
 
 make db-reset          # optional: clean SQLite + seed governance from default.yaml
-make run               # control plane :7700 + agents + UI (Ctrl+C stops all; frees stale ports)
+make run               # control plane :7700 + agents + Admin/Dashboard (Ctrl+C stops all; frees stale ports)
 ```
 
 **Docker (same shape as cloud):** plane + research + summarize sharing a DB volume —
 
 ```bash
 docker compose up --build
-# optional UI: docker compose --profile ui up --build
+# optional product UI (Admin + Dashboard): docker compose --profile ui up --build
 ```
 
 See [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
@@ -38,20 +38,23 @@ make research-server
 # Terminal 3
 make summarize-server
 
-# Terminal 4
+# Terminal 4 — plane product UI (Admin + Dashboard)
 make ui
+
+# Optional — bench Chat + Simulator demos
+make bench-ui
 ```
 
 Open http://localhost:8501.
 
-| Page | Purpose |
-|------|---------|
-| **Test Bench** | Live A2A pipeline (research → summarize) |
-| **Run simulator** | In-process run with trace, spans, control-plane timeline (demo mode = no API key) |
-| **Policy admin** | Edit budgets, policies, segments (SQLite) |
-| **Dashboard** | Run history, cost, halt reasons |
+| Page | Entry | Purpose |
+|------|-------|---------|
+| **Policy admin** | `make ui` / compose `--profile ui` | Edit budgets, policies, segments (SQLite) |
+| **Dashboard** | same | Run history, cost, halt reasons |
+| **Test Bench (Chat)** | `make bench-ui` only | Live A2A pipeline (research → summarize) |
+| **Run simulator** | `make bench-ui` only | In-process run with trace, spans (demo mode = no API key) |
 
-Configure agents in the Test Bench sidebar, or use **Run simulator** for governance debugging.
+Configure agents in the Test Bench sidebar (`make bench-ui`), or use **Run simulator** for governance debugging.
 
 ### Governance / DB
 

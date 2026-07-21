@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start research server, summarize server, and Streamlit UI."""
+"""Start control plane, agents, and product UI (Admin + Dashboard)."""
 
 from __future__ import annotations
 
@@ -145,14 +145,14 @@ def main() -> int:
         _shutdown()
         return 1
 
-    print(f"Starting UI at http://localhost:{UI_PORT}")
+    print(f"Starting product UI (Admin + Dashboard) at http://localhost:{UI_PORT}")
     ui = subprocess.run(
         [
             PYTHON,
             "-m",
             "streamlit",
             "run",
-            "bench/ui/app.py",
+            "src/tokenops/ui/app.py",
             f"--server.port={UI_PORT}",
         ],
         cwd=ROOT,
