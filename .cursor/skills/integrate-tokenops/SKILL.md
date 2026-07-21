@@ -11,8 +11,10 @@ description: >-
 # Integrate TokenOps
 
 Copyable procedure for GitHub Copilot, Claude Code, Cursor, or any assistant.
-Reference implementation: **Planner → Researcher → Writer** under `bench/triad/`.
-Full walkthrough: [`docs/field-guide-add-tokenops.md`](../../../docs/field-guide-add-tokenops.md).
+
+- **Core library:** [theagentplane/tokenops](https://github.com/theagentplane/tokenops) (`pip install`)
+- **Runnable reference (triad / two-agent):** [theagentplane/tokenops-wiki](https://github.com/theagentplane/tokenops-wiki)
+  — `examples/triad/`, field guide `docs/field-guide-add-tokenops.md`
 
 ## Plane vs agent (do not conflate)
 
@@ -34,7 +36,7 @@ apply across processes. Child spend hits that ledger once — **no parent cost r
 | `TOKENOPS_URL` | Remote plane base URL (e.g. `http://localhost:7700`) → HTTP `register_run` |
 | `TOKENOPS_EMBEDDED=1` | Force in-process `Store` (tests / single-process) |
 | `TOKENOPS_DB` | SQLite path shared by plane + agents |
-| `TOKENOPS_CONFIG` | YAML for governance seed (e.g. `src/tokenops/config/triad.yaml`) |
+| `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`; demos: wiki `examples/config/`) |
 
 - **Production / multi-process:** set `TOKENOPS_URL`; agents must **not** mount `/v1/runs`.
 - **Tests:** `TOKENOPS_EMBEDDED=1` (or omit URL) so `from_env()` uses embedded Store.
@@ -65,9 +67,8 @@ with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT
     ...
 ```
 
-UI / bench clients should **not** call `/v1/runs` for the default flow — see
-`bench/triad/client.py` (`submit_goal_sync_with_meta`) and `bench/a2a/client.py`
-(`submit_task_sync_with_meta`).
+UI / bench clients should **not** call `/v1/runs` for the default flow — see wiki
+`examples/triad/client.py` and `examples/a2a/client.py`.
 
 ## Step 2 — Propagate run_id
 
@@ -76,7 +77,6 @@ Prefer ambient headers: A2A `post_task` merges `propagation_headers()` from cont
 ```python
 from tokenops.control.context import RUN_ID_HEADER, PARENT_SPAN_ID_HEADER
 
-# Explicit override only when needed:
 headers = {RUN_ID_HEADER: run_id}
 if parent_span_id:
     headers[PARENT_SPAN_ID_HEADER] = parent_span_id
@@ -93,17 +93,14 @@ with downstream_run_scope(store, headers=headers, service=AGENT):
     governor = build_governor(
         store.governance_config_for(AGENT),
         price,
-        ApplyControls(),  # or PreviewControls()
-        store=store,      # shared SQLite across processes
+        ApplyControls(),
+        store=store,
         enforce=True,
     )
     governor.ledger.open_run(run_id)
     with governance_scope(governor, attr, provider=..., model=...):
         ...
 ```
-
-`store=store` is required for cross-process budget/step caps.
-`governance_config_for(AGENT)` loads per-agent policies (`agent=None` = global).
 
 ## Step 4 — Wrap the LLM
 
@@ -118,8 +115,6 @@ governed = wrap_complete(
 )
 agent.run(..., complete_fn=governed)
 ```
-
-Runs **pre_call** policies then **observe** on completion.
 
 ## Step 5 — Tool boundaries + crossing hook
 
@@ -137,18 +132,15 @@ from tokenops.control import install_crossing_hook
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
 
-# Once per server process (module import / create_app):
-install_crossing_hook()  # Chronicle on_crossing → Governor.observe
+install_crossing_hook()
 ```
 
-Reference: `bench/triad/researcher/tools.py`, `bench/triad/researcher/server.py`.
+Reference: wiki `examples/triad/researcher/tools.py`.
 
 ## Step 6 — Delegates: spans only (no parent cost rollup)
 
 Child LLM/tool spend is already in the **shared ledger** for the same `run_id`.
-Do **not** call `observation_from_delegate` to re-add `cost_micros` (double-counts).
-
-Refuse outbound delegates when `ledger.budget_left("run_llm_cap", ...)` is exhausted.
+Do **not** call `observation_from_delegate` to re-add `cost_micros`.
 
 ## Step 7 — HTTP surface
 
@@ -162,17 +154,14 @@ install_crossing_hook()
 ## Verify
 
 ```bash
-# Local triad demo
-TOKENOPS_CONFIG=src/tokenops/config/triad.yaml make db-reset
-make run-triad
-
-# Offline e2e (mocked LLM)
-python -m pytest tests/test_triad_e2e.py -q
+# Clone wiki examples (sibling of tokenops)
+cd ../tokenops-wiki && make install
+TOKENOPS_CONFIG=examples/config/triad.yaml make db-reset
+make triad
 ```
 
 ## Docs
 
-- Field guide + screenshots: `docs/field-guide-add-tokenops.md`
-- Deploy / env: `docs/control-plane-deploy.md`, `CONTROL_PLANE.md`
-- Attribution: `docs/run-attribution.md`
-- Policies: `docs/policies/`, `docs/testing.md`
+- Core deploy: https://github.com/theagentplane/tokenops/blob/main/docs/control-plane-deploy.md
+- Field guide + screenshots: https://github.com/theagentplane/tokenops-wiki/blob/main/docs/field-guide-add-tokenops.md
+- Attribution: https://github.com/theagentplane/tokenops/blob/main/docs/run-attribution.md

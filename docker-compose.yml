@@ -1,5 +1,4 @@
-# Local compose mirrors the cloud shape: one control-plane service + agent SDKs.
-# Agents share TOKENOPS_DB via volume and register runs at TOKENOPS_URL.
+# Control plane (+ optional Admin/Dashboard). Agent demos live in tokenops-wiki.
 
 services:
   tokenops:
@@ -20,42 +19,6 @@ services:
       timeout: 3s
       retries: 10
 
-  research:
-    build: .
-    command: ["python", "-m", "bench.servers.research"]
-    ports:
-      - "8001:8001"
-    environment:
-      TOKENOPS_DB: /data/tokenops.db
-      TOKENOPS_URL: http://tokenops:7700
-      TOKENOPS_CONFIG: src/tokenops/config/compose.yaml
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      SEARCH_BACKEND: ${SEARCH_BACKEND:-corpus}
-    volumes:
-      - tokenops-data:/data
-    depends_on:
-      tokenops:
-        condition: service_healthy
-
-  summarize:
-    build: .
-    command: ["python", "-m", "bench.servers.summarize"]
-    ports:
-      - "8002:8002"
-    environment:
-      TOKENOPS_DB: /data/tokenops.db
-      TOKENOPS_URL: http://tokenops:7700
-      TOKENOPS_CONFIG: src/tokenops/config/compose.yaml
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-    volumes:
-      - tokenops-data:/data
-    depends_on:
-      tokenops:
-        condition: service_healthy
-
-  # Product Admin + Dashboard (plane-side). Chat/Simulator stay in bench/ui (make bench-ui).
   ui:
     profiles: ["ui"]
     build: .
@@ -72,7 +35,7 @@ services:
     environment:
       TOKENOPS_DB: /data/tokenops.db
       TOKENOPS_URL: http://tokenops:7700
-      TOKENOPS_CONFIG: src/tokenops/config/compose.yaml
+      TOKENOPS_CONFIG: src/tokenops/config/default.yaml
     volumes:
       - tokenops-data:/data
     depends_on:

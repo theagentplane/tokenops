@@ -18,11 +18,11 @@ The agent (data plane) stays vanilla; the control plane taps boundary crossings 
 | 10 policy templates + Governor harness | ✅ | `control/policies/*`, `control/engine.py` |
 | Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE) | ✅ | `ApplyControls`, `wrap_complete` |
 | Preview mode (detect + decide, no push) | ✅ | `GovernanceMode.PREVIEW`, `PreviewControls`, `POST /v1/runs` `mode` |
-| Native server enforcement | ✅ | `bench/agents/*/native/server.py` (LangChain: #6) |
+| Native server enforcement | ✅ | `examples/…` in [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki) (LangChain: #6) |
 | SQLite store + auto-seed from YAML | ✅ | `control/store.py`, `config/default.yaml` `governance:` |
 | Admin UI (edit budgets/policies) | ✅ | `tokenops/ui/views/admin.py` |
 | Dashboard (runs, cost, read-only gov preview) | ✅ | `tokenops/ui/views/dashboard.py` |
-| Run simulator (in-process trace + control plane) | ✅ | `bench/ui/views/simulator_view.py`, `bench/ui/simulator.py` |
+| Run simulator (in-process trace + control plane) | ✅ | [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki) `examples/ui/` |
 | DB reset / reseed scripts | ✅ | `scripts/db_clear.py`, `scripts/db_reseed.py`, `make db-reset` |
 | User/tag segment-scoped budgets (config) | ⏳ | machinery in `segment_key_for`; seed is run-only ([#8](https://github.com/theagentplane/tokenops/issues/8)) |
 | Composite segment matchers (AND) | ⏳ | [#5](https://github.com/theagentplane/tokenops/issues/5) |
