@@ -1,12 +1,21 @@
-# TokenOps Test Bench
+# TokenOps
 
+[![CI](https://github.com/theagentplane/tokenops/actions/workflows/test.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/test.yml)
 [![Type Checking](https://img.shields.io/badge/types-Mypy%20%7C%20Strict-2A2A2A?style=flat-square)](https://mypy-lang.org/)
 [![Telemetry Standard](https://img.shields.io/badge/telemetry-OpenTelemetry%20GenAI-334155?style=flat-square&logo=opentelemetry)](https://opentelemetry.io/)
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 
-A multi-agent A2A test bench for TokenOps. The default stack is the **two-agent** pipeline
-(**Research** → **Summarize**). A **three-agent triad** (**Planner** → **Researcher** → **Writer**)
-is also available for richer governance demos (shared run ledger, tool boundaries, delegate rollups).
+**Control plane + SDK** for agent token governance, plus a multi-agent A2A **test bench**.
+The default stack is the **two-agent** pipeline (**Research** → **Summarize**). A **three-agent
+triad** (**Planner** → **Researcher** → **Writer**) is the reference for shared-run ledger,
+tool boundaries, and delegate rollups.
+
+| Piece | What |
+|-------|------|
+| **Control plane** | `make control-plane` → `POST /v1/runs` on `:7700`, shared `TOKENOPS_DB` |
+| **SDK (in agents)** | `ControlPlaneClient`, `wrap_complete`, `governance_scope`, Chronicle crossing hook |
+| **Product UI** | `make ui` — Admin + Dashboard (plane-side) |
+| **Bench UI** | `make bench-ui` — Chat + Simulator demos only |
 
 ## Quick start
 
@@ -15,7 +24,7 @@ make install
 cp .env.example .env   # add your API keys (optional for simulator demo mode)
 
 make db-reset          # optional: clean SQLite + seed governance from default.yaml
-make run               # control plane :7700 + agents + Admin/Dashboard (Ctrl+C stops all; frees stale ports)
+make run               # control plane :7700 + agents + Admin/Dashboard (Ctrl+C stops all)
 ```
 
 **Docker (same shape as cloud):** plane + research + summarize sharing a DB volume —
@@ -56,7 +65,16 @@ Open http://localhost:8501.
 | **Test Bench (Chat)** | `make bench-ui` only | Live A2A pipeline (research → summarize) |
 | **Run simulator** | `make bench-ui` only | In-process run with trace, spans (demo mode = no API key) |
 
-Configure agents in the Test Bench sidebar (`make bench-ui`), or use **Run simulator** for governance debugging.
+### Make targets
+
+| Target | Role |
+|--------|------|
+| `make control-plane` | Standalone plane (`python -m tokenops.server`) |
+| `make run` | Two-agent stack + plane + Admin/Dashboard |
+| `make run-triad` | Plane + Planner/Researcher/Writer + Admin/Dashboard |
+| `make ui` | Plane product UI (Admin + Dashboard) |
+| `make bench-ui` | Bench-only Chat + Simulator |
+| `make db-reset` | Clear SQLite + reseed governance from `TOKENOPS_CONFIG` |
 
 ### Triad bench (Planner → Researcher → Writer)
 
@@ -98,7 +116,9 @@ print(meta)
 "
 ```
 
-Field guide (how TokenOps was added): [`docs/field-guide-add-tokenops.md`](docs/field-guide-add-tokenops.md).
+**How TokenOps was added (screenshots):** [`docs/field-guide-add-tokenops.md`](docs/field-guide-add-tokenops.md).
+
+**Integration skill** (Cursor / GHCP / Claude Code): [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md).
 
 ### Governance / DB
 
@@ -113,6 +133,25 @@ API keys live in a **`.env`** file at the repo root (loaded by both agent server
 - `ANTHROPIC_API_KEY` — if summarize (or any agent) uses Anthropic
 
 You can still `export` keys in your shell; those override `.env`.
+
+## CI
+
+[`.github/workflows/test.yml`](.github/workflows/test.yml) runs on PRs and pushes to `main`:
+
+1. Default pytest suite (excludes metagpt / browseruse / trial heavy suites)
+2. Explicit policy / governance suite (cost_budget, step_cap, wrap/crossing, triad e2e, …)
+
+Locally:
+
+```bash
+python -m pip install -e . && python -m pip install pytest
+python -m pytest -q \
+  --ignore=tests/test_metagpt_integration.py \
+  --ignore=tests/test_metagpt_live_scenarios.py \
+  --ignore=tests/test_browseruse_suites.py \
+  --ignore=tests/test_trials_sweep.py \
+  --ignore=tests/test_trial_status.py
+```
 
 ## Search tool
 
@@ -146,6 +185,7 @@ bench/          # A2A test benches
   agents/       # two-agent research + summarize
   triad/        # three-agent planner + researcher + writer
   a2a/ ui/      # shared HTTP helpers + Chat/Simulator
+.cursor/skills/integrate-tokenops/  # copilot integration skill
 ```
 
 - UI / clients register runs on the **control plane** (`ControlPlaneClient` → `TOKENOPS_URL`)
@@ -159,6 +199,7 @@ See [`docs/code-navigation.md`](docs/code-navigation.md) and [`docs/control-plan
 - [Control plane status](CONTROL_PLANE.md)
 - [Control plane deploy](docs/control-plane-deploy.md) — compose vs SDK, `TOKENOPS_URL`, `register_run`
 - [Field guide: add TokenOps to the triad](docs/field-guide-add-tokenops.md)
+- [Integrate skill](.cursor/skills/integrate-tokenops/SKILL.md)
 - [Customer outcomes](docs/customer-outcomes.md) — first-order metrics: cost, completion under budget, quality
 - [Run attribution](docs/run-attribution.md)
 - [Architecture](docs/architecture.md)
@@ -166,3 +207,4 @@ See [`docs/code-navigation.md`](docs/code-navigation.md) and [`docs/control-plan
 - [Why Token Governance?](docs/why-token-governance.md)
 - [Agent Spec](docs/agent-spec.md)
 - [Code Navigation](docs/code-navigation.md)
+- [Testing](docs/testing.md)

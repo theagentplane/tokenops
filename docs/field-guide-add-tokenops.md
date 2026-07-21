@@ -1,11 +1,12 @@
 # Field guide: adding TokenOps to the triad bench
 
 This walkthrough mirrors how TokenOps was wired into the **Planner → Researcher → Writer**
-bench under `bench/triad/`. Screenshots are left as TODOs for a later pass — the code steps
-are the source of truth.
+bench under `bench/triad/`. Code screenshots below were generated with
+`python scripts/render_field_guide_snippets.py` → [`docs/field-guide/assets/`](field-guide/assets/).
 
 Related: [`CONTROL_PLANE.md`](../CONTROL_PLANE.md), [`control-plane-deploy.md`](control-plane-deploy.md),
 [`docs/run-attribution.md`](run-attribution.md).
+Copilot skill (same procedure): [`.cursor/skills/integrate-tokenops/SKILL.md`](../.cursor/skills/integrate-tokenops/SKILL.md).
 
 ## Shape
 
@@ -39,9 +40,24 @@ POST /v1/tasks  +  X-TokenOps-Run-Id  ──▶  Planner
                                          Planner observes rollup → TaskResponse
 ```
 
+### Before: naive complete
+
+Agent code stays injectable — no TokenOps imports in `agent.py`:
+
+![Naive LLM call](field-guide/assets/01-naive-complete.png)
+
+<details>
+<summary>SVG fallback</summary>
+
+![Naive LLM call (SVG)](field-guide/assets/01-naive-complete.svg)
+
+</details>
+
 ## Step 1 — Register the run (control plane)
 
 Before any agent work, the client registers once:
+
+![register_run](field-guide/assets/02-register-run.png)
 
 ```python
 from tokenops.control.client import ControlPlaneClient
@@ -58,8 +74,6 @@ run_id = reg["run_id"]
 - With `TOKENOPS_EMBEDDED=1` (tests), the client uses an in-process `Store` at `TOKENOPS_DB`.
 
 See `bench/triad/client.py` (`submit_goal_sync_with_meta`).
-
-<!-- TODO: screenshot — Admin/Dashboard showing a fresh run_id after register -->
 
 ## Step 2 — Propagate `run_id` on every A2A hop
 
@@ -79,6 +93,8 @@ resolve registration via `downstream_run_scope(store, headers=..., service=...)`
 ## Step 3 — Open governance scope + build governor
 
 Each server handler (Planner / Researcher / Writer) follows the same pattern:
+
+![governance_scope](field-guide/assets/03-governance-scope.png)
 
 ```python
 with downstream_run_scope(store, headers=headers, service=AGENT):
@@ -102,11 +118,11 @@ with downstream_run_scope(store, headers=headers, service=AGENT):
 `store=store` is what makes **cost_budget** / **step_cap** shared across the three processes
 for one `run_id`.
 
-<!-- TODO: screenshot — Policy admin showing run_llm_cap + step_cap for triad -->
-
 ## Step 4 — Wrap the LLM (`wrap_complete`)
 
 Replace the bare provider call with a governed dispatch:
+
+![wrap_complete](field-guide/assets/04-wrap-complete.png)
 
 ```python
 from tokenops.control import wrap_complete
@@ -130,6 +146,8 @@ emits LLM observations for **observe** policies (`cost_budget`, `step_cap`, …)
 
 On the Researcher, tools are Chronicle boundaries so TokenOps can observe tool crossings
 without changing the agent loop:
+
+![boundary + crossing hook](field-guide/assets/05-boundary-crossing.png)
 
 ```python
 from chronicle import InputState, boundary
@@ -157,8 +175,6 @@ That wires Chronicle `on_crossing` → `Governor.observe` (see `tokenops.control
 
 `tool_reject` / `tool_output_cap` in the seed registry include `search` and `fetch`
 (`src/tokenops/config/triad.yaml`).
-
-<!-- TODO: screenshot — Dashboard span/timeline with search tool crossing -->
 
 ## Step 6 — Delegate rollup (parent observes child spend)
 
@@ -227,6 +243,13 @@ print(meta['status'], meta['cost_micros'], r.summary[:200])
 
 # Tests (mocked LLM)
 python -m pytest tests/test_triad_e2e.py -q
+```
+
+## Regenerating screenshots
+
+```bash
+python scripts/render_field_guide_snippets.py
+# writes docs/field-guide/assets/{01..05}-*.{svg,png}
 ```
 
 ## Checklist for a new agent
