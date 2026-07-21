@@ -6,7 +6,7 @@ feeds the Governor. If a policy HALTs, ``Halt`` propagates out of the agent's lo
 is exactly the brownfield control channel, with no change to agent logic.
 
 The adapter **duck-types** the step object (reads ``.action`` / ``.query`` / ``.tokens``),
-so ``tokenops.control`` never imports ``tokenops.agents`` — the dependency stays one-way.
+so ``tokenops.control`` never imports ``bench.agents`` — the dependency stays one-way.
 """
 
 from __future__ import annotations

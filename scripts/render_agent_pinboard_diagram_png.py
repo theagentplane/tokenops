@@ -7,8 +7,8 @@ import html
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "demo-assets" / "architecture" / "agent-pinboard.png"
-TMP = ROOT / "demo-assets" / "_code_html" / "agent-pinboard.html"
+OUT = ROOT / "bench" / "demo-assets" / "architecture" / "agent-pinboard.png"
+TMP = ROOT / "bench" / "demo-assets" / "_code_html" / "agent-pinboard.html"
 
 GOLD = "#C9A227"
 INK = "#0A0A0A"

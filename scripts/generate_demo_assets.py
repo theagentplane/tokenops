@@ -11,21 +11,22 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "demo-assets"
+ASSETS = ROOT / "bench" / "demo-assets"
 SCREENSHOTS = ASSETS / "screenshots"
 VIDEOS = ASSETS / "videos"
 TABLES = ASSETS / "tables"
 
 os.chdir(ROOT)
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
-os.environ.setdefault("PYTHONPATH", str(ROOT / "src"))
+os.environ.setdefault("PYTHONPATH", f"{ROOT / 'src'}{os.pathsep}{ROOT}")
 os.environ.setdefault("TOKENOPS_CONFIG", "src/tokenops/config/default.yaml")
 
 from tokenops.config import load_config  # noqa: E402
 from tokenops.control.models import GovernanceMode  # noqa: E402
 from tokenops.control.store import Store  # noqa: E402
 from tokenops.env import load_env  # noqa: E402
-from tokenops.ui.simulator import run_simulation  # noqa: E402
+from bench.ui.simulator import run_simulation  # noqa: E402
 
 load_env()
 
@@ -139,7 +140,7 @@ def seed_runs() -> None:
 
 def start_streamlit() -> subprocess.Popen:
     print("Starting Streamlit UI...")
-    _run([PYTHON, "-m", "tokenops.servers.summarize"], timeout=1)  # no-op probe
+    _run([PYTHON, "-m", "bench.servers.summarize"], timeout=1)  # no-op probe
     # Free port
     subprocess.run(["make", "stop"], cwd=ROOT, capture_output=True, text=True)
     proc = subprocess.Popen(
@@ -380,7 +381,7 @@ def _build_illustrative_tables() -> None:
     (TABLES / "H3_cross_bench_summary.md").write_text(
         "# Cross-bench summary\n\nLive sweep did not complete. Run:\n\n"
         "```bash\npython benchmarking/run_trials_sweep.py --suite showcase_suite --framework both "
-        "--trial-counts 1,3,5 --cooldown-sec 90 --out demo-assets/tables/showcase_sweep.json\n```\n"
+        "--trial-counts 1,3,5 --cooldown-sec 90 --out bench/demo-assets/tables/showcase_sweep.json\n```\n"
     )
 
 

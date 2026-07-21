@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tokenops"
 version = "0.1.0"
-description = "Two-agent A2A test bench for research and summarize pipelines"
+description = "TokenOps control plane with two-agent A2A test bench"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "chronicle @ git+https://github.com/theagentplane/chronicle.git",
+  "chronicle @ git+https://github.com/theagentplane/chronicle.git@a6ea45c85bf45b0e67f5d3c14359d77331f40967",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",
@@ -30,10 +30,13 @@ langchain = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[tool.setuptools.package-dir]
+"" = "src"
+"bench" = "bench"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["src", "."]
+# Note: "bench*" would also match top-level "benchmarking/" — keep these exact.
+include = ["tokenops*", "bench", "bench.*"]

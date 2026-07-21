@@ -10,14 +10,15 @@ boundaries, and three Streamlit UIs; state shared via one SQLite file.
 
 | Entry point | Module | Purpose |
 |-------------|--------|---------|
-| `POST /v1/runs` + `POST /v1/tasks` | `a2a/server.py` | register run dims; task requires `X-TokenOps-Run-Id` |
+| `POST /v1/runs` | `control/http.py` `mount_run_registration` | register run dims (entry agent) |
+| `POST /v1/tasks` | `bench/a2a/server.py` | task requires `X-TokenOps-Run-Id` |
 | `build_attribution(reg, service=…)` | `attribution.py` | registration → ledger `Attribution` |
-| `@boundary` + `emit_observation` | `chronicle/boundary.py`, `control/boundary.py` | record crossing + govern ingest |
+| `@boundary` + crossing hook | Chronicle + `control/crossing.py` | record crossing + govern ingest |
 | `wrap_complete(…)` | `integration.py` | provider wrap — **pre_call** before dispatch |
 | `build_governor(config, price)` | `config.py` | `budgets:`/`policies:` → wired `Governor` |
 | `Store.governance_config_for(agent)` | `store.py` | SQLite → exact `build_governor` dict |
 | `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
-| `run_simulation(…)` | `ui/simulator.py` | in-process research→summarize with trace log |
+| `run_simulation(…)` | `bench/ui/simulator.py` | in-process research→summarize with trace log |
 
 Native A2A servers wire these per request; Admin writes the store; Dashboard reads runs;
 Simulator runs in-process with full control-plane visibility.

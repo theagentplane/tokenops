@@ -1,4 +1,4 @@
-"""TokenOps UI — single entry with three demo pages + optional admin."""
+"""TokenOps product UI — Admin + Dashboard."""
 
 from __future__ import annotations
 
@@ -17,14 +17,12 @@ inject_theme()
 
 _UI = Path(__file__).resolve().parent
 
-chat = st.Page(_UI / "views/chat.py", title="Chat", default=True)
-simulator = st.Page(_UI / "views/simulator_view.py", title="Simulator")
-dashboard = st.Page(_UI / "views/dashboard.py", title="Dashboard")
+dashboard = st.Page(_UI / "views/dashboard.py", title="Dashboard", default=True)
 admin = st.Page(_UI / "views/admin.py", title="Admin")
 
 st.navigation(
     {
-        "": [chat, simulator, dashboard],
+        "": [dashboard],
         "Configure": [admin],
     }
 ).run()

@@ -43,7 +43,7 @@ def store(tmp_path):
 
 
 def test_preview_mode_records_actions_without_halting(store):
-    from tokenops.agents.research.native.agent import NativeResearchAgent
+    from bench.agents.research.native.agent import NativeResearchAgent
     from tokenops.config.schema import AgentServerConfig
 
     reg = store.register_run(
@@ -76,7 +76,7 @@ def test_preview_mode_records_actions_without_halting(store):
 
 
 def test_enforce_mode_still_halts(store):
-    from tokenops.agents.research.native.agent import NativeResearchAgent
+    from bench.agents.research.native.agent import NativeResearchAgent
     from tokenops.config.schema import AgentServerConfig
 
     reg = store.register_run(RunRegistration(run_id="enforce-run", intent="demo"))

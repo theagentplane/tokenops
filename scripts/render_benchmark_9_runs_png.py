@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the archived 9-run benchmark table as a gold/black PNG.
 
-Source table: demo-assets/tables/archive/browseruse_benchmark_results.md
+Source table: bench/demo-assets/tables/archive/browseruse_benchmark_results.md
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "demo-assets" / "tables" / "archive" / "browseruse_benchmark_results.md"
-OUT = ROOT / "demo-assets" / "tables" / "overall_9_runs_benchmark.png"
+SRC = ROOT / "bench" / "demo-assets" / "tables" / "archive" / "browseruse_benchmark_results.md"
+OUT = ROOT / "bench" / "demo-assets" / "tables" / "overall_9_runs_benchmark.png"
 
 # Theme (matches src/tokenops/ui/theme.py)
 GOLD = "#C9A227"
@@ -329,7 +329,7 @@ def main() -> int:
     cols, rows = _parse_markdown_table(SRC.read_text())
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ROOT / "demo-assets" / "_code_html" / "overall_9_runs_benchmark.html"
+    tmp = ROOT / "bench" / "demo-assets" / "_code_html" / "overall_9_runs_benchmark.html"
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(_html_table(cols, rows))
 

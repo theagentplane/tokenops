@@ -77,6 +77,11 @@ make research-server
 
 ## Architecture
 
+```
+src/tokenops/   # core control plane (ledger, policies, Admin/Dashboard, providers)
+bench/          # two-agent A2A test bench (agents, a2a, chat + simulator, demo-assets)
+```
+
 - UI sends task to **research server** only
 - Research server completes research, then calls **summarize server** via A2A HTTP
 - Summarize returns summary to research; research returns full result to UI

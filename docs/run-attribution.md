@@ -120,26 +120,31 @@ step_to_observation(step, attr, *, service, boundary_tags) -> Observation
 
 ## Boundary annotation (`@boundary`)
 
-Chronicle-compatible package: `tokenops.chronicle` (mirrors
-[theagentplane/chronicle](https://github.com/theagentplane/chronicle)).
+Use Chronicle's decorator directly
+([theagentplane/chronicle](https://github.com/theagentplane/chronicle)).
+TokenOps registers a crossing hook so LIVE crossings feed the Governor when
+governance context is bound:
 
 ```python
-from tokenops.chronicle import boundary, reset_session, ReplayPlan, get_session
-from tokenops.control import governance_scope
+from chronicle import boundary, get_session, ReplayPlan
+from chronicle.session import reset_session
+from tokenops.control import governance_scope, install_crossing_hook
 
-@boundary("search", kind="tool")          # same signature as Chronicle
+install_crossing_hook()  # also done on `import tokenops.control`
+
+@boundary("search", kind="tool")          # Chronicle decorator
 def search(query: str) -> SearchResult: ...
 
 reset_session().begin_trace(run_id)       # Chronicle session
-with governance_scope(governor, attr):    # TokenOps extension → governor.observe
+with governance_scope(governor, attr):    # TokenOps → governor.observe via hook
     search("pricing")
 ```
 
 | Chronicle | TokenOps |
 |-----------|----------|
-| `session.record_envelope` | retained in `tokenops.chronicle` |
+| `session.record_envelope` | Chronicle package |
 | REPLAY + STUB / cut-point LIVE | retained via `ReplayPlan` |
-| — | `governor.observe` when `governance_scope` is bound |
+| `session.on_crossing` | `control/crossing.py` → `governor.observe` when bound |
 
 ## Run registration API (#2)
 
@@ -159,8 +164,8 @@ X-TokenOps-Run-Id: <run_id>
 { "task": "...", "bench": { "corpus_profile": "healthy" } }
 ```
 
-Implemented in `a2a/server.py` (`register_run` when `store=` is passed to `create_a2a_app`).
-Research native server: `agents/research/native/server.py` task handler resolves only.
+Implemented in `control/http.py` (`mount_run_registration`); research native
+`build_app()` mounts it on the A2A app. Task handlers resolve registration only.
 
 ## Cross-process ledger (spend + halt)
 

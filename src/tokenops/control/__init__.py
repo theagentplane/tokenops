@@ -65,6 +65,17 @@ from tokenops.control.context import (
     governance_scope,
 )
 from tokenops.control.boundary import emit_observation, observation_from_crossing
+from tokenops.control.crossing import install_crossing_hook, on_crossing
+
+# Process-wide: re-attach after every reset_session (Chronicle clears on_crossing).
+install_crossing_hook()
+
+from tokenops.control.http import (
+    mount_run_registration,
+    post_run,
+    post_run_sync,
+    with_governance_errors,
+)
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 
 __all__ = [
@@ -86,4 +97,8 @@ __all__ = [
     "require_registration", "entry_run_scope", "downstream_run_scope",
     "RUN_ID_HEADER", "PARENT_SPAN_ID_HEADER", "SpanContext", "GovernanceContext",
     "governance_scope", "observation_from_crossing", "emit_observation",
+    # Chronicle crossing hook
+    "install_crossing_hook", "on_crossing",
+    # HTTP (A2A mount + clients)
+    "mount_run_registration", "with_governance_errors", "post_run", "post_run_sync",
 ]

@@ -6,7 +6,7 @@ policies (output_runaway / progress_guard / context_compaction) fire determinist
 
 from __future__ import annotations
 
-from tokenops.chronicle import reset_session
+import chronicle.session as chronicle_session
 from tokenops.control import ApplyControls, Governor, Ledger, build_attribution, wrap_complete
 from tokenops.control.context import SpanContext, governance_scope, run_scope
 from tokenops.control.models import RunRegistration
@@ -68,7 +68,7 @@ def test_retry_recovers_from_degenerate_output():
     scripted = ScriptedModel(fail_n=2)
     governed = _bound_run(gov, attr, scripted)
 
-    reset_session().begin_trace("r1")
+    chronicle_session.reset_session().begin_trace("r1")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
         with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
@@ -131,7 +131,7 @@ def test_cancel_tears_down_degenerate_stream_then_retries():
                            stream_dispatch=stream, service="research",
                            ngram=3, repeats=4, check_every=4, on_cancel=lambda: cancels.append(1))
 
-    reset_session().begin_trace("r2")
+    chronicle_session.reset_session().begin_trace("r2")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
         with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])

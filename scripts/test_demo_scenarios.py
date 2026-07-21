@@ -7,14 +7,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from tokenops.a2a.client import check_health_sync, submit_task_sync_with_meta  # noqa: E402
+from bench.a2a.client import check_health_sync, submit_task_sync_with_meta  # noqa: E402
 from tokenops.config import load_config  # noqa: E402
 from tokenops.control.models import GovernanceMode  # noqa: E402
 from tokenops.control.store import Store  # noqa: E402
 from tokenops.env import load_env  # noqa: E402
-from tokenops.ui.demo_chips import live_governance_banner, prepare_chip_governance  # noqa: E402
+from bench.ui.demo_chips import live_governance_banner, prepare_chip_governance  # noqa: E402
 
 
 def _assert(name: str, ok: bool, detail: str = "") -> None:

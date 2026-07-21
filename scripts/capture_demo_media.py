@@ -13,7 +13,7 @@ from pathlib import Path
 _RUN_ID_RE = re.compile(r"run_[0-9a-f]{8}")
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "demo-assets"
+ASSETS = ROOT / "bench" / "demo-assets"
 CODE_SHOTS = ASSETS / "code"
 VIDEOS = ASSETS / "videos"
 UI_BASE = "http://localhost:8501"
@@ -64,7 +64,7 @@ CODE_SNIPPETS = [
     {
         "name": "01_boundary_search_tool",
         "title": "@boundary — tool hook (search)",
-        "file": "src/tokenops/agents/research/native/agent.py",
+        "file": "bench/agents/research/native/agent.py",
         "start": 36,
         "end": 53,
         "highlight": {36, 37, 41},
@@ -72,7 +72,7 @@ CODE_SNIPPETS = [
     {
         "name": "02_wrap_complete_server",
         "title": "wrap_complete — LLM hook in research server",
-        "file": "src/tokenops/agents/research/native/server.py",
+        "file": "bench/agents/research/native/server.py",
         "start": 88,
         "end": 100,
         "highlight": {97, 98, 99},

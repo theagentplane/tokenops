@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 import pytest
+import chronicle.session as chronicle_session
+from chronicle import InputState, ReplayPlan, boundary, get_session
+from chronicle.session import SessionMode
 
-from tokenops.chronicle import (
-    InputState,
-    ReplayPlan,
-    SessionMode,
-    boundary,
-    get_session,
-    reset_session,
-)
-from tokenops.control import ApplyControls, build_governor, build_attribution
+from tokenops.control import ApplyControls, build_attribution, build_governor, install_crossing_hook
+from tokenops.control.context import SpanContext, clear, governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
-from tokenops.control.context import SpanContext, clear, governance_scope, run_scope
 from conftest import toy_price
 
 
@@ -26,8 +21,13 @@ def store(tmp_path):
     s.close()
 
 
+@pytest.fixture(autouse=True)
+def _crossing_hook():
+    install_crossing_hook()
+
+
 def test_chronicle_live_records_envelope():
-    reset_session()
+    chronicle_session.reset_session()
     session = get_session()
     assert session.mode == SessionMode.LIVE
 
@@ -39,13 +39,13 @@ def test_chronicle_live_records_envelope():
     assert out["snippet"] == "pricing"
     assert len(session.recorded_envelopes) == 1
     assert session.recorded_envelopes[0].node_id == "search"
-    reset_session()
+    chronicle_session.reset_session()
 
 
 def test_chronicle_replay_stub_skips_execution(tmp_path):
     trace_dir = tmp_path / "trace"
 
-    reset_session()
+    chronicle_session.reset_session()
     session = get_session()
     session.begin_trace("trace-replay")
 
@@ -55,7 +55,7 @@ def test_chronicle_replay_stub_skips_execution(tmp_path):
 
     search("record-me")
     session.export_trace(trace_dir)
-    reset_session()
+    chronicle_session.reset_session()
 
     session = get_session()
     session.enable_replay(ReplayPlan().stub("search", 1))
@@ -71,7 +71,7 @@ def test_chronicle_replay_stub_skips_execution(tmp_path):
     out = search_replay("ignored")
     assert out["snippet"] == "record-me"
     assert called == []
-    reset_session()
+    chronicle_session.reset_session()
 
 
 def test_boundary_tokenops_observe_when_governed(store):
@@ -87,7 +87,7 @@ def test_boundary_tokenops_observe_when_governed(store):
     attr = build_attribution(reg, service="research")
     gov.ledger.open_run("r1")
 
-    reset_session().begin_trace("r1")
+    chronicle_session.reset_session().begin_trace("r1")
 
     @boundary(
         "search",
@@ -104,5 +104,5 @@ def test_boundary_tokenops_observe_when_governed(store):
             search("pricing")
 
     clear()
-    reset_session()
+    chronicle_session.reset_session()
     assert gov.ledger.step_count("r1") == 1
