@@ -1,0 +1,77 @@
+# Triad bench config: Planner → Researcher → Writer (ports 8011/8012/8013).
+# Governance seed is demo-friendly: cost_budget + step_cap can fire on multi-hop runs.
+task: "Explain enterprise SaaS pricing for a mid-market CRM"
+corpus_profile: healthy
+
+agents:
+  research:
+    url: http://localhost:8001
+    summarize_url: http://localhost:8002
+    framework: native
+    provider: openai
+    model: gpt-4o-mini
+    port: 8001
+    max_steps: 5
+    satisfaction_threshold: 0.7
+  summarize:
+    url: http://localhost:8002
+    framework: native
+    provider: openai
+    model: gpt-4o-mini
+    port: 8002
+  planner:
+    url: http://localhost:8011
+    provider: openai
+    model: gpt-4o-mini
+    port: 8011
+    max_questions: 3
+    researcher_url: http://localhost:8012
+    writer_url: http://localhost:8013
+  researcher:
+    url: http://localhost:8012
+    provider: openai
+    model: gpt-4o-mini
+    port: 8012
+    max_steps: 4
+    satisfaction_threshold: 0.7
+  writer:
+    url: http://localhost:8013
+    provider: openai
+    model: gpt-4o-mini
+    port: 8013
+
+governance:
+  budgets:
+    - id: run_llm_cap
+      limit_micros: 500000          # $0.50 per run — easier to demo cost_budget than $2
+      dimension: run
+  policies:
+    cost_budget:
+      budget: run_llm_cap
+    pre_call_worst_case:
+      budget: run_llm_cap
+      default_max_output: 1024
+    step_cap:
+      max_steps: 12                 # planner + researcher loop + writer + tools
+    concurrency_cap:
+      max_concurrent: 4
+      mode: reject
+    tool_fix:
+      registry: [search, fetch]
+      k: 4
+    tool_output_cap:
+      cap_tokens: 8000
+    progress_guard:
+      window: 6
+      repeats: 3
+      max_corrections: 2
+    cost_guard:
+      budget: run_llm_cap
+      threshold: 0.8
+      mode: minimize
+    context_compaction:
+      ctx_max: 100000
+      has_hook: false
+    output_runaway:
+      repeats: 4
+      max_retries: 2

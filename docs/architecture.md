@@ -1,7 +1,8 @@
 # TokenOps control plane — architecture & dependency graph
 
 Where the code starts, how the modules depend on each other, and what each is for.
-Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Simulator live in tokenops-wiki; state shared via one SQLite file.
+Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Simulator under
+`examples/`; state shared via one SQLite file.
 
 ---
 
@@ -12,22 +13,22 @@ Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Sim
 | `POST /v1/runs` | `control/http.py` `mount_run_registration` (plane app) | register run dims |
 | `ControlPlaneClient` | `control/client.py` | SDK register_run (HTTP or embedded Store) |
 | `python -m tokenops.server` | `server/app.py` | standalone control plane (:7700) |
-| `POST /v1/tasks` | `examples/a2a/server.py` ([tokenops-wiki](https://github.com/theagentplane/tokenops-wiki)) | task requires `X-TokenOps-Run-Id` |
+| `POST /v1/tasks` | `examples/a2a/server.py` | task requires `X-TokenOps-Run-Id` |
 | `build_attribution(reg, service=…)` | `attribution.py` | registration → ledger `Attribution` |
 | `@boundary` + crossing hook | Chronicle + `control/crossing.py` | record crossing + govern ingest |
 | `wrap_complete(…)` | `integration.py` | provider wrap — **pre_call** before dispatch |
 | `build_governor(config, price)` | `config.py` | `budgets:`/`policies:` → wired `Governor` |
 | `Store.governance_config_for(agent)` | `store.py` | SQLite → exact `build_governor` dict |
 | `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
-| `run_simulation(…)` | `examples/ui/simulator.py` (wiki) | in-process research→summarize with trace log |
+| `run_simulation(…)` | `examples/ui/simulator.py` | in-process research→summarize with trace log |
 
-Native A2A servers (wiki) wire these per request; Admin writes the store; Dashboard reads runs.
+Native A2A servers under `examples/` wire these per request; Admin writes the store; Dashboard reads runs.
 
 ## Dependency + data-flow graph
 
 ```mermaid
 graph TD
-    subgraph dataplane["data plane (your agents / wiki demos)"]
+    subgraph dataplane["data plane (your agents / examples)"]
         agent["A2A / in-process agents"]
         chronicle["chronicle @boundary"]
     end

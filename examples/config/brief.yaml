@@ -1,0 +1,63 @@
+# Brief stack (LangChain): Scout → Analyst → Editor (ports 8021/8022/8023).
+# LLM path: ChatOpenAI → wrap_complete(dispatch=langchain) → GovernedChatModel.
+# Governance: $0.40 / run budget with cost_budget + step_cap.
+task: "Competitive brief on mid-market AI coding assistants"
+corpus_profile: healthy
+
+agents:
+  scout:
+    url: http://localhost:8021
+    provider: openai
+    model: gpt-4o-mini
+    port: 8021
+    max_angles: 2
+    analyst_url: http://localhost:8022
+    editor_url: http://localhost:8023
+  analyst:
+    url: http://localhost:8022
+    provider: openai
+    model: gpt-4o-mini
+    port: 8022
+    max_steps: 3
+    satisfaction_threshold: 0.7
+  editor:
+    url: http://localhost:8023
+    provider: openai
+    model: gpt-4o-mini
+    port: 8023
+
+governance:
+  budgets:
+    - id: run_llm_cap
+      limit_micros: 400000          # $0.40 per run
+      dimension: run
+  policies:
+    cost_budget:
+      budget: run_llm_cap
+    pre_call_worst_case:
+      budget: run_llm_cap
+      default_max_output: 1024
+    step_cap:
+      max_steps: 14
+    concurrency_cap:
+      max_concurrent: 4
+      mode: reject
+    tool_fix:
+      registry: [search, fetch]
+      k: 4
+    tool_output_cap:
+      cap_tokens: 8000
+    progress_guard:
+      window: 6
+      repeats: 3
+      max_corrections: 2
+    cost_guard:
+      budget: run_llm_cap
+      threshold: 0.8
+      mode: minimize
+    context_compaction:
+      ctx_max: 100000
+      has_hook: false
+    output_runaway:
+      repeats: 4
+      max_retries: 2

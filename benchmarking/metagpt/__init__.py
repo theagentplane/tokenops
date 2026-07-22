@@ -1,0 +1,1 @@
+"""MetaGPT live benchmark adapter."""

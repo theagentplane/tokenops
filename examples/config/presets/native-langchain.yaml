@@ -1,0 +1,19 @@
+task: "Research enterprise SaaS pricing"
+corpus_profile: healthy
+
+agents:
+  research:
+    url: http://localhost:8001
+    summarize_url: http://localhost:8002
+    framework: native
+    provider: openai
+    model: gpt-4o-mini
+    port: 8001
+    max_steps: 20
+    satisfaction_threshold: 0.7
+  summarize:
+    url: http://localhost:8002
+    framework: langchain
+    provider: openai
+    model: gpt-4o-mini
+    port: 8002

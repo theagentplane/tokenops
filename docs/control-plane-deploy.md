@@ -1,7 +1,7 @@
 # Control plane deploy
 
-Standalone TokenOps plane + SDK. Agent demos and compose overlays for research/summarize
-or the triad live in [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki).
+Standalone TokenOps plane + SDK. Agent demos and compose overlays live in-repo under
+[`examples/`](../examples/) (`docker-compose.examples.yml`, `docker-compose.triad.yml`).
 
 ## Shape
 
@@ -10,7 +10,7 @@ or the triad live in [tokenops-wiki](https://github.com/theagentplane/tokenops-w
 | `tokenops` | `python -m tokenops.server` | Plane: `POST /v1/runs`, `GET /health`, shared SQLite |
 | `ui` (optional profile) | `streamlit run src/tokenops/ui/app.py` | Admin + Dashboard |
 
-Agents in your app (or wiki examples) set `TOKENOPS_URL=http://tokenops:7700` so they
+Agents in your app (or `examples/`) set `TOKENOPS_URL=http://tokenops:7700` so they
 **do not** mount `/v1/runs` locally.
 
 ## Env
@@ -42,16 +42,20 @@ make ui              # Admin + Dashboard on :8501
 
 Or `make run` starts the plane + product UI.
 
-## Examples (wiki)
+## Examples
 
 ```bash
-# Sibling checkout
-cd ../tokenops-wiki && make install
-make run             # two-agent
-make triad           # planner → researcher → writer
+make install
+make demo            # two-agent (research → summarize)
+make demo-triad      # planner → researcher → writer
+make demo-brief      # scout → analyst → editor
+# Docker:
+docker compose -f docker-compose.examples.yml up --build
+docker compose -f docker-compose.examples.yml -f docker-compose.triad.yml up --build \
+  tokenops planner researcher writer
 ```
 
-Field guide: https://github.com/theagentplane/tokenops-wiki/blob/main/docs/field-guide-add-tokenops.md
+Field guide: [`docs/guides/field-guide-add-tokenops.md`](guides/field-guide-add-tokenops.md).
 
 ## SDK registration
 

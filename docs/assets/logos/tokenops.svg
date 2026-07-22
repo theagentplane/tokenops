@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" role="img" aria-label="TokenOps">
+  <rect x="1" y="3" width="8" height="14" rx="2" fill="#2563eb"/>
+  <rect x="11" y="3" width="8" height="14" rx="2" fill="#6366f1"/>
+  <path d="M10 6.5v7" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M7.5 10h5" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

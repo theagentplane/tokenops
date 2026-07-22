@@ -1,0 +1,81 @@
+# Local compose mirrors the cloud shape: one control-plane service + agent SDKs.
+# Agents share TOKENOPS_DB via volume and register runs at TOKENOPS_URL.
+
+services:
+  tokenops:
+    build: .
+    command: ["python", "-m", "tokenops.server"]
+    ports:
+      - "7700:7700"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_PORT: "7700"
+      TOKENOPS_HOST: "0.0.0.0"
+      TOKENOPS_CONFIG: examples/config/default.yaml
+    volumes:
+      - tokenops-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7700/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  research:
+    build: .
+    command: ["python", "-m", "examples.servers.research"]
+    ports:
+      - "8001:8001"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/compose.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-corpus}
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy
+
+  summarize:
+    build: .
+    command: ["python", "-m", "examples.servers.summarize"]
+    ports:
+      - "8002:8002"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/compose.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy
+
+  # Product Admin + Dashboard (plane-side). Chat/Simulator: make bench-ui (examples/ui).
+  ui:
+    profiles: ["ui"]
+    build: .
+    command:
+      [
+        "python",
+        "-c",
+        "import pathlib, tokenops.ui, subprocess, sys; p=pathlib.Path(tokenops.ui.__file__).parent/'app.py'; raise SystemExit(subprocess.call([sys.executable,'-m','streamlit','run',str(p),'--server.port=8501','--server.address=0.0.0.0']))",
+      ]
+    ports:
+      - "8501:8501"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/compose.yaml
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy
+
+volumes:
+  tokenops-data:
