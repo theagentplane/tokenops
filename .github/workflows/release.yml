@@ -1,0 +1,62 @@
+name: Release
+
+# Publishing a GitHub Release triggers a build and upload to PyPI.
+# See RELEASING.md for the one-time PyPI Trusted Publisher setup.
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches package version
+        # Guard against cutting a release before the version bump is merged:
+        # the tag (vX.Y.Z) must match pyproject's version, or we would publish
+        # the wrong version under the tag's name.
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "release tag: $tag | pyproject version: $version"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Release tag v$tag does not match pyproject version $version. Bump the version and merge it before creating the release."
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: |
+          pip install "build>=1.2"
+          python -m build
+
+      - name: Check metadata
+        run: |
+          pip install "twine>=6"
+          twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted Publishing (OIDC) — no API tokens stored. Matches the `pypi`
+    # environment and `release.yml` workflow name configured on PyPI.
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

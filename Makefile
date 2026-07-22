@@ -4,7 +4,8 @@
 	planner-server researcher-server writer-server \
 	scout-server analyst-server editor-server \
 	stop-demo stop-triad stop-brief \
-	db-clear db-reseed db-reset
+	db-clear db-reseed db-reset \
+	dist check-dist
 
 PYTHON ?= python3
 export PYTHONPATH := .$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -13,6 +14,16 @@ export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
 	$(PYTHON) -m pip install -e ".[dev,examples]"
+
+# Build sdist + wheel under dist/ (see RELEASING.md).
+dist:
+	rm -rf dist build *.egg-info src/*.egg-info
+	$(PYTHON) -m pip install -q "build>=1.2"
+	$(PYTHON) -m build
+
+check-dist: dist
+	$(PYTHON) -m pip install -q "twine>=6"
+	$(PYTHON) -m twine check dist/*
 
 control-plane:
 	$(PYTHON) -m tokenops.server

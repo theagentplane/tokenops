@@ -6,13 +6,15 @@
 Cap spend and steer behavior across a whole agent workflow — not per request — with a shared ledger and in-path enforcement.
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/test.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/theagentplane/tokenops)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 [![Stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=flat&color=yellow)](https://github.com/theagentplane/tokenops/stargazers)
 
 <br>
 
-<img src="examples/demo-assets/videos/02_governance_on_budget_cap.png" alt="TokenOps Dashboard: governance halt when worst-case cost exceeds remaining run budget" width="720" />
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.png" alt="TokenOps Dashboard: governance halt when worst-case cost exceeds remaining run budget" width="720" />
 
 </div>
 
@@ -63,14 +65,17 @@ Chronicle records decision boundaries; TokenOps attaches as the cost/governance 
 ## Install
 
 ```bash
+pip install agent-tokenops
+
+# With example / bench extras (LangChain, ddgs):
+pip install "agent-tokenops[examples]"
+
 # From source (development):
 pip install -e ".[dev,examples]"
-
-# From GitHub:
-pip install "tokenops @ git+https://github.com/theagentplane/tokenops.git"
 ```
 
-Requires Python 3.10+. Not on PyPI yet.
+Requires Python 3.10+. PyPI name is `agent-tokenops`; import is still `tokenops`
+(same pattern as Chronicle). See [`RELEASING.md`](RELEASING.md) for releases.
 
 ## Quick start
 
@@ -172,6 +177,7 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 | Target | Role |
 |--------|------|
 | `make install` | Editable install with dev + examples extras |
+| `make dist` / `check-dist` | Build sdist+wheel / `twine check` |
 | `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
 | `make ui` | Admin + Dashboard on `:8501` |
 | `make run` | Plane + Admin/Dashboard |
@@ -217,7 +223,7 @@ TokenOps is early (0.x). Near-term:
 - User/tag segment-scoped budgets (machinery exists; seed is run-only today).
 - Optional fail-closed mode on missing registration or exceeded budget.
 - Remote observe / decide (fatter plane) for multi-host stacks.
-- PyPI publish and a documentation site.
+- Documentation site.
 
 Status of each control-plane job: [`CONTROL_PLANE.md`](CONTROL_PLANE.md). Ideas welcome via GitHub issues.
 

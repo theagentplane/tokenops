@@ -1,13 +1,38 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tokenops"
+name = "agent-tokenops"
 version = "0.1.0"
 description = "TokenOps control plane and SDK for run-aware agent token governance"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+authors = [
+  { name = "Susheem Koul" },
+  { name = "Tisha Chawla" },
+]
+keywords = [
+  "llm",
+  "agents",
+  "governance",
+  "token-budget",
+  "multi-agent",
+  "control-plane",
+  "cost-control",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Systems Administration",
+]
 dependencies = [
   "agent-chronicle>=0.1.1",
   "openai>=1.0",
@@ -21,13 +46,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = [
+  "pytest>=8.0",
+  "build>=1.2",
+  "twine>=6.0",
+]
 examples = [
   "ddgs>=9.0",
   "langchain-core>=0.3",
   "langchain-openai>=0.2",
   "langchain-anthropic>=0.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/theagentplane/tokenops"
+Repository = "https://github.com/theagentplane/tokenops"
+Issues = "https://github.com/theagentplane/tokenops/issues"
+Changelog = "https://github.com/theagentplane/tokenops/blob/main/CHANGELOG.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -44,3 +79,7 @@ addopts = "-m 'not e2e and not live'"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tokenops*"]
+
+# Ship the default governance YAML with the wheel (loader resolves via Path(__file__)).
+[tool.setuptools.package-data]
+tokenops = ["config/*.yaml"]

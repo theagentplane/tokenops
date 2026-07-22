@@ -90,7 +90,7 @@ Set FontSize 18
 Set Width 1200
 Set Height 700
 Set Theme "Catppuccin Mocha"
-Type "pip install tokenops"
+Type "pip install agent-tokenops"
 Enter
 Sleep 1s
 Type "# show the core loop"
