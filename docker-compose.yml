@@ -1,4 +1,5 @@
-# Control plane (+ optional Admin/Dashboard). Agent demos live in tokenops-wiki.
+# Control plane (+ optional Admin/Dashboard).
+# Agent demos: docker-compose.examples.yml / docker-compose.triad.yml, or make demo / demo-triad.
 
 services:
   tokenops:

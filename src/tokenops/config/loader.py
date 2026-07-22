@@ -1,6 +1,6 @@
 """Governance YAML loading for the TokenOps control plane.
 
-Agent/server bench config lives in tokenops-wiki (``examples.app_config``).
+Agent/server bench config lives under ``examples.app_config``.
 """
 
 from __future__ import annotations

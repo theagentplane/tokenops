@@ -13,8 +13,8 @@ description: >-
 Copyable procedure for GitHub Copilot, Claude Code, Cursor, or any assistant.
 
 - **Core library:** [theagentplane/tokenops](https://github.com/theagentplane/tokenops) (`pip install`)
-- **Runnable reference (triad / two-agent):** [theagentplane/tokenops-wiki](https://github.com/theagentplane/tokenops-wiki)
-  — `examples/triad/`, field guide `docs/field-guide-add-tokenops.md`
+- **Runnable reference (triad / two-agent):** in-repo `examples/triad/`, `examples/agents/` —
+  field guide `docs/guides/field-guide-add-tokenops.md`
 
 ## Plane vs agent (do not conflate)
 
@@ -36,7 +36,7 @@ apply across processes. Child spend hits that ledger once — **no parent cost r
 | `TOKENOPS_URL` | Remote plane base URL (e.g. `http://localhost:7700`) → HTTP `register_run` |
 | `TOKENOPS_EMBEDDED=1` | Force in-process `Store` (tests / single-process) |
 | `TOKENOPS_DB` | SQLite path shared by plane + agents |
-| `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`; demos: wiki `examples/config/`) |
+| `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`; demos: `examples/config/`) |
 
 - **Production / multi-process:** set `TOKENOPS_URL`; agents must **not** mount `/v1/runs`.
 - **Tests:** `TOKENOPS_EMBEDDED=1` (or omit URL) so `from_env()` uses embedded Store.
@@ -67,7 +67,7 @@ with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT
     ...
 ```
 
-UI / bench clients should **not** call `/v1/runs` for the default flow — see wiki
+UI / bench clients should **not** call `/v1/runs` for the default flow — see
 `examples/triad/client.py` and `examples/a2a/client.py`.
 
 ## Step 2 — Propagate run_id
@@ -135,7 +135,7 @@ def invoke(query: str) -> SearchResult:
 install_crossing_hook()
 ```
 
-Reference: wiki `examples/triad/researcher/tools.py`.
+Reference: `examples/triad/researcher/tools.py`.
 
 ## Step 6 — Delegates: spans only (no parent cost rollup)
 
@@ -154,14 +154,13 @@ install_crossing_hook()
 ## Verify
 
 ```bash
-# Clone wiki examples (sibling of tokenops)
-cd ../tokenops-wiki && make install
+make install
 TOKENOPS_CONFIG=examples/config/triad.yaml make db-reset
-make triad
+make demo-triad
 ```
 
 ## Docs
 
-- Core deploy: https://github.com/theagentplane/tokenops/blob/main/docs/control-plane-deploy.md
-- Field guide + screenshots: https://github.com/theagentplane/tokenops-wiki/blob/main/docs/field-guide-add-tokenops.md
-- Attribution: https://github.com/theagentplane/tokenops/blob/main/docs/run-attribution.md
+- Deploy: `docs/control-plane-deploy.md`
+- Field guide + screenshots: `docs/guides/field-guide-add-tokenops.md`
+- Attribution: `docs/run-attribution.md`

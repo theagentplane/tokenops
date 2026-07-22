@@ -4,7 +4,7 @@ Governance for agent stacks: **register → measure → record → detect → de
 The agent (data plane) stays vanilla; the control plane taps boundary crossings and enforces on
 **cost** (micro-USD integers).
 
-Runnable A2A demos live in [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki).
+Runnable A2A demos live in-repo under [`examples/`](examples/) (`make demo` / `demo-triad` / `demo-brief`).
 
 ## What it does (jobs → status)
 
@@ -79,14 +79,14 @@ python -m pytest -q
 ```
 
 Product UI (`make ui` / compose `--profile ui`): **Policy admin** · **Dashboard**.
-Agent demos / Chat / Simulator: [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki).
+Agent demos / Chat / Simulator: `make demo`, `make demo-triad`, `make bench-ui` ([`examples/`](examples/)).
 
 ## Proof loops
 
 - **Offline:** `tests/test_attribution_ledger_policies_e2e.py` — register → govern → HALT on `step_cap`.
 - **HTTP:** same file — `POST /v1/runs` → agent task with run header.
 - **Shared ledger:** `tests/test_cross_process_budget_gating.py`.
-- **Live demos:** wiki two-agent / triad / simulator.
+- **Live demos:** `make demo` / `demo-triad` / `bench-ui`.
 
 ## Deferred
 
@@ -95,4 +95,4 @@ LangChain governance ([#6](https://github.com/theagentplane/tokenops/issues/6)) 
 ## Docs
 
 `docs/run-attribution.md` · `docs/architecture.md` · `docs/control-plane-deploy.md` · `docs/testing.md` ·
-`docs/governance-policy.md` · [tokenops-wiki](https://github.com/theagentplane/tokenops-wiki)
+`docs/governance-policy.md` · `examples/README.md` · `docs/guides/field-guide-add-tokenops.md`

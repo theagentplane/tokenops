@@ -11,10 +11,14 @@ env
 *.db
 .env
 tokenops.db
-bench/demo-assets/videos
+examples/demo-assets/videos/_raw
+examples/demo-assets/_code_html
+benchmarking/**/.venv
+benchmarking/**/vendor
 **/__pycache__
 *.egg-info
 dist
 build
 .coverage
 htmlcov
+docs/product/*.pptx

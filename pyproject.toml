@@ -9,7 +9,7 @@ description = "TokenOps control plane and SDK for run-aware agent token governan
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "chronicle @ git+https://github.com/theagentplane/chronicle.git@f470f38fe5a16140e46805ee00a8128b3b014b28",
+  "agent-chronicle>=0.1.1",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",
@@ -22,10 +22,21 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+examples = [
+  "ddgs>=9.0",
+  "langchain-core>=0.3",
+  "langchain-openai>=0.2",
+  "langchain-anthropic>=0.2",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
+markers = [
+  "e2e: example / bench end-to-end tests (not run in default CI)",
+  "live: requires API keys or vendored frameworks",
+]
+addopts = "-m 'not e2e and not live'"
 
 [tool.setuptools.package-dir]
 "" = "src"

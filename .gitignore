@@ -14,6 +14,8 @@ build/
 venv/
 benchmarking/**/.venv/
 benchmarking/**/vendor/
+examples/demo-assets/videos/_raw/
+examples/demo-assets/_code_html/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

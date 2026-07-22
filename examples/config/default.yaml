@@ -1,0 +1,79 @@
+task: "Research enterprise SaaS pricing"
+corpus_profile: healthy
+
+agents:
+  research:
+    url: http://localhost:8001
+    summarize_url: http://localhost:8002
+    framework: native
+    provider: openai
+    model: gpt-4o-mini
+    port: 8001
+    max_steps: 5
+    satisfaction_threshold: 0.7
+  summarize:
+    url: http://localhost:8002
+    framework: native
+    provider: openai
+    model: gpt-4o-mini
+    port: 8002
+  # Triad bench (Planner → Researcher → Writer). Optional; see triad.yaml / make run-triad.
+  planner:
+    url: http://localhost:8011
+    provider: openai
+    model: gpt-4o-mini
+    port: 8011
+    max_questions: 3
+    researcher_url: http://localhost:8012
+    writer_url: http://localhost:8013
+  researcher:
+    url: http://localhost:8012
+    provider: openai
+    model: gpt-4o-mini
+    port: 8012
+    max_steps: 5
+    satisfaction_threshold: 0.7
+  writer:
+    url: http://localhost:8013
+    provider: openai
+    model: gpt-4o-mini
+    port: 8013
+
+# TokenOps control plane. Consumed by tokenops.control.build_governor(...).
+# Budgets are spend caps bound to a segment; policies are the (detect, fix) templates.
+# Applies to all agents (research/summarize and triad) when agent scope is unset.
+governance:
+  budgets:
+    - id: run_llm_cap
+      limit_micros: 2000000          # $2.00 per run; null/omitted -> unlimited accumulator
+      dimension: run
+  policies:
+    cost_budget:
+      budget: run_llm_cap
+    pre_call_worst_case:
+      budget: run_llm_cap
+      default_max_output: 1024
+    step_cap:
+      max_steps: 20
+    concurrency_cap:
+      max_concurrent: 4
+      mode: reject
+    tool_fix:
+      registry: [search]
+      k: 3
+    tool_output_cap:
+      cap_tokens: 8000
+    progress_guard:
+      window: 6
+      repeats: 3
+      max_corrections: 2
+    cost_guard:
+      budget: run_llm_cap
+      threshold: 0.8
+      mode: minimize
+    context_compaction:
+      ctx_max: 100000
+      has_hook: false
+    output_runaway:
+      repeats: 4
+      max_retries: 2

@@ -1,12 +1,18 @@
-.PHONY: install control-plane ui run stop db-clear db-reseed db-reset
+.PHONY: install control-plane ui run stop \
+	demo demo-triad demo-brief bench-ui \
+	research-server summarize-server \
+	planner-server researcher-server writer-server \
+	scout-server analyst-server editor-server \
+	stop-demo stop-triad stop-brief \
+	db-clear db-reseed db-reset
 
 PYTHON ?= python3
-export PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH),)
+export PYTHONPATH := .$(if $(PYTHONPATH),:$(PYTHONPATH),)
 export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
-	$(PYTHON) -m pip install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev,examples]"
 
 control-plane:
 	$(PYTHON) -m tokenops.server
@@ -26,6 +32,80 @@ p.send_signal(signal.SIGTERM); p.wait(timeout=5); raise SystemExit(rc)"
 
 stop:
 	@for port in 7700 8501; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "Stopping listener on port $$port ($$pids)"; \
+			kill $$pids 2>/dev/null || true; \
+			sleep 0.5; \
+			pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+			if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi; \
+		fi; \
+	done
+
+# --- Examples / demos ---
+
+research-server:
+	$(PYTHON) -m examples.servers.research
+
+summarize-server:
+	$(PYTHON) -m examples.servers.summarize
+
+planner-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) -m examples.servers.planner
+
+researcher-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) -m examples.servers.researcher
+
+writer-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) -m examples.servers.writer
+
+scout-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) -m examples.servers.scout
+
+analyst-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) -m examples.servers.analyst
+
+editor-server:
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) -m examples.servers.editor
+
+bench-ui:
+	streamlit run examples/ui/app.py --server.port 8501
+
+demo: stop-demo
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/default.yaml} $(PYTHON) run.py
+
+demo-triad: stop-triad
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) run_triad.py
+
+demo-brief: stop-brief
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) run_brief.py
+
+stop-demo:
+	@for port in 7700 8001 8002 8501; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "Stopping listener on port $$port ($$pids)"; \
+			kill $$pids 2>/dev/null || true; \
+			sleep 0.5; \
+			pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+			if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi; \
+		fi; \
+	done
+
+stop-triad:
+	@for port in 7700 8011 8012 8013 8501; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "Stopping listener on port $$port ($$pids)"; \
+			kill $$pids 2>/dev/null || true; \
+			sleep 0.5; \
+			pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
+			if [ -n "$$pids" ]; then kill -9 $$pids 2>/dev/null || true; fi; \
+		fi; \
+	done
+
+stop-brief:
+	@for port in 7700 8021 8022 8023; do \
 		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null); \
 		if [ -n "$$pids" ]; then \
 			echo "Stopping listener on port $$port ($$pids)"; \

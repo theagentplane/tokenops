@@ -1,0 +1,57 @@
+# Compose overlay for the triad bench (plane + planner/researcher/writer).
+# Usage: docker compose -f docker-compose.examples.yml -f docker-compose.triad.yml up --build
+# Does not replace the default two-agent (research/summarize) stack.
+
+services:
+  planner:
+    build: .
+    command: ["python", "-m", "examples.servers.planner"]
+    ports:
+      - "8011:8011"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/triad.compose.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-corpus}
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy
+
+  researcher:
+    build: .
+    command: ["python", "-m", "examples.servers.researcher"]
+    ports:
+      - "8012:8012"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/triad.compose.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SEARCH_BACKEND: ${SEARCH_BACKEND:-corpus}
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy
+
+  writer:
+    build: .
+    command: ["python", "-m", "examples.servers.writer"]
+    ports:
+      - "8013:8013"
+    environment:
+      TOKENOPS_DB: /data/tokenops.db
+      TOKENOPS_URL: http://tokenops:7700
+      TOKENOPS_CONFIG: examples/config/triad.compose.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - tokenops-data:/data
+    depends_on:
+      tokenops:
+        condition: service_healthy

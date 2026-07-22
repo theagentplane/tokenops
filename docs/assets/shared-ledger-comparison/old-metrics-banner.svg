@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="200" viewBox="0 0 1200 200">
+  <rect width="1200" height="200" fill="#12161c"/>
+  <text x="24" y="40" fill="#dc5050" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Before  per-process in-memory ledger</text>
+  <text x="24" y="72" fill="#e6e6e6" font-family="system-ui,sans-serif" font-size="18">Status: completed</text>
+  <text x="24" y="110" fill="#8c96a0" font-family="system-ui,sans-serif" font-size="14">Research</text>
+  <text x="24" y="132" fill="#e6e6e6" font-family="system-ui,sans-serif" font-size="20">$0.0010</text>
+  <text x="280" y="110" fill="#8c96a0" font-family="system-ui,sans-serif" font-size="14">Summarize</text>
+  <text x="280" y="132" fill="#e6e6e6" font-family="system-ui,sans-serif" font-size="20">$0.0002</text>
+  <text x="536" y="110" fill="#8c96a0" font-family="system-ui,sans-serif" font-size="14">Total run</text>
+  <text x="536" y="132" fill="#e6e6e6" font-family="system-ui,sans-serif" font-size="20">$0.0012</text>
+  <text x="792" y="110" fill="#8c96a0" font-family="system-ui,sans-serif" font-size="14">Run budget cap</text>
+  <text x="792" y="132" fill="#e6e6e6" font-family="system-ui,sans-serif" font-size="20">$0.0010</text>
+  <text x="24" y="175" fill="#dc5050" font-family="system-ui,sans-serif" font-size="16">Summarize agent sees a fresh $0.001 cap  run completes 19% over budget.</text>
+</svg>
