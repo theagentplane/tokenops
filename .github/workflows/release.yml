@@ -1,33 +1,64 @@
 name: Release
 
-# Publishing a GitHub Release triggers a build and upload to PyPI.
-# See RELEASING.md for the one-time PyPI Trusted Publisher setup.
+# One-shot release: optional tag input → verify → build → tag → GitHub Release → PyPI.
+# See RELEASING.md for Trusted Publisher setup.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0). Leave empty to use v{version} from pyproject.toml."
+        required: false
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create tag + GitHub Release
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Verify tag matches package version
-        # Guard against cutting a release before the version bump is merged:
-        # the tag (vX.Y.Z) must match pyproject's version, or we would publish
-        # the wrong version under the tag's name.
+      - name: Resolve tag and verify against pyproject
+        id: meta
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
           version="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
-          echo "release tag: $tag | pyproject version: $version"
-          if [ "$tag" != "$version" ]; then
-            echo "::error::Release tag v$tag does not match pyproject version $version. Bump the version and merge it before creating the release."
+          if [ -n "${INPUT_TAG}" ]; then
+            tag="${INPUT_TAG}"
+          else
+            tag="v${version}"
+          fi
+          # Accept either "0.1.0" or "v0.1.0"
+          case "$tag" in
+            v*) ;;
+            *) tag="v${tag}" ;;
+          esac
+          tag_version="${tag#v}"
+          echo "tag: $tag | pyproject version: $version | sha: $GITHUB_SHA"
+          if [ "$tag_version" != "$version" ]; then
+            echo "::error::Tag $tag does not match pyproject version $version. Bump version (and __version__) and merge before releasing."
             exit 1
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build sdist and wheel
         run: |
@@ -39,17 +70,51 @@ jobs:
           pip install "twine>=6"
           twine check dist/*
 
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            existing="$(git rev-list -n 1 "${TAG}")"
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag ${TAG} already exists on $existing, not $GITHUB_SHA."
+              exit 1
+            fi
+            echo "Tag ${TAG} already points at this commit; reusing."
+          else
+            git tag "${TAG}" "$GITHUB_SHA"
+            git push origin "refs/tags/${TAG}"
+          fi
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "::error::GitHub Release ${TAG} already exists. Delete it or bump the version."
+            exit 1
+          fi
+
+          gh release create "${TAG}" dist/* \
+            --title "agent-tokenops ${VERSION}" \
+            --generate-notes \
+            --target "$GITHUB_SHA"
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
   publish:
-    needs: build
+    needs: release
     runs-on: ubuntu-latest
-    # Trusted Publishing (OIDC) — no API tokens stored. Matches the `pypi`
-    # environment and `release.yml` workflow name configured on PyPI.
-    environment: pypi
+    # Trusted Publishing (OIDC) — no API tokens. Matches PyPI pending publisher:
+    # workflow release.yml + environment pypi.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/agent-tokenops/
     permissions:
       id-token: write
     steps:
