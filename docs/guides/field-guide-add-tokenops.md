@@ -13,22 +13,24 @@ Copilot skill: [integrate-tokenops](../../.cursor/skills/integrate-tokenops/SKIL
 
 | Agent | Port | Role | TokenOps seams |
 |-------|------|------|----------------|
-| **Planner** | 8011 | Break goal into questions + outline; **entry** | `entry_task_run_scope` → `wrap_complete` → A2A hops (span headers) |
-| **Researcher** | 8012 | Tools (`search` / `fetch`) gather facts | `downstream_run_scope` → `wrap_complete` + `@boundary` + crossing hook |
-| **Writer** | 8013 | Final answer from findings | `downstream_run_scope` → `wrap_complete` |
+| **Planner** | 8011 | Break goal into questions + outline; **entry** | `instrument_app` + `tokenops_run` → `wrap_complete` → A2A hops |
+| **Researcher** | 8012 | Tools (`search` / `fetch`) gather facts | same `tokenops_run` + `@boundary` + crossing hook |
+| **Writer** | 8013 | Final answer from findings | same `tokenops_run` → `wrap_complete` |
 
 Naive agent logic lives in each `agent.py`. Instrumentation lives in each `server.py`
 (and `researcher/tools.py` for tool boundaries).
 
 ```
-UI: POST /v1/tasks  (no run_id)
+UI: POST /v1/tasks  (task only — no run_id, no intent/mode)
         │
         ▼
-     Planner  entry_task_run_scope → ControlPlaneClient.register_run → plane POST /v1/runs
+     Planner  instrument_app(service, intent=..., provider=..., model=...)
+              with tokenops_run():  # register-or-join + bind governance
               │ wrap_complete (plan LLM)
               │ post_task → merge_propagation_headers (run_id + parent span)
               ▼
          Researcher
+              │ with tokenops_run():  # joins via X-TokenOps-Run-Id
               │ wrap_complete + @boundary(search/fetch)
               │ child spend → shared ledger (same run_id)
               ▼
@@ -36,7 +38,7 @@ UI: POST /v1/tasks  (no run_id)
               │ post_task → Writer (same headers)
               ▼
             Writer
-              │ wrap_complete → shared ledger
+              │ with tokenops_run() → wrap_complete → shared ledger
               ▼
            Planner → TaskResponse (no parent cost rollup)
 ```
@@ -45,34 +47,73 @@ UI: POST /v1/tasks  (no run_id)
 
 Agent code stays injectable — no TokenOps imports in `agent.py`:
 
-![Naive LLM call](assets/01-naive-complete.png)
+![Naive LLM call](assets/01-naive-complete.svg)
 
-<details>
-<summary>SVG fallback</summary>
+## Step 1 — Instrument the app + open a run
 
-![Naive LLM call (SVG)](assets/01-naive-complete.svg)
+The UI calls **Planner** `POST /v1/tasks` with **task only**. Intent / mode / provider /
+model come from the agent definition on `instrument_app` (or kwargs to `tokenops_run`).
 
-</details>
-
-## Step 1 — Entry agent registers the run (not the UI)
-
-The UI calls **Planner** `POST /v1/tasks` without a run id. The Planner (entry agent)
-opens the run via `ControlPlaneClient.register_run` → plane `POST /v1/runs` (or
-embedded Store), then executes the task under that `run_id`:
-
-![register_run](assets/02-register-run.png)
+![register_run](assets/02-register-run.svg)
 
 ```python
-# Inside Planner server (entry_task_run_scope):
-# if X-TokenOps-Run-Id missing → ControlPlaneClient.register_run(...)
-# then bind context and handle the task
+from tokenops import ControlPlaneClient, instrument_app, tokenops_run
+from tokenops.control import wrap_complete, with_governance_errors
+from tokenops.providers import complete
+
+client = ControlPlaneClient.from_env()
+
+async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
+    # Ambient RequestContext from instrument_app — no Store(path), no attr build.
+    with tokenops_run(client=client) as bound:
+        governed = wrap_complete(
+            bound.governor, bound.controls, bound.attr,
+            provider=cfg.provider, model=cfg.model,
+            dispatch=complete, service=AGENT,
+        )
+        ...
+
+app = create_a2a_app(..., handler=with_governance_errors(handler))
+instrument_app(
+    app,
+    service=AGENT,
+    intent="triad_plan",          # agent owns intent/mode — not the UI
+    provider=cfg.provider,
+    model=cfg.model,
+)
 ```
 
-Downstream Researcher/Writer receive the same `run_id` via auto-injected headers
-(`merge_propagation_headers` on A2A `post_task`).
+`tokenops_run` register-or-joins: missing `X-TokenOps-Run-Id` → plane
+`ControlPlaneClient.register_run`; present header → join that run and open a new span.
 
-See `examples/triad/client.py` (`submit_goal_sync_with_meta` — UI path, no client register)
-and `tokenops.control.attribution.entry_task_run_scope`.
+Downstream Researcher/Writer use the **same** `with tokenops_run(client=client):` —
+headers from A2A `post_task` (`merge_propagation_headers`) carry the run id.
+
+See `examples/triad/planner/server.py` and `examples/triad/client.py`
+(`submit_goal_sync_with_meta` — UI path, no client register).
+
+### Non-FastAPI
+
+TokenOps does not yet ship middleware for Flask, Starlette-only, or other frameworks.
+Bind ambient context yourself, then open the same scope:
+
+```python
+from tokenops import bind_request_context, tokenops_run, RequestContext
+
+bind_request_context(RequestContext(
+    headers=dict(headers),
+    payload=payload,
+    service="planner",
+    intent="triad_plan",
+    provider=...,
+    model=...,
+))
+with tokenops_run():
+    ...
+```
+
+Or pass `headers=` / `payload=` / `service=` / `intent=` as explicit kwargs to
+`tokenops_run` (no ambient bind required).
 
 ## Step 2 — Propagate `run_id` on every A2A hop
 
@@ -89,68 +130,60 @@ if parent_span_id:
     headers[PARENT_SPAN_ID_HEADER] = parent_span_id
 ```
 
-Downstream agents resolve via `downstream_run_scope`. Missing `run_id` on a **non-entry**
-hop soft-registers an `unattributed` run and logs `tokenops.missing_run_id` (do not rely
-on that for the happy path — always propagate from the entry agent).
+Missing `run_id` on a hop soft-registers an `unattributed` run and logs
+`tokenops.missing_run_id` (do not rely on that for the happy path — always propagate
+from the entry agent).
 
-## Step 3 — Open governance scope + build governor
+## Step 3 — Use the bound handle (no nested scopes)
 
-Each server handler (Planner / Researcher / Writer) follows the same pattern:
+`tokenops_run` already binds registration, span, governor, and attribution.
+Use `bound.governor` / `bound.controls` / `bound.attr` — do not hand-roll
+`build_governor`, `build_attribution`, or a nested governance scope.
 
-![governance_scope](assets/03-governance-scope.png)
+![governance_scope](assets/03-governance-scope.svg)
 
 ```python
-with downstream_run_scope(store, headers=headers, service=AGENT):
-    reg = current_registration()
-    attr = build_attribution(reg, service=AGENT)
-    controls = ApplyControls()  # or PreviewControls()
-    governor = build_governor(
-        store.governance_config_for(AGENT),
-        price,
-        controls,
-        store=store,          # shared SQLite ledger across processes
-        enforce=True,
+with tokenops_run(client=client) as bound:
+    run_id = bound.registration.run_id
+    client.create_run(RunRecord(run_id=run_id, agent=AGENT, status="running", ...))
+    governed = wrap_complete(
+        bound.governor, bound.controls, bound.attr,
+        provider=cfg.provider, model=cfg.model,
+        dispatch=complete, service=AGENT,
     )
-    governor.ledger.open_run(run_id)
-    store.create_run(RunRecord(run_id=run_id, agent=AGENT, status="running", ...))
-
-    with governance_scope(governor, attr, provider=..., model=...):
-        ...
+    ...
 ```
 
-`store=store` is what makes **cost_budget** / **step_cap** shared across the three processes
-for one `run_id`.
+Shared ledger config comes from `ControlPlaneClient` / plane (`TOKENOPS_URL` +
+`TOKENOPS_DB`) so **cost_budget** / **step_cap** apply across processes for one `run_id`.
 
 ## Step 4 — Wrap the LLM (`wrap_complete`)
 
-Replace the bare provider call with a governed dispatch:
-
-![wrap_complete](assets/04-wrap-complete.png)
+![wrap_complete](assets/04-wrap-complete.svg)
 
 ```python
 from tokenops.control import wrap_complete
 from tokenops.providers import complete
 
 governed = wrap_complete(
-    governor, controls, attr,
+    bound.governor, bound.controls, bound.attr,
     provider=cfg.provider,
     model=cfg.model,
     dispatch=complete,
     service=AGENT,
 )
-# Pass governed into the naive agent as complete_fn
 agent.run(..., complete_fn=governed)
 ```
 
-`wrap_complete` runs **pre_call** policies (e.g. `pre_call_worst_case`, `cost_guard`) and
-emits LLM observations for **observe** policies (`cost_budget`, `step_cap`, …).
+`wrap_complete` runs **pre_call** policies and emits LLM observations for **observe**
+policies (`cost_budget`, `step_cap`, …).
 
 ## Step 5 — Tool boundaries (`@boundary` + crossing hook)
 
 On the Researcher, tools are Chronicle boundaries so TokenOps can observe tool crossings
 without changing the agent loop:
 
-![boundary + crossing hook](assets/05-boundary-crossing.png)
+![boundary + crossing hook](assets/05-boundary-crossing.svg)
 
 ```python
 from chronicle import InputState, boundary
@@ -166,15 +199,8 @@ def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
 ```
 
-Install the process-wide hook once per server:
-
-```python
-from tokenops.control import install_crossing_hook
-
-install_crossing_hook()
-```
-
-That wires Chronicle `on_crossing` → `Governor.observe` (see `tokenops.control.crossing`).
+`instrument_app` installs the process-wide crossing hook (idempotent). You can also call
+`tokenops.init()` or `install_crossing_hook()` once at startup.
 
 `tool_freq` / `tool_output_cap` in the seed registry include `search` and `fetch`
 (`examples/config/triad.yaml`).
@@ -194,8 +220,8 @@ Refuse to delegate when the shared run budget is already exhausted
 ```python
 app = create_a2a_app(..., handler=with_governance_errors(handler))
 if should_mount_run_registration():
-    mount_run_registration(app, store)  # only when not using TOKENOPS_URL plane
-install_crossing_hook()
+    mount_run_registration(app, client.require_store())  # only when not using TOKENOPS_URL
+instrument_app(app, service=AGENT, intent=..., provider=..., model=...)
 ```
 
 `with_governance_errors` maps `Halt` / registration errors to HTTP responses the client can
@@ -247,11 +273,13 @@ python scripts/render_field_guide_snippets.py
 ## Checklist for a new agent
 
 1. Keep `agent.py` vanilla (injectable `complete_fn`).
-2. **Entry** agent: `entry_task_run_scope` (registers when UI omits `run_id`).
-   **Downstream**: `downstream_run_scope`.
-3. In `server.py`: `build_governor(..., store=store)` → `governance_scope` →
-   `wrap_complete` → `with_governance_errors` → `install_crossing_hook`.
-4. Mark tools with Chronicle `@boundary`; rely on the crossing hook for observe.
-5. Propagate `X-TokenOps-Run-Id` (and parent span) on every outbound A2A call
-   (`merge_propagation_headers` / ambient context).
-6. Do **not** re-bill child `cost_micros` on the parent (shared ledger already has it).
+2. `instrument_app(app, service=..., intent=..., provider=..., model=...)` once at startup
+   (or `bind_request_context` + `tokenops_run` if not FastAPI).
+3. In each handler: `with tokenops_run(client=client) as bound:` →
+   `wrap_complete(bound.governor, bound.controls, bound.attr, ...)` →
+   `with_governance_errors` on the HTTP handler.
+4. UI / client sends **task only**; agent owns `intent` / `mode`.
+5. Mark tools with Chronicle `@boundary`; rely on the crossing hook for observe.
+6. Propagate `X-TokenOps-Run-Id` (and parent span) on every outbound A2A call
+   (ambient `merge_propagation_headers` is enough).
+7. Do **not** re-bill child spend on the parent (shared ledger already has it).

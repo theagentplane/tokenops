@@ -1,11 +1,12 @@
 ---
 name: integrate-tokenops
 description: >-
-  Integrate TokenOps governance into multi-agent systems: entry_task_run_scope /
-  ControlPlaneClient.register_run, governance_scope, wrap_complete, Chronicle @boundary,
-  install_crossing_hook, TOKENOPS_URL vs embedded Store, and plane vs agent split. Use when
-  adding TokenOps to an agent stack, wiring the triad bench pattern, or when the user
-  mentions register_run, wrap_complete, crossing hooks, control plane, or TOKENOPS_URL.
+  Integrate TokenOps governance into multi-agent systems: instrument_app /
+  tokenops_run / ControlPlaneClient, wrap_complete, Chronicle @boundary,
+  install_crossing_hook, TOKENOPS_URL vs embedded Store, and plane vs agent split.
+  Use when adding TokenOps to an agent stack, wiring the triad bench pattern, or
+  when the user mentions register_run, wrap_complete, crossing hooks, control plane,
+  or TOKENOPS_URL.
 ---
 
 # Integrate TokenOps
@@ -21,13 +22,14 @@ Copyable procedure for GitHub Copilot, Claude Code, Cursor, or any assistant.
 | Layer | Owns | Does not own |
 |-------|------|----------------|
 | **Control plane** (`python -m tokenops.server`, `:7700`) | `POST /v1/runs`, shared SQLite (`TOKENOPS_DB`), Admin/Dashboard | Agent loops, LLM calls, tools |
-| **Agent process** (TokenOps SDK in-process) | `wrap_complete`, ledger/policies, Chronicle boundaries, A2A tasks | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
+| **Agent process** (TokenOps SDK in-process) | `tokenops_run`, `wrap_complete`, ledger/policies, Chronicle boundaries, A2A tasks | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
 
-**UI path:** client calls the **entry** agent `POST /v1/tasks` **without** `run_id`.
-The entry agent opens the run via `entry_task_run_scope` → `ControlPlaneClient.register_run`
-→ plane `POST /v1/runs` (or embedded Store). Downstream hops inherit headers via
-`merge_propagation_headers`. Agents share one ledger file so **cost_budget** / **step_cap**
-apply across processes. Child spend hits that ledger once — **no parent cost rollup**.
+**UI path:** client calls the **entry** agent `POST /v1/tasks` with **task only**
+(no `run_id`, no intent/mode). The entry agent opens the run via `tokenops_run` →
+`ControlPlaneClient.register_run` → plane `POST /v1/runs` (or embedded Store).
+Downstream hops inherit headers via `merge_propagation_headers`. Agents share one
+ledger file so **cost_budget** / **step_cap** apply across processes. Child spend
+hits that ledger once — **no parent cost rollup**.
 
 ## Env
 
@@ -45,30 +47,55 @@ apply across processes. Child spend hits that ledger once — **no parent cost r
 
 ```
 TokenOps integration:
-- [ ] 1. Entry agent: entry_task_run_scope (UI omits run_id)
-- [ ] 2. Propagate X-TokenOps-Run-Id (+ parent span) on every A2A hop
-- [ ] 3. Downstream: downstream_run_scope → build_governor(..., store=store) → governance_scope
-- [ ] 4. LLM: wrap_complete(..., dispatch=complete) as complete_fn
-- [ ] 5. Tools: Chronicle @boundary + install_crossing_hook() once per process
+- [ ] 1. instrument_app(app, service=..., intent=..., provider=..., model=...)
+- [ ] 2. Handler: with tokenops_run(client=client) as bound:
+- [ ] 3. Propagate X-TokenOps-Run-Id (+ parent span) on every A2A hop
+- [ ] 4. LLM: wrap_complete(bound.governor, bound.controls, bound.attr, ...)
+- [ ] 5. Tools: Chronicle @boundary (+ crossing hook via instrument_app)
 - [ ] 6. Do NOT re-bill child spend on the parent (shared ledger already has it)
 - [ ] 7. Keep agent.py vanilla (injectable complete_fn / tools)
+- [ ] 8. UI sends task only; agent owns intent/mode
 ```
 
-## Step 1 — Entry agent registers the run
+## Step 1 — Instrument + tokenops_run
 
 ```python
-from tokenops.control import entry_task_run_scope
-from tokenops.control.context import current_registration
+from tokenops import ControlPlaneClient, instrument_app, tokenops_run
+from tokenops.control import wrap_complete, with_governance_errors
+from tokenops.providers import complete
 
-# Inside entry agent handler (Planner / Research):
-with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
-    reg = current_registration()
-    run_id = reg.run_id
-    ...
+client = ControlPlaneClient.from_env()
+
+async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
+    with tokenops_run(client=client) as bound:
+        governed = wrap_complete(
+            bound.governor, bound.controls, bound.attr,
+            provider=cfg.provider, model=cfg.model,
+            dispatch=complete, service=AGENT,
+        )
+        agent.run(..., complete_fn=governed)
+
+app = create_a2a_app(..., handler=with_governance_errors(handler))
+instrument_app(app, service=AGENT, intent="triad_plan",
+               provider=cfg.provider, model=cfg.model)
 ```
 
 UI / bench clients should **not** call `/v1/runs` for the default flow — see
 `examples/triad/client.py` and `examples/a2a/client.py`.
+
+### Non-FastAPI
+
+```python
+from tokenops import RequestContext, bind_request_context, tokenops_run
+
+bind_request_context(RequestContext(
+    headers=dict(headers), payload=payload, service=AGENT, intent="...",
+))
+with tokenops_run():
+    ...
+```
+
+Or pass kwargs explicitly to `tokenops_run(headers=..., payload=..., service=..., intent=...)`.
 
 ## Step 2 — Propagate run_id
 
@@ -82,25 +109,12 @@ if parent_span_id:
     headers[PARENT_SPAN_ID_HEADER] = parent_span_id
 ```
 
-Entry: `entry_task_run_scope`. Downstream: `downstream_run_scope(store, headers=..., service=...)`.
+Every hop uses the same `with tokenops_run(...):` — entry registers, downstream joins.
 
-## Step 3 — Governance scope + governor
+## Step 3 — Bound handle (no nested scopes)
 
-```python
-with downstream_run_scope(store, headers=headers, service=AGENT):
-    reg = current_registration()
-    attr = build_attribution(reg, service=AGENT)
-    governor = build_governor(
-        store.governance_config_for(AGENT),
-        price,
-        ApplyControls(),
-        store=store,
-        enforce=True,
-    )
-    governor.ledger.open_run(run_id)
-    with governance_scope(governor, attr, provider=..., model=...):
-        ...
-```
+Do not hand-roll attribution or a separate governance scope. Use `bound.*` from
+`tokenops_run`.
 
 ## Step 4 — Wrap the LLM
 
@@ -109,7 +123,7 @@ from tokenops.control import wrap_complete
 from tokenops.providers import complete
 
 governed = wrap_complete(
-    governor, controls, attr,
+    bound.governor, bound.controls, bound.attr,
     provider=cfg.provider, model=cfg.model,
     dispatch=complete, service=AGENT,
 )
@@ -132,7 +146,7 @@ from tokenops.control import install_crossing_hook
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
 
-install_crossing_hook()
+install_crossing_hook()  # also done by instrument_app / tokenops.init
 ```
 
 Reference: `examples/triad/researcher/tools.py`.
@@ -147,8 +161,8 @@ Propagate run/span headers on hops; do **not** re-add child `cost_micros` on the
 ```python
 app = create_a2a_app(..., handler=with_governance_errors(handler))
 if should_mount_run_registration():  # False when TOKENOPS_URL is set
-    mount_run_registration(app, store)
-install_crossing_hook()
+    mount_run_registration(app, client.require_store())
+instrument_app(app, service=AGENT, intent=..., provider=..., model=...)
 ```
 
 ## Verify

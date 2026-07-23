@@ -69,7 +69,14 @@ reg = client.register_run(
 )
 ```
 
-Prefer `entry_task_run_scope` in the entry agent so UIs can omit `run_id`.
+Prefer `tokenops_run` in the entry agent so UIs can omit `run_id` (and omit
+intent/mode — those come from `instrument_app` / agent kwargs).
+
+## Non-FastAPI
+
+TokenOps does not yet ship middleware for other frameworks. Use
+`bind_request_context(...)` then `with tokenops_run():`, or pass kwargs
+explicitly to `tokenops_run`.
 
 ## Out of scope (this MVP)
 

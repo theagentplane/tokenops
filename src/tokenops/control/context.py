@@ -92,14 +92,14 @@ def clear() -> None:
 
 
 @contextmanager
-def governance_scope(
+def _governance_scope(
     governor: object,
     attr: Attribution,
     *,
     provider: str = "",
     model: str = "",
 ) -> Iterator[GovernanceContext]:
-    """Install governor context for ``@boundary`` within an already-bound run scope."""
+    """Install governor context for ``@boundary`` (used by :func:`~tokenops.control.run.tokenops_run`)."""
     ctx = GovernanceContext(governor=governor, attr=attr, provider=provider, model=model)
     tok = _governance.set(ctx)
     try:

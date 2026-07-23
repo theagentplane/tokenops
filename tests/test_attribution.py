@@ -7,7 +7,7 @@ import pytest
 from tokenops.control.attribution import (
     begin_downstream_run,
     begin_entry_run,
-    build_attribution,
+    _build_attribution,
     require_registration,
 )
 from tokenops.control.context import RUN_ID_HEADER, clear, current_registration, current_span
@@ -85,7 +85,7 @@ def test_begin_downstream_resolves_registration(store):
 
 def test_build_attribution_maps_service_and_user_dims(store):
     reg = RunRegistration(run_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"})
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     assert attr.run_id == "r1"
     assert attr.agent == "research"
     assert attr.user == "alice"

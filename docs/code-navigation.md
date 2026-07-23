@@ -26,10 +26,9 @@
 ## Request path (SDK)
 
 ```
-ControlPlaneClient.register_run / POST /v1/runs  →  plane
-entry_task_run_scope / downstream_run_scope
-  → build_governor(..., store=store)
-  → wrap_complete / @boundary + install_crossing_hook
+instrument_app → RequestContext
+tokenops_run  →  register-or-join + bind governor
+  → wrap_complete / @boundary + crossing hook
 ```
 
 ## Docs

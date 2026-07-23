@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control import ApplyControls, build_governor, build_attribution, Halt, wrap_complete
-from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control import ApplyControls, build_governor, Halt, wrap_complete
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.ledger import RUN_TOTAL_BUDGET, LIFETIME, segment_key_for
 from tokenops.control.models import PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
@@ -45,7 +46,7 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
             user_dims={"Country": "US", "IsFortune500": "true", "user_id": "alice"},
         )
     )
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
 
     assert attr.run_id == "e2e-run-1"
     assert attr.agent == "research"
@@ -68,7 +69,7 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     )
 
     with run_scope(reg, SpanContext(span_id="span-root", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt) as exc:
                 for _ in range(20):
                     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}])

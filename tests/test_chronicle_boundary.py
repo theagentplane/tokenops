@@ -7,8 +7,9 @@ import chronicle.session as chronicle_session
 from chronicle import InputState, ReplayPlan, boundary, get_session
 from chronicle.session import SessionMode
 
-from tokenops.control import ApplyControls, build_attribution, build_governor, install_crossing_hook
-from tokenops.control.context import SpanContext, clear, governance_scope, run_scope
+from tokenops.control import ApplyControls, build_governor, install_crossing_hook
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, clear, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
 from conftest import toy_price
@@ -84,7 +85,7 @@ def test_boundary_tokenops_observe_when_governed(store):
         }
     }
     gov = build_governor(config, toy_price, ApplyControls())
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     gov.ledger.open_run("r1")
 
     chronicle_session.reset_session().begin_trace("r1")
@@ -100,7 +101,7 @@ def test_boundary_tokenops_observe_when_governed(store):
         return {"snippet": query, "completeness": 0.9}
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
-        with governance_scope(gov, attr):
+        with _governance_scope(gov, attr):
             search("pricing")
 
     clear()

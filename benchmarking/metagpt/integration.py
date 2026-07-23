@@ -9,11 +9,10 @@ from typing import Any
 from tokenops.control import (
     ApplyControls,
     Halt,
-    build_attribution,
     build_governor,
-    governance_scope,
 )
-from tokenops.control.context import SpanContext, run_scope
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 
 from benchmarking.common.configs import circuit_breaker_config
@@ -109,12 +108,12 @@ def install() -> None:
         provider = str(api_type.value if hasattr(api_type, "value") else api_type or "openai")
         model = getattr(self.llm, "model", "gpt-4o-mini")
 
-        attr = build_attribution(active.registration, service="metagpt")
+        attr = _build_attribution(active.registration, service="metagpt")
         set_active_run(active)
         message = None
         try:
             with run_scope(active.registration, active.span):
-                with governance_scope(active.governor, attr, provider=provider, model=model):
+                with _governance_scope(active.governor, attr, provider=provider, model=model):
                     message = await _orig_role_run(self, with_message=with_message)
             return message
         except Halt:

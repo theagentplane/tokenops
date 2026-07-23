@@ -52,10 +52,7 @@ from tokenops.control.attribution import (
     begin_downstream_run,
     begin_entry_run,
     begin_entry_task_run,
-    build_attribution,
-    downstream_run_scope,
-    entry_run_scope,
-    entry_task_run_scope,
+    merge_registration_dims,
     require_registration,
 )
 from tokenops.control.context import (
@@ -63,7 +60,6 @@ from tokenops.control.context import (
     RUN_ID_HEADER,
     GovernanceContext,
     SpanContext,
-    governance_scope,
 )
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.crossing import install_crossing_hook, on_crossing
@@ -78,8 +74,17 @@ from tokenops.control.http import (
     with_governance_errors,
 )
 from tokenops.control.client import ControlPlaneClient, should_mount_run_registration
+from tokenops.control.governance_cache import clear_governance_config_cache
+from tokenops.control.instrument import instrument_app
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 from tokenops.control.propagate import merge_propagation_headers, propagation_headers
+from tokenops.control.request_context import (
+    RequestContext,
+    bind_request_context,
+    clear_request_context,
+    current_request_context,
+)
+from tokenops.control.run import TokenOpsBound, agentplane_run_scope, tokenops_run
 
 __all__ = [
     # vocabulary
@@ -95,17 +100,23 @@ __all__ = [
     # data-plane integration
     "make_on_step", "wrap_complete", "wrap_stream", "apply_carry_to_messages", "consume_carry",
     "step_to_observation",
-    # attribution
-    "RunRegistration", "GovernanceMode", "parse_governance_mode", "build_attribution", "begin_entry_run", "begin_downstream_run",
+    # attribution / unified run
+    "RunRegistration", "GovernanceMode", "parse_governance_mode",
+    "merge_registration_dims",
+    "begin_entry_run", "begin_downstream_run",
     "begin_entry_task_run",
-    "require_registration", "entry_run_scope", "entry_task_run_scope", "downstream_run_scope",
+    "require_registration",
+    "tokenops_run", "agentplane_run_scope", "TokenOpsBound",
+    "RequestContext", "bind_request_context", "clear_request_context", "current_request_context",
+    "instrument_app",
     "RUN_ID_HEADER", "PARENT_SPAN_ID_HEADER", "SpanContext", "GovernanceContext",
-    "governance_scope", "observation_from_crossing", "emit_observation",
+    "observation_from_crossing", "emit_observation",
     # Chronicle crossing hook
     "install_crossing_hook", "on_crossing",
     # HTTP (A2A mount + clients)
     "mount_run_registration", "with_governance_errors", "post_run", "post_run_sync",
     "ControlPlaneClient", "should_mount_run_registration",
+    "clear_governance_config_cache",
     # HTTP propagation (auto run_id / parent span)
     "propagation_headers", "merge_propagation_headers",
 ]

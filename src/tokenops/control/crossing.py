@@ -42,14 +42,19 @@ def on_crossing(
     if current_governance() is None or current_registration() is None:
         return
     gov = current_governance()
+    state = _input_state_to_dict(input_state)
+    # Prefer provider/model from the crossing (e.g. wrap_llm dispatch args) so
+    # MUTATE model overrides price correctly; fall back to bound governance.
+    provider = str(state.get("provider") or (gov.provider if gov else "") or "")
+    model = str(state.get("model") or (gov.model if gov else "") or "")
     obs = observation_from_crossing(
         boundary_id=boundary_id,
         kind=kind,
         service=_service_name(),
-        input_state=_input_state_to_dict(input_state),
+        input_state=state,
         result=result,
-        provider=gov.provider if gov else "",
-        model=gov.model if gov else "",
+        provider=provider,
+        model=model,
     )
     emit_observation(obs)
 

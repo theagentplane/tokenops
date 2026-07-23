@@ -64,6 +64,18 @@ def test_register_run_duplicate_raises(tmp_path):
     store.close()
 
 
+def test_resolve_run_and_governance_config_for(tmp_path):
+    store = Store(str(tmp_path / "facade.db"), auto_seed=False)
+    client = ControlPlaneClient(store=store)
+    client.register_run(intent="x", run_id="r1", mode="preview")
+    reg = client.resolve_run("r1")
+    assert reg.intent == "x"
+    assert reg.mode is GovernanceMode.PREVIEW
+    cfg = client.governance_config_for("any")
+    assert "governance" in cfg
+    store.close()
+
+
 def test_should_mount_run_registration(monkeypatch):
     monkeypatch.delenv("TOKENOPS_URL", raising=False)
     monkeypatch.delenv("TOKENOPS_EMBEDDED", raising=False)

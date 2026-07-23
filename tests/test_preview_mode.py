@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tokenops.control.attribution import _build_attribution
+
 import pytest
 
 from tokenops.control import (
@@ -11,7 +13,7 @@ from tokenops.control import (
     build_governance_stack,
     wrap_complete,
 )
-from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import GovernanceMode, PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -53,9 +55,7 @@ def test_preview_mode_records_actions_without_halting(store):
     assert isinstance(controls, PreviewControls)
     gov.ledger.open_run("preview-run")
 
-    from tokenops.control import build_attribution
-
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     governed = wrap_complete(
         gov, controls, attr,
         provider="openai", model="gpt-4o-mini",
@@ -63,7 +63,7 @@ def test_preview_mode_records_actions_without_halting(store):
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             for _ in range(5):
                 governed("openai", "gpt-4o-mini", [{"role": "user", "content": "task"}])
 
@@ -80,9 +80,7 @@ def test_enforce_mode_still_halts(store):
     )
     gov.ledger.open_run("enforce-run")
 
-    from tokenops.control import build_attribution
-
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     governed = wrap_complete(
         gov, controls, attr,
         provider="openai", model="gpt-4o-mini",
@@ -90,7 +88,7 @@ def test_enforce_mode_still_halts(store):
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt):
                 for _ in range(10):
                     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "task"}])

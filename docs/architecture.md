@@ -10,13 +10,13 @@ Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Sim
 
 | Entry point | Module | Purpose |
 |-------------|--------|---------|
-| `POST /v1/runs` | `control/http.py` `mount_run_registration` (plane app) | register run dims |
+| `tokenops_run` / `instrument_app` | `control/run.py`, `instrument.py` | register-or-join + bind governance |
 | `ControlPlaneClient` | `control/client.py` | SDK register_run (HTTP or embedded Store) |
 | `python -m tokenops.server` | `server/app.py` | standalone control plane (:7700) |
-| `POST /v1/tasks` | `examples/a2a/server.py` | task requires `X-TokenOps-Run-Id` |
-| `build_attribution(reg, service=…)` | `attribution.py` | registration → ledger `Attribution` |
+| `POST /v1/tasks` | `examples/a2a/server.py` | task handler (run via `tokenops_run`) |
 | `@boundary` + crossing hook | Chronicle + `control/crossing.py` | record crossing + govern ingest |
-| `wrap_complete(…)` | `integration.py` | provider wrap — **pre_call** before dispatch |
+| `wrap_complete(…)` | `integration.py` | pre_call gate; dispatch via Chronicle `wrap_llm` |
+| `GovernedChatModel` | `adapters/langchain.py` | LangChain `BaseChatModel` → governed complete_fn |
 | `build_governor(config, price)` | `config.py` | `budgets:`/`policies:` → wired `Governor` |
 | `Store.governance_config_for(agent)` | `store.py` | SQLite → exact `build_governor` dict |
 | `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
@@ -30,7 +30,7 @@ Native A2A servers under `examples/` wire these per request; Admin writes the st
 graph TD
     subgraph dataplane["data plane (your agents / examples)"]
         agent["A2A / in-process agents"]
-        chronicle["chronicle @boundary"]
+        chronicle["chronicle @boundary / wrap_llm"]
     end
 
     subgraph uis["Product UI"]
@@ -68,22 +68,21 @@ graph TD
 ## Runtime flow of one governed run
 
 ```
-POST /v1/runs  { intent, user_dims }  →  run_registrations
-POST /v1/tasks  +  X-TokenOps-Run-Id
-  ├─ downstream_run_scope / entry_run_scope  →  SpanContext + registration in contextvars
-  ├─ governor = build_governor(store.governance_config_for(agent), price, ApplyControls())
-  ├─ store.create_run(RunRecord status="running")
+UI: POST /v1/tasks  (task only; no run_id)
+  ├─ instrument_app binds RequestContext (service, intent, provider, model)
+  ├─ with tokenops_run(client=…):  →  register-or-join + SpanContext + governance
+  ├─ store/client.create_run(RunRecord status="running")
   │
-  ├─ agent.run(…, complete_fn=wrap_complete(…))
+  ├─ agent.run(…, complete_fn=wrap_complete(bound.…))
   │     pre_call  → worst-case / concurrency detectors
-  │     dispatch  → providers.complete
-  │     observe   → LLM Observation (via emit_observation in wrap)
+  │     dispatch  → chronicle.wrap_llm(providers.complete)
+  │     observe   → LLM Observation via on_crossing → Governor
   │     @boundary tool  → Chronicle envelope + observe
   │
   ├─ delegate  →  child server (same run_id, X-TokenOps-Parent-Span-Id)
   │     child spend → shared ledger (no parent rollup)
   │
-  └─ store.update_run(status, halt_reason, cost_micros, steps)
+  └─ client.update_run(status, halt_reason, cost_micros, steps)
 ```
 
 The **Ledger** splits state by lifetime:
@@ -110,7 +109,7 @@ Scripts: `scripts/db_clear.py`, `scripts/db_reseed.py`. UI `get_store()` uses `a
 
 - Dependencies point **one way**; the data plane never imports control internals except taps.
 - **Store assembles the `build_governor` dict** — YAML `governance:` is reference + auto-seed source.
-- **Per-request governor** — concurrent runs never share window/halt/spend state.
+- **Per-request governor** — typical isolation for window / local halt; spend / inflight / halt may be shared via Store.
 - **Fail closed** — missing registration, unknown template, unknown price → refuse.
 
-See also `docs/run-attribution.md`.
+See also `docs/run-attribution.md` and `docs/concurrency.md` (thread / multi-process contract).

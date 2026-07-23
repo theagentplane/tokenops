@@ -268,9 +268,9 @@ with tab_ctrl:
             st.caption("Empty.")
 
     st.subheader("Attribution tags (from registration)")
-    from tokenops.control import build_attribution
+    from tokenops.control.attribution import _build_attribution
 
-    attr = build_attribution(result.registration, service="research")
+    attr = _build_attribution(result.registration, service="research")
     st.json({"user": attr.user, "agent": attr.agent, "run_id": attr.run_id, "tags": attr.tags})
 
 with tab_timeline:

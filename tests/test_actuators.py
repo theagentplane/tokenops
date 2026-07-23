@@ -7,8 +7,9 @@ policies (output_runaway / progress_guard / context_compaction) fire determinist
 from __future__ import annotations
 
 import chronicle.session as chronicle_session
-from tokenops.control import ApplyControls, Governor, Ledger, build_attribution, wrap_complete
-from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control import ApplyControls, Governor, Ledger, wrap_complete
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 import pytest
 
@@ -27,7 +28,7 @@ from conftest import toy_price
 
 
 def _attr(run_id):
-    return build_attribution(
+    return _build_attribution(
         RunRegistration(run_id=run_id, intent="t", user_dims={"user_id": "alice"}),
         service="research",
     )
@@ -63,14 +64,14 @@ def test_retry_recovers_from_degenerate_output():
     gov.register(*output_runaway.build(repeats=4, max_retries=2))
 
     reg = RunRegistration(run_id="r1", intent="t", user_dims={"user_id": "alice"})
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     ledger.open_run("r1")
     scripted = ScriptedModel(fail_n=2)
     governed = _bound_run(gov, attr, scripted)
 
     chronicle_session.reset_session().begin_trace("r1")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
 
     # 1 initial + 2 retries, ending on the clean output
@@ -123,7 +124,7 @@ def test_cancel_tears_down_degenerate_stream_then_retries():
     gov.register(*output_runaway.build(repeats=4, max_retries=2))
 
     reg = RunRegistration(run_id="r2", intent="t", user_dims={"user_id": "alice"})
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     ledger.open_run("r2")
     stream = ScriptedStream(fail_n=2)
     cancels = []
@@ -133,7 +134,7 @@ def test_cancel_tears_down_degenerate_stream_then_retries():
 
     chronicle_session.reset_session().begin_trace("r2")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
 
     # two degenerate streams were cancelled mid-flight, then a clean stream completed

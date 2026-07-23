@@ -7,7 +7,6 @@ progresses so Streamlit can render a live timeline.
 from __future__ import annotations
 
 import time
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -20,22 +19,16 @@ from chronicle.session import reset_session
 
 from tokenops.control import install_crossing_hook
 from examples.app_config import AgentServerConfig
-from tokenops.control.attribution import build_attribution
 from tokenops.control.context import (
     PARENT_SPAN_ID_HEADER,
     RUN_ID_HEADER,
-    SpanContext,
-    current_span,
-    governance_scope,
-    run_scope,
 )
+from tokenops import tokenops_run
 from tokenops.control import (
     ApplyControls,
     Halt,
     PreviewControls,
     build_governor,
-    build_governance_stack,
-    downstream_run_scope,
     wrap_complete,
 )
 from tokenops.control.core import Action, BoundaryStep, CallRequest, Observation, Signal
@@ -282,73 +275,13 @@ def run_simulation(
     log = _TraceLog(on_event)
     user_dims = dict(user_dims or {})
     user_dims.setdefault("user_id", "simulator")
-    run_id = f"run-{uuid.uuid4().hex[:12]}"
     price = build_price_book()
 
     research_cfg = research_cfg or AgentServerConfig(max_steps=5, satisfaction_threshold=0.7)
     summarize_cfg = summarize_cfg or AgentServerConfig()
 
-    reg = store.register_run(
-        RunRegistration(
-            run_id=run_id, intent=intent, user_dims=user_dims, mode=governance_mode,
-        ),
-    )
-    log.emit(
-        "register",
-        "run registered",
-        run_id=run_id,
-        intent=intent,
-        user_dims=user_dims,
-        governance_mode=governance_mode.value,
-    )
-
-    session = reset_session()
-    trace_id = session.begin_trace(run_id)
-    log.emit("trace", "Chronicle trace started", trace_id=trace_id, run_id=run_id)
-
-    root_span = SpanContext(span_id=f"span-{uuid.uuid4().hex[:10]}", service="research")
-    log.emit(
-        "span",
-        "entry span bound",
-        agent="research",
-        run_id=run_id,
-        span_id=root_span.span_id,
-        parent_span_id=root_span.parent_span_id,
-        service=root_span.service,
-    )
-
     research_gov = _make_trace_governor(store, "research", log, price, mode=governance_mode)
     summarize_gov: _TraceGovernor | None = None
-
-    research_gov.ledger.open_run(run_id)
-    store.create_run(
-        RunRecord(run_id=run_id, agent="research", status="running", task=task,
-                  started_at=time.time(), dims={**user_dims, "intent": intent})
-    )
-
-    attr_research = build_attribution(reg, service="research")
-    if demo_mode:
-        if demo_scenario == "search_loop_trap":
-            research_dispatch = _demo_search_loop_complete([0])
-        else:
-            research_dispatch = _demo_research_complete([0])
-    else:
-        research_dispatch = None
-    if research_dispatch is None:
-        from tokenops.providers import complete as live_complete
-
-        research_dispatch = live_complete
-
-    research_controls = research_gov.controls
-    governed_research = wrap_complete(
-        research_gov,
-        research_controls,
-        attr_research,
-        provider=research_cfg.provider,
-        model=research_cfg.model,
-        dispatch=research_dispatch,
-        service="research",
-    )
 
     steps: list[StepEvent] = []
     token_usage = TokenUsage()
@@ -357,6 +290,12 @@ def run_simulation(
     status: Literal["completed", "halted", "throttled"] = "completed"
     halt_reason: str | None = None
     summarize_cost = 0
+    run_id = ""
+    reg: RunRegistration | None = None
+    trace_id = ""
+    session = reset_session()
+    research_ok = False
+    parent_span_id = ""
 
     def on_step(event: StepEvent) -> None:
         steps.append(event)
@@ -372,120 +311,180 @@ def run_simulation(
 
     research_agent = NativeResearchAgent(research_cfg)
 
-    with run_scope(reg, root_span):
-        with governance_scope(
-            research_gov, attr_research, provider=research_cfg.provider, model=research_cfg.model
-        ):
-            try:
-                findings = research_agent.run(
-                    task,
-                    corpus_profile,  # type: ignore[arg-type]
-                    on_step,
-                    governed_research,
-                    service="research",
+    try:
+        with tokenops_run(
+            store=store,
+            headers={},
+            payload={"task": task},
+            service="research",
+            intent=intent,
+            user_dims=user_dims,
+            mode=governance_mode,
+            provider=research_cfg.provider,
+            model=research_cfg.model,
+            governor=research_gov,
+            controls=research_gov.controls,
+        ) as bound:
+            reg = bound.registration
+            run_id = reg.run_id
+            log.emit(
+                "register",
+                "run registered",
+                run_id=run_id,
+                intent=intent,
+                user_dims=user_dims,
+                governance_mode=governance_mode.value,
+            )
+            trace_id = session.begin_trace(run_id)
+            log.emit("trace", "Chronicle trace started", trace_id=trace_id, run_id=run_id)
+            log.emit(
+                "span",
+                "entry span bound",
+                agent="research",
+                run_id=run_id,
+                span_id=bound.span.span_id,
+                parent_span_id=bound.span.parent_span_id,
+                service=bound.span.service,
+            )
+
+            store.create_run(
+                RunRecord(
+                    run_id=run_id,
+                    agent="research",
+                    status="running",
+                    task=task,
+                    started_at=time.time(),
+                    dims={**user_dims, "intent": intent},
                 )
-                steps.append(
-                    StepEvent(agent="research", action="delegate", detail="calling summarize agent")
+            )
+
+            if demo_mode:
+                if demo_scenario == "search_loop_trap":
+                    research_dispatch = _demo_search_loop_complete([0])
+                else:
+                    research_dispatch = _demo_research_complete([0])
+            else:
+                research_dispatch = None
+            if research_dispatch is None:
+                from tokenops.providers import complete as live_complete
+
+                research_dispatch = live_complete
+
+            governed_research = wrap_complete(
+                research_gov,
+                research_gov.controls,
+                bound.attr,
+                provider=research_cfg.provider,
+                model=research_cfg.model,
+                dispatch=research_dispatch,
+                service="research",
+            )
+
+            findings = research_agent.run(
+                task,
+                corpus_profile,  # type: ignore[arg-type]
+                on_step,
+                governed_research,
+                service="research",
+            )
+            steps.append(
+                StepEvent(agent="research", action="delegate", detail="calling summarize agent")
+            )
+            log.emit("delegate", "research → summarize", agent="research", run_id=run_id)
+            parent_span_id = bound.span.span_id
+            research_ok = True
+
+        if research_ok:
+            headers = {RUN_ID_HEADER: run_id, PARENT_SPAN_ID_HEADER: parent_span_id}
+            # Downstream hop — sequential tokenops_run (joins existing run_id).
+            summarize_gov = _make_trace_governor(
+                store, "summarize", log, price, mode=governance_mode,
+            )
+            with tokenops_run(
+                store=store,
+                headers=headers,
+                service="summarize",
+                provider=summarize_cfg.provider,
+                model=summarize_cfg.model,
+                governor=summarize_gov,
+                controls=summarize_gov.controls,
+            ) as sum_bound:
+            log.emit(
+                "span",
+                "downstream span bound",
+                agent="summarize",
+                run_id=run_id,
+                span_id=sum_bound.span.span_id,
+                parent_span_id=sum_bound.span.parent_span_id,
+                service=sum_bound.span.service,
+            )
+            store.create_run(
+                RunRecord(
+                    run_id=run_id,
+                    agent="summarize",
+                    status="running",
+                    parent_span=parent_span_id,
+                    task=task,
+                    started_at=time.time(),
+                    dims={**user_dims, "intent": intent},
                 )
-                log.emit("delegate", "research → summarize", agent="research", run_id=run_id)
+            )
 
-                parent_span_id = current_span().span_id if current_span() else root_span.span_id
-                headers = {RUN_ID_HEADER: run_id, PARENT_SPAN_ID_HEADER: parent_span_id}
+            sum_dispatch = _demo_summarize_complete([0]) if demo_mode else None
+            if sum_dispatch is None:
+                from tokenops.providers import complete as live_complete
 
-                with downstream_run_scope(store, headers=headers, service="summarize"):
-                    sum_span = current_span()
-                    assert sum_span is not None
-                    log.emit(
-                        "span",
-                        "downstream span bound",
-                        agent="summarize",
-                        run_id=run_id,
-                        span_id=sum_span.span_id,
-                        parent_span_id=sum_span.parent_span_id,
-                        service=sum_span.service,
-                    )
+                sum_dispatch = live_complete
 
-                    summarize_gov = _make_trace_governor(
-                        store, "summarize", log, price, mode=governance_mode,
-                    )
-                    summarize_controls = summarize_gov.controls
+            governed_sum = wrap_complete(
+                summarize_gov,
+                summarize_gov.controls,
+                sum_bound.attr,
+                provider=summarize_cfg.provider,
+                model=summarize_cfg.model,
+                dispatch=sum_dispatch,
+                service="summarize",
+            )
 
-                    summarize_gov.ledger.open_run(run_id)
-                    store.create_run(
-                        RunRecord(
-                            run_id=run_id,
-                            agent="summarize",
-                            status="running",
-                            parent_span=parent_span_id,
-                            task=task,
-                            started_at=time.time(),
-                            dims={**user_dims, "intent": intent},
-                        )
-                    )
+            summarize_agent = NativeSummarizeAgent(summarize_cfg)
 
-                    attr_sum = build_attribution(reg, service="summarize")
-                    sum_dispatch = _demo_summarize_complete([0]) if demo_mode else None
-                    if sum_dispatch is None:
-                        from tokenops.providers import complete as live_complete
+            def on_sum_step(event: StepEvent) -> None:
+                steps.append(event)
+                token_usage.input_tokens += event.tokens.input_tokens
+                token_usage.output_tokens += event.tokens.output_tokens
+                log.emit("step", event.action, agent="summarize", detail=event.detail)
 
-                        sum_dispatch = live_complete
+            summary = summarize_agent.run(task, findings, on_sum_step, governed_sum)
+            summarize_cost = summarize_gov.ledger.cost_micros(run_id)
+            store.update_run(
+                run_id,
+                status="completed",
+                cost_micros=summarize_cost,
+                steps=summarize_gov.ledger.step_count(run_id),
+                ended_at=time.time(),
+            )
+    except Halt as halt:
+        status, halt_reason = "halted", halt.action.reason
+        log.emit("halt", halt_reason or "halted", agent="research", run_id=run_id)
+    except Throttled as thr:
+        status, halt_reason = "throttled", thr.action.reason
+        log.emit("throttle", halt_reason or "throttled", agent="research", run_id=run_id)
+    finally:
+        if run_id:
+            gov_events = governance_events_payload(research_gov.controls)
+            detector = halt_detector_from_events(gov_events) if status == "halted" else None
+            store.update_run(
+                run_id,
+                status=status,
+                halt_reason=halt_reason,
+                detector=detector,
+                cost_micros=research_gov.ledger.cost_micros(run_id),
+                steps=research_gov.ledger.step_count(run_id),
+                ended_at=time.time(),
+                governance_events=gov_events,
+            )
 
-                    governed_sum = wrap_complete(
-                        summarize_gov,
-                        summarize_controls,
-                        attr_sum,
-                        provider=summarize_cfg.provider,
-                        model=summarize_cfg.model,
-                        dispatch=sum_dispatch,
-                        service="summarize",
-                    )
-
-                    summarize_agent = NativeSummarizeAgent(summarize_cfg)
-
-                    def on_sum_step(event: StepEvent) -> None:
-                        steps.append(event)
-                        token_usage.input_tokens += event.tokens.input_tokens
-                        token_usage.output_tokens += event.tokens.output_tokens
-                        log.emit("step", event.action, agent="summarize", detail=event.detail)
-
-                    with governance_scope(
-                        summarize_gov,
-                        attr_sum,
-                        provider=summarize_cfg.provider,
-                        model=summarize_cfg.model,
-                    ):
-                        summary = summarize_agent.run(task, findings, on_sum_step, governed_sum)
-
-                    summarize_cost = summarize_gov.ledger.cost_micros(run_id)
-                    store.update_run(
-                        run_id,
-                        status="completed",
-                        cost_micros=summarize_cost,
-                        steps=summarize_gov.ledger.step_count(run_id),
-                        ended_at=time.time(),
-                    )
-
-                # Child spend already recorded in the shared ledger for this run_id.
-            except Halt as halt:
-                status, halt_reason = "halted", halt.action.reason
-                log.emit("halt", halt_reason or "halted", agent="research", run_id=run_id)
-            except Throttled as thr:
-                status, halt_reason = "throttled", thr.action.reason
-                log.emit("throttle", halt_reason or "throttled", agent="research", run_id=run_id)
-            finally:
-                gov_events = governance_events_payload(research_gov.controls)
-                detector = halt_detector_from_events(gov_events) if status == "halted" else None
-                store.update_run(
-                    run_id,
-                    status=status,
-                    halt_reason=halt_reason,
-                    detector=detector,
-                    cost_micros=research_gov.ledger.cost_micros(run_id),
-                    steps=research_gov.ledger.step_count(run_id),
-                    ended_at=time.time(),
-                    governance_events=gov_events,
-                )
-
+    assert reg is not None
     for env in session.recorded_envelopes:
         svc = "research" if env.node_id == "search" else "research"
         log.emit(
