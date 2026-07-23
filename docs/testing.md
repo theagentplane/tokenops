@@ -32,7 +32,8 @@ python -m pytest -x                                # stop at first failure
 | File | Proves |
 |------|--------|
 | `test_ledger.py` | pricing, single-source `cum_spent`, velocity/recent, `budget_left`, inflight, sticky halt |
-| `test_cost_budget.py` … `test_output_runaway.py` | one per policy — detector + Action |
+| `test_cost_budget.py` … `test_tool_fix.py` (+ `test_trajectory_hint.py`) | one per policy — detector + Action (`FakeView`) |
+| `test_policies_wrap_integration.py` | **all** policies through Governor + mocked `wrap_complete` / observe |
 | `test_config.py` | `build_governor` wires policies from a dict |
 | `test_integration.py` | in-process wrap + fake model halt |
 | `test_apply.py` | corrective controls through `wrap_complete` |

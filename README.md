@@ -44,8 +44,8 @@ flowchart LR
     end
 
     subgraph AGENTS["Agent processes (SDK)"]
-        E["Entry agent<br/>entry_task_run_scope"] -->|"register_run"| R
-        E -->|"X-TokenOps-Run-Id"| D["Downstream agents"]
+        E["Entry agent<br/>tokenops_run"] -->|"register_run"| R
+        E -->|"X-TokenOps-Run-Id"| D["Downstream agents<br/>tokenops_run"]
         E & D -->|"wrap_complete"| G["Governor<br/>pre_call → detect → decide → apply"]
         E & D -->|"@boundary + crossing hook"| G
         G --> L["Shared ledger<br/>(same run_id)"]
@@ -58,7 +58,7 @@ flowchart LR
 | Piece | Owns | Does not own |
 |---|---|---|
 | **Control plane** (`python -m tokenops.server`) | `POST /v1/runs`, shared SQLite, Admin/Dashboard | Agent loops, LLM calls, tools |
-| **SDK (in agents)** | `wrap_complete`, ledger/policies, Chronicle crossing hook, run propagation | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
+| **SDK (in agents)** | `tokenops_run`, `wrap_complete`, ledger/policies, Chronicle crossing hook | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
 
 Chronicle records decision boundaries; TokenOps attaches as the cost/governance observer on live crossings. See [Chronicle](https://github.com/theagentplane/chronicle) for record-and-replay.
 
@@ -87,32 +87,33 @@ make db-reset          # optional: clean SQLite + seed governance from default.y
 make run               # control plane :7700 + Admin/Dashboard :8501
 ```
 
-Wire governance into an agent: register the run at the **entry**, wrap the LLM, and install the Chronicle crossing hook for tools.
+Wire governance into an agent: `instrument_app` once, then `tokenops_run` per request.
+The UI sends **task only**; intent / mode come from agent config on `instrument_app`.
 
 ```python
-from tokenops import ControlPlaneClient
-from tokenops.control import (
-    wrap_complete,
-    entry_task_run_scope,
-    governance_scope,
-    install_crossing_hook,
-)
+from tokenops import ControlPlaneClient, instrument_app, tokenops_run
+from tokenops.control import wrap_complete, with_governance_errors
 from tokenops.providers import complete
-
-install_crossing_hook()  # once per process; Chronicle on_crossing → Governor.observe
 
 client = ControlPlaneClient.from_env()  # TOKENOPS_URL or embedded Store
 
-# Entry agent: UI omits run_id; entry opens the run on the plane
-with entry_task_run_scope(store, headers=headers, payload=payload, service="planner"):
-    with governance_scope(governor, attr, provider=..., model=...):
+async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
+    with tokenops_run(client=client) as bound:
         governed = wrap_complete(
-            governor, controls, attr,
+            bound.governor, bound.controls, bound.attr,
             provider=provider, model=model,
             dispatch=complete, service="planner",
         )
         run_agent(..., complete_fn=governed)
+
+app = create_a2a_app(..., handler=with_governance_errors(handler))
+instrument_app(app, service="planner", intent="triad_plan",
+               provider=provider, model=model)
 ```
+
+**Non-FastAPI:** TokenOps does not yet ship middleware for other frameworks. Use
+`bind_request_context(RequestContext(headers=..., payload=..., service=...))` then
+`with tokenops_run():`, or pass those kwargs explicitly to `tokenops_run`.
 
 Point agents at the plane and share one DB:
 

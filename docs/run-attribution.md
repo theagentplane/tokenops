@@ -28,7 +28,7 @@ Rules:
 
 - **Registration is preferred** before boundary telemetry so cross-agent budgets share one `run_id`.
 - **Duplicate register** for the same `run_id` → error.
-- **Entry agent missing `X-TokenOps-Run-Id`** → `entry_task_run_scope` registers via
+- **Entry agent missing `X-TokenOps-Run-Id`** → `tokenops_run` registers via
   `ControlPlaneClient` (plane `POST /v1/runs` or embedded Store).
 - **Downstream missing `X-TokenOps-Run-Id`** → soft path: auto-register an `unattributed` run,
   log `tokenops.missing_run_id` / `cross_agent_attribution_broken`, and still govern locally.
@@ -77,13 +77,13 @@ Code: `control/context.py`, `control/attribution.py`.
 
 ```
 1. Entry (research / planner)
-     entry_task_run_scope → ControlPlaneClient.register_run (if UI omitted run_id)
+     tokenops_run → ControlPlaneClient.register_run (if UI omitted run_id)
      span s1: service=entry, parent=null
      boundaries → Observation → governor.observe
 
 2. Delegate
      headers: X-TokenOps-Run-Id, X-TokenOps-Parent-Span-Id=s1 (ambient merge)
-     child resolves run_id (no register)
+     child tokenops_run joins run_id (no register)
      span s2: service=child, parent=s1
      child LLM/tool spend → shared ledger (no parent cost rollup)
 
@@ -97,8 +97,8 @@ Same `run_id` across the workflow. New `span_id` per agent hop.
 
 ## Ingest seam (Tisha)
 
-Ingest builds a legacy `Attribution` for `segment_key_for` via
-`build_attribution(registration, service=…)`:
+Ingest builds a ledger `Attribution` for `segment_key_for` inside `tokenops_run`
+(and boundary ingest):
 
 - `run_id` ← registration
 - `agent` ← boundary `service`
@@ -111,13 +111,16 @@ Policies and ledger stay unchanged until composite segment matchers land (#5).
 ## API (v1)
 
 ```python
+# Happy path — integrators
+from tokenops import ControlPlaneClient, instrument_app, tokenops_run
+
+with tokenops_run(client=client) as bound:
+    ...  # bound.registration, bound.attr, bound.governor, bound.controls
+
+# Plane / Store (control plane)
 store.register_run(RunRegistration(run_id, intent="", user_dims={}))
 store.resolve_run(run_id)  # raises RunNotRegisteredError
 
-attribution.begin_run(store, headers, payload, service="research", entry=True)
-attribution.require_run(store)  # boundaries / ingest
-
-build_attribution(reg, service="research") -> Attribution
 step_to_observation(step, attr, *, service, boundary_tags) -> Observation
 ```
 
@@ -133,15 +136,16 @@ governance context is bound:
 ```python
 from chronicle import boundary, get_session, ReplayPlan
 from chronicle.session import reset_session
-from tokenops.control import governance_scope, install_crossing_hook
+from tokenops import tokenops_run
+from tokenops.control import install_crossing_hook
 
-install_crossing_hook()  # also done on `import tokenops.control`
+install_crossing_hook()  # also done by instrument_app / tokenops.init
 
 @boundary("search", kind="tool")          # Chronicle decorator
 def search(query: str) -> SearchResult: ...
 
 reset_session().begin_trace(run_id)       # Chronicle session
-with governance_scope(governor, attr):    # TokenOps → governor.observe via hook
+with tokenops_run(client=client) as bound:  # binds governor for crossing hook
     search("pricing")
 ```
 
@@ -166,12 +170,13 @@ POST /v1/runs
 ```
 POST /v1/tasks
 # X-TokenOps-Run-Id optional on entry; required (propagated) on downstream hops
+# UI sends task only — intent/mode from agent instrument_app / tokenops_run kwargs
 { "task": "...", "bench": { "corpus_profile": "healthy" } }
 ```
 
 Implemented in `control/http.py` (`mount_run_registration`) on the plane app
 (`tokenops.server`); agents mount the same route only when ``TOKENOPS_URL`` is
-unset. Entry agents use ``entry_task_run_scope`` → ``ControlPlaneClient.register_run``.
+unset. Entry agents use ``tokenops_run`` → ``ControlPlaneClient.register_run``.
 Downstream handlers resolve registration only.
 
 ## Cross-process ledger (spend + halt)

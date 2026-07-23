@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
-from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from conftest import make_attr, toy_price
 
@@ -38,7 +38,7 @@ def test_budget_halts_governed_complete():
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt):
                 for _ in range(20):
                     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}])

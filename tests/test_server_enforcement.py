@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from tokenops.control.attribution import _build_attribution
+
 import pytest
 
 from tokenops.control import (
     ApplyControls,
     Halt,
-    build_attribution,
     build_governor,
     wrap_complete,
 )
-from tokenops.control.context import SpanContext, governance_scope, run_scope
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -31,7 +32,7 @@ def test_store_policy_halts_governed_complete(tmp_path):
     cfg = s.governance_config_for("research")
 
     gov = build_governor(cfg, build_price_book(), ApplyControls())
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     gov.ledger.open_run("run-1")
 
     governed = wrap_complete(
@@ -41,7 +42,7 @@ def test_store_policy_halts_governed_complete(tmp_path):
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
-        with governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
+        with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt):
                 for _ in range(20):
                     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "continue"}])

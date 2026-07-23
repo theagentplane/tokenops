@@ -22,10 +22,28 @@ reads of that one accumulator, so the map is the only place spend is ever writte
 Invariant — *every run has a run budget*: structurally guaranteed, because a
 ``dimension="run"`` budget resolves a fresh ``segment_key`` per run, so one system
 budget definition covers every run without you configuring anything.
+
+Concurrency
+-----------
+One :class:`Ledger` is safe for concurrent threads. Mutations and reads of the in-memory
+maps (``runs`` / ``_spent`` / ``_inflight``) are serialized on an internal RLock.
+
+* **Different ``run_id``s** on the same Ledger: safe; spend / steps / halt do not lose
+  updates under concurrent ``record`` / ``admit`` / ``mark_halted``.
+* **Same ``run_id``**: also safe — calls serialize; halt flags are not torn. Prefer one
+  writer per run when possible (typical: per-request Governor), but re-entrancy from
+  multiple threads will not corrupt counters.
+* **Store-backed Ledger**: spend / inflight / halt go through :class:`~tokenops.control.store.Store`
+  (itself thread-safe). Multiple Ledgers / Governors in one process sharing one Store are
+  safe for those shared accumulators; each Ledger's step window remains local to that
+  Ledger instance.
+
+See ``docs/concurrency.md``.
 """
 
 from __future__ import annotations
 
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Literal, Sequence
@@ -133,7 +151,10 @@ class RunState:
 
 class Ledger:
     """Attribute + LedgerView. Per-process run state (window, local step count); spend,
-    inflight, and halt may be backed by :class:`Store` for cross-process A2A."""
+    inflight, and halt may be backed by :class:`Store` for cross-process A2A.
+
+    Thread-safe for concurrent use from multiple threads (see module docstring).
+    """
 
     def __init__(
         self,
@@ -142,6 +163,7 @@ class Ledger:
         price: PriceFn | None = None,
         store: Store | None = None,
     ) -> None:
+        self._lock = threading.RLock()
         self._store = store
         self.runs: dict[str, RunState] = {}
         self._spent: dict[tuple[str, str, str], Micros] = defaultdict(int)
@@ -170,22 +192,25 @@ class Ledger:
     # ---- write side (Attribute) ------------------------------------------ #
 
     def open_run(self, run_id: str, parent_run: str | None = None) -> None:
-        self.runs[run_id] = RunState(parent_run=parent_run)
+        with self._lock:
+            self.runs[run_id] = RunState(parent_run=parent_run)
 
     def admit(self, segment_key: str) -> None:
         """A call for this segment has started (concurrency)."""
-        if self._store is not None:
-            self._store.ledger_admit(segment_key)
-        else:
-            self._inflight[segment_key] += 1
+        with self._lock:
+            if self._store is not None:
+                self._store.ledger_admit(segment_key)
+            else:
+                self._inflight[segment_key] += 1
 
     def complete(self, segment_key: str) -> None:
         """A call for this segment has returned. Floored at 0 so a stray complete cannot
         drive the counter negative."""
-        if self._store is not None:
-            self._store.ledger_complete(segment_key)
-        else:
-            self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
+        with self._lock:
+            if self._store is not None:
+                self._store.ledger_complete(segment_key)
+            else:
+                self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
 
     def record(self, obs: Observation) -> BoundaryStep:
         """Price the crossing, update every matching budget accumulator, append a
@@ -193,105 +218,116 @@ class Ledger:
 
         This is the LLD's ``Attribute.record()``: the only place spend is written.
         """
-        rs = self.runs[obs.attr.run_id]
+        with self._lock:
+            rs = self.runs[obs.attr.run_id]
 
-        cost: Micros = 0
-        if obs.node_type == "llm" and obs.usage is not None:
-            if self._price is None:
-                raise RuntimeError("Ledger has no price book; cannot price an llm call (fail closed)")
-            cost = self._price(obs.provider, obs.model, obs.usage)
-        elif obs.node_type == "delegate":
-            cost = obs.rolled_up_cost_micros  # child run total rolls up into the parent
+            cost: Micros = 0
+            if obs.node_type == "llm" and obs.usage is not None:
+                if self._price is None:
+                    raise RuntimeError("Ledger has no price book; cannot price an llm call (fail closed)")
+                cost = self._price(obs.provider, obs.model, obs.usage)
+            elif obs.node_type == "delegate":
+                cost = obs.rolled_up_cost_micros  # child run total rolls up into the parent
 
-        # One event can feed many accumulators (incl. the system run-total) — that is why
-        # spend lives in the map, not on the run object.
-        for b in self._budgets:
-            sk = segment_key(obs.attr, b)
-            if sk is None:
-                continue
-            self._write_spent_delta(b.budget_id, sk, b.period, cost)
+            # One event can feed many accumulators (incl. the system run-total) — that is why
+            # spend lives in the map, not on the run object.
+            for b in self._budgets:
+                sk = segment_key(obs.attr, b)
+                if sk is None:
+                    continue
+                self._write_spent_delta(b.budget_id, sk, b.period, cost)
 
-        rs.steps += 1
-        cum = self._read_spent(
-            RUN_TOTAL_BUDGET.budget_id, f"run:{obs.attr.run_id}", LIFETIME,
-        )
-        step = BoundaryStep(
-            step=rs.steps,
-            ts=obs.ts,
-            node_type=obs.node_type,
-            boundary_id=obs.boundary_id,
-            cum_spent_micros=cum,
-            input=obs.input,
-            output=obs.output,
-            tags={**dict(obs.boundary_tags), **dict(obs.tags)},
-            usage=obs.usage,
-            signature=obs.signature,
-            result_hash=obs.result_hash,
-        )
-        rs.window.append(step)
-        return step
+            rs.steps += 1
+            cum = self._read_spent(
+                RUN_TOTAL_BUDGET.budget_id, f"run:{obs.attr.run_id}", LIFETIME,
+            )
+            step = BoundaryStep(
+                step=rs.steps,
+                ts=obs.ts,
+                node_type=obs.node_type,
+                boundary_id=obs.boundary_id,
+                cum_spent_micros=cum,
+                input=obs.input,
+                output=obs.output,
+                tags={**dict(obs.boundary_tags), **dict(obs.tags)},
+                usage=obs.usage,
+                signature=obs.signature,
+                result_hash=obs.result_hash,
+            )
+            rs.window.append(step)
+            return step
 
     def mark_halted(self, run_id: str, reason: str = "") -> None:
-        rs = self.runs.get(run_id)
-        if rs is None:
-            rs = self.runs[run_id] = RunState()
-        rs.halted = True
-        rs.halt_reason = reason or rs.halt_reason
-        if self._store is not None:
-            self._store.ledger_mark_halted(run_id, reason)
+        with self._lock:
+            rs = self.runs.get(run_id)
+            if rs is None:
+                rs = self.runs[run_id] = RunState()
+            rs.halted = True
+            rs.halt_reason = reason or rs.halt_reason
+            if self._store is not None:
+                self._store.ledger_mark_halted(run_id, reason)
 
     def clear_halt(self, run_id: str) -> None:
         """Explicit resume of the *same* run — lift the gate. Deliberately separate from
         any automatic path: a halted run never un-halts itself."""
-        rs = self.runs.get(run_id)
-        if rs is not None:
-            rs.halted = False
-            rs.halt_reason = None
-        if self._store is not None:
-            self._store.ledger_clear_halt(run_id)
+        with self._lock:
+            rs = self.runs.get(run_id)
+            if rs is not None:
+                rs.halted = False
+                rs.halt_reason = None
+            if self._store is not None:
+                self._store.ledger_clear_halt(run_id)
 
     # ---- read side (LedgerView) ------------------------------------------ #
 
     def cost_micros(self, run_id: str) -> Micros:
-        return self._read_spent(RUN_TOTAL_BUDGET.budget_id, f"run:{run_id}", LIFETIME)
+        with self._lock:
+            return self._read_spent(RUN_TOTAL_BUDGET.budget_id, f"run:{run_id}", LIFETIME)
 
     def step_count(self, run_id: str) -> int:
-        rs = self.runs.get(run_id)
-        return rs.steps if rs else 0
+        with self._lock:
+            rs = self.runs.get(run_id)
+            return rs.steps if rs else 0
 
     def is_halted(self, run_id: str) -> bool:
-        if self._store is not None and self._store.ledger_is_halted(run_id):
-            return True
-        rs = self.runs.get(run_id)
-        return bool(rs and rs.halted)
+        with self._lock:
+            if self._store is not None and self._store.ledger_is_halted(run_id):
+                return True
+            rs = self.runs.get(run_id)
+            return bool(rs and rs.halted)
 
     def budget_left(self, budget_id: str, segment_key: str, period: str = "lifetime") -> Micros:
-        b = self._budget_by_id.get(budget_id)
-        if b is None:
-            return 0  # unknown budget → no headroom (fail closed)
-        if b.limit_micros is None:
-            return UNLIMITED_LEFT
-        spent = self._read_spent(budget_id, segment_key, period)
-        return b.limit_micros - spent
+        with self._lock:
+            b = self._budget_by_id.get(budget_id)
+            if b is None:
+                return 0  # unknown budget → no headroom (fail closed)
+            if b.limit_micros is None:
+                return UNLIMITED_LEFT
+            spent = self._read_spent(budget_id, segment_key, period)
+            return b.limit_micros - spent
 
     def inflight(self, segment_key: str) -> int:
-        if self._store is not None:
-            return self._store.ledger_inflight(segment_key)
-        return self._inflight[segment_key]
+        with self._lock:
+            if self._store is not None:
+                return self._store.ledger_inflight(segment_key)
+            return self._inflight[segment_key]
 
     def velocity(self, run_id: str, m: int) -> float:
-        rs = self.runs.get(run_id)
-        if not rs or len(rs.window) < 2:
-            return 0.0
-        m = min(m, len(rs.window))
-        newest = rs.window[-1].cum_spent_micros
-        oldest = rs.window[-m].cum_spent_micros
-        return (newest - oldest) / m
+        with self._lock:
+            rs = self.runs.get(run_id)
+            if not rs or len(rs.window) < 2:
+                return 0.0
+            m = min(m, len(rs.window))
+            newest = rs.window[-1].cum_spent_micros
+            oldest = rs.window[-m].cum_spent_micros
+            return (newest - oldest) / m
 
     def recent(self, run_id: str, n: int) -> Sequence[BoundaryStep]:
-        rs = self.runs.get(run_id)
-        return rs.window[-n:] if rs else []
+        with self._lock:
+            rs = self.runs.get(run_id)
+            return list(rs.window[-n:]) if rs else []
 
     def window(self, run_id: str) -> Sequence[BoundaryStep]:
-        rs = self.runs.get(run_id)
-        return list(rs.window) if rs else []
+        with self._lock:
+            rs = self.runs.get(run_id)
+            return list(rs.window) if rs else []

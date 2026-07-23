@@ -9,11 +9,10 @@ from typing import Any
 from tokenops.control import (
     ApplyControls,
     Halt,
-    build_attribution,
     build_governor,
-    governance_scope,
 )
-from tokenops.control.context import SpanContext, run_scope
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRecord, RunRegistration
 from tokenops.control.store import Store
 from tokenops.control.trajectory import enqueue_completed_run, schedule_trajectory_drain
@@ -245,7 +244,7 @@ def install() -> None:
         for llm in _agent_llms(self):
             wrap_ainvoke(llm)
 
-        attr = build_attribution(active.registration, service="browseruse")
+        attr = _build_attribution(active.registration, service="browseruse")
         provider = getattr(self.llm, "provider", "openai")
         model = getattr(self.llm, "model", "gpt-4o-mini")
 
@@ -253,7 +252,7 @@ def install() -> None:
         history = None
         try:
             with run_scope(active.registration, active.span):
-                with governance_scope(
+                with _governance_scope(
                     active.governor, attr, provider=provider, model=model,
                 ):
                     history = await _orig_run(self, *args, **kwargs)

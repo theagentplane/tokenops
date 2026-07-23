@@ -32,18 +32,18 @@ Runnable A2A demos live in-repo under [`examples/`](examples/) (`make demo` / `d
 
 ```
 POST /v1/runs  →  register run_id + intent + user_dims (SQLite)
-POST /v1/tasks + X-TokenOps-Run-Id
-  → build_governor(store.governance_config_for(agent), store=store)
-  → run_scope + governance_scope
+POST /v1/tasks (task only; optional X-TokenOps-Run-Id)
+  → instrument_app + tokenops_run (register-or-join + bind governance)
   → agent loop:
        complete() ──▶ wrap_complete ──▶ pre_call ──▶ detect→decide→apply
        @boundary  ──▶ chronicle envelope + crossing hook ──▶ observe ──▶ ledger.record
        delegate   ──▶ child agent (same run_id, parent span header) ──▶ shared ledger
-  → store.update_run(RunRecord) ──▶ Dashboard
+  → client.update_run(RunRecord) ──▶ Dashboard
 ```
 
-Layers: `core` → `ledger` → `policies` → `engine` → `config`/`store` → `integration` /
-`boundary` / `crossing` / `attribution`. See `docs/architecture.md` and `docs/run-attribution.md`.
+Layers: `core` → `ledger` → `policies` → `engine` → `config`/`store` → `run` /
+`integration` / `boundary` / `crossing` / `attribution`. See `docs/architecture.md`
+and `docs/run-attribution.md`.
 
 ## Governance config (SQLite)
 

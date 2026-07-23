@@ -5,7 +5,8 @@ from __future__ import annotations
 from functools import wraps
 from typing import Any
 
-from tokenops.control import build_attribution, consume_carry
+from tokenops.control import consume_carry
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.core import CallRequest
 
@@ -97,7 +98,7 @@ def wrap_ainvoke(llm: Any) -> None:
         if active is None:
             return await orig(messages, *args, **kwargs)
 
-        attr = build_attribution(active.registration, service="browseruse")
+        attr = _build_attribution(active.registration, service="browseruse")
         active.controls.begin_call()
         main_llm = _is_main_llm(active, llm)
         primary_turn = main_llm and active._main_llm_calls == 0

@@ -8,16 +8,28 @@ ACID + concurrent readers as a single inspectable, deletable file — no daemon.
 The key method is :meth:`Store.governance_config_for`, which assembles exactly the dict
 ``control.config.build_governor`` already consumes — so the store drops in for static YAML
 and ``build_governor`` is unchanged.
+
+Concurrency
+-----------
+One :class:`Store` instance is safe for concurrent threads in a single process: all DB
+access is serialized on an internal :class:`~threading.RLock` (sqlite3 connections are not
+re-entrant across threads without that). Multi-statement ledger ops (add-spent, admit,
+halt) hold the lock for the whole critical section so counters and halt flags are not torn.
+
+Multi-process: each process opens its own ``Store`` / connection on the same file; WAL +
+atomic SQL keep ledger accumulators correct across processes. See ``docs/concurrency.md``.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sqlite3
+import threading
 import time
 import uuid
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence, TypeVar
 
 from tokenops.control.models import (
     BudgetSpec,
@@ -30,6 +42,19 @@ from tokenops.control.models import (
     Segment,
     parse_governance_mode,
 )
+
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+
+def _locked(fn: _F) -> _F:
+    """Serialize access to ``self._db``; re-entrant for nested Store method calls."""
+
+    @functools.wraps(fn)
+    def wrapper(self: Store, *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return fn(self, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
 
 def _known_policy_templates() -> frozenset[str]:
     from tokenops.control.config import _TEMPLATES
@@ -122,10 +147,13 @@ def new_id(prefix: str) -> str:
 class Store:
     def __init__(self, path: str = "tokenops.db", *, auto_seed: bool = True) -> None:
         self.path = path
+        self._lock = threading.RLock()
         self._db = sqlite3.connect(path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA foreign_keys=ON")
+        # Wait up to 5s on lock contention instead of failing immediately (SQLITE_BUSY).
+        self._db.execute("PRAGMA busy_timeout=5000")
         self._db.executescript(_SCHEMA)
         self._migrate()
         self._db.commit()
@@ -153,53 +181,72 @@ class Store:
                 if "duplicate column" not in str(exc).lower():
                     raise
 
+    @_locked
     def close(self) -> None:
         self._db.close()
 
     # ---- segments --------------------------------------------------------- #
 
+    def _invalidate_governance_config_cache(self) -> None:
+        from tokenops.control.governance_cache import clear_governance_config_cache
+
+        clear_governance_config_cache(store_path=self.path)
+
+    @_locked
     def upsert_segment(self, seg: Segment) -> Segment:
         self._db.execute(
             "REPLACE INTO segments(id, name, dimension, tag_key, match_value) VALUES (?,?,?,?,?)",
             (seg.id, seg.name, seg.dimension, seg.tag_key, seg.match_value),
         )
         self._db.commit()
+        self._invalidate_governance_config_cache()
         return seg
 
+    @_locked
     def get_segment(self, sid: str) -> Segment | None:
         row = self._db.execute("SELECT * FROM segments WHERE id=?", (sid,)).fetchone()
         return _segment(row) if row else None
 
+    @_locked
     def list_segments(self) -> list[Segment]:
         return [_segment(r) for r in self._db.execute("SELECT * FROM segments ORDER BY name")]
 
+    @_locked
     def delete_segment(self, sid: str) -> None:
         self._db.execute("DELETE FROM segments WHERE id=?", (sid,))
         self._db.commit()
+        self._invalidate_governance_config_cache()
 
     # ---- budgets ---------------------------------------------------------- #
 
+    @_locked
     def upsert_budget(self, b: BudgetSpec) -> BudgetSpec:
         self._db.execute(
             "REPLACE INTO budgets(id, limit_micros, dimension, tag_key, period) VALUES (?,?,?,?,?)",
             (b.id, b.limit_micros, b.dimension, b.tag_key, b.period),
         )
         self._db.commit()
+        self._invalidate_governance_config_cache()
         return b
 
+    @_locked
     def get_budget(self, bid: str) -> BudgetSpec | None:
         row = self._db.execute("SELECT * FROM budgets WHERE id=?", (bid,)).fetchone()
         return _budget(row) if row else None
 
+    @_locked
     def list_budgets(self) -> list[BudgetSpec]:
         return [_budget(r) for r in self._db.execute("SELECT * FROM budgets ORDER BY id")]
 
+    @_locked
     def delete_budget(self, bid: str) -> None:
         self._db.execute("DELETE FROM budgets WHERE id=?", (bid,))
         self._db.commit()
+        self._invalidate_governance_config_cache()
 
     # ---- policy instances ------------------------------------------------- #
 
+    @_locked
     def upsert_policy_instance(self, pi: PolicyInstance) -> PolicyInstance:
         if pi.template not in _known_policy_templates():  # fail closed — same rule as build_governor
             raise ValueError(
@@ -212,19 +259,25 @@ class Store:
              1 if pi.enabled else 0),
         )
         self._db.commit()
+        self._invalidate_governance_config_cache()
         return pi
 
+    @_locked
     def get_policy_instance(self, pid: str) -> PolicyInstance | None:
         row = self._db.execute("SELECT * FROM policy_instances WHERE id=?", (pid,)).fetchone()
         return _policy(row) if row else None
 
+    @_locked
     def list_policy_instances(self) -> list[PolicyInstance]:
         return [_policy(r) for r in self._db.execute("SELECT * FROM policy_instances ORDER BY template")]
 
+    @_locked
     def delete_policy_instance(self, pid: str) -> None:
         self._db.execute("DELETE FROM policy_instances WHERE id=?", (pid,))
         self._db.commit()
+        self._invalidate_governance_config_cache()
 
+    @_locked
     def seed_default_governance_if_empty(self, governance: dict | None = None) -> bool:
         """Load budgets + policies from config YAML when the store has none yet.
 
@@ -237,6 +290,7 @@ class Store:
             return False
         return self._apply_governance_yaml(governance)
 
+    @_locked
     def clear_all(self) -> None:
         """Delete every row (runs, registrations, governance, ledger). Schema is preserved."""
         for table in (
@@ -245,18 +299,23 @@ class Store:
         ):
             self._db.execute(f"DELETE FROM {table}")
         self._db.commit()
+        self._invalidate_governance_config_cache()
 
+    @_locked
     def clear_governance(self) -> None:
         """Delete segments, budgets, and policy instances only."""
         for table in ("policy_instances", "budgets", "segments"):
             self._db.execute(f"DELETE FROM {table}")
         self._db.commit()
+        self._invalidate_governance_config_cache()
 
+    @_locked
     def reseed_governance(self, governance: dict | None = None) -> bool:
         """Replace governance config from YAML (discards Admin edits)."""
         self.clear_governance()
         return self._apply_governance_yaml(governance)
 
+    @_locked
     def _apply_governance_yaml(self, governance: dict | None = None) -> bool:
         if governance is None:
             from tokenops.config.loader import load_governance_yaml
@@ -291,6 +350,7 @@ class Store:
 
     # ---- run registration (attribution) ----------------------------------- #
 
+    @_locked
     def register_run(self, reg: RunRegistration) -> RunRegistration:
         if self.get_run_registration(reg.run_id) is not None:
             raise RunAlreadyRegisteredError(f"run {reg.run_id!r} is already registered")
@@ -301,12 +361,14 @@ class Store:
         self._db.commit()
         return reg
 
+    @_locked
     def resolve_run(self, run_id: str) -> RunRegistration:
         reg = self.get_run_registration(run_id)
         if reg is None:
             raise RunNotRegisteredError(f"run {run_id!r} is not registered")
         return reg
 
+    @_locked
     def get_run_registration(self, run_id: str) -> RunRegistration | None:
         row = self._db.execute("SELECT * FROM run_registrations WHERE run_id=?", (run_id,)).fetchone()
         return _registration(row) if row else None
@@ -320,7 +382,18 @@ class Store:
         the budgets they reference, and resolves an attached segment into dimension/tag_key
         for segment-scoped templates. One instance per template (last wins) — matches the
         Governor's name-routed registration.
+
+        Results are cached in-process (§10); invalidated on governance writes or via
+        :func:`~tokenops.control.governance_cache.clear_governance_config_cache`.
         """
+        from tokenops.control.governance_cache import get_cached_governance_config
+
+        return get_cached_governance_config(
+            self.path, agent, lambda: self._assemble_governance_config(agent),
+        )
+
+    @_locked
+    def _assemble_governance_config(self, agent: str) -> dict:
         instances = [pi for pi in self.list_policy_instances()
                      if pi.enabled and (pi.agent is None or pi.agent == agent)]
         budget_ids = {pi.budget_id for pi in instances if pi.budget_id}
@@ -342,6 +415,7 @@ class Store:
 
     # ---- runs (dashboard) ------------------------------------------------- #
 
+    @_locked
     def create_run(self, rec: RunRecord) -> RunRecord:
         if not rec.started_at:
             rec.started_at = time.time()
@@ -356,6 +430,7 @@ class Store:
         self._db.commit()
         return rec
 
+    @_locked
     def update_run(self, run_id: str, **fields) -> None:
         if not fields:
             return
@@ -365,10 +440,12 @@ class Store:
         self._db.execute(f"UPDATE runs SET {cols} WHERE run_id=?", (*fields.values(), run_id))
         self._db.commit()
 
+    @_locked
     def get_run(self, run_id: str) -> RunRecord | None:
         row = self._db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
         return _run(row) if row else None
 
+    @_locked
     def list_runs(self, *, problematic_only: bool = False, limit: int = 200) -> list[RunRecord]:
         sql = "SELECT * FROM runs"
         if problematic_only:
@@ -376,6 +453,7 @@ class Store:
         sql += " ORDER BY started_at DESC LIMIT ?"
         return [_run(r) for r in self._db.execute(sql, (limit,))]
 
+    @_locked
     def run_tag_keys(self, *, limit: int = 500) -> list[str]:
         """Distinct segment-tag keys seen across recent runs — the choices a dashboard can
         group runs by (in addition to ``agent``)."""
@@ -386,6 +464,7 @@ class Store:
 
     # ---- shared ledger (cross-process spend / inflight / halt) ------------ #
 
+    @_locked
     def ledger_add_spent(
         self, budget_id: str, segment_key: str, period: str, delta: int,
     ) -> int:
@@ -405,6 +484,7 @@ class Store:
         self._db.commit()
         return int(row[0]) if row else 0
 
+    @_locked
     def ledger_get_spent(self, budget_id: str, segment_key: str, period: str) -> int:
         row = self._db.execute(
             "SELECT spent_micros FROM ledger_spent "
@@ -413,6 +493,7 @@ class Store:
         ).fetchone()
         return int(row[0]) if row else 0
 
+    @_locked
     def ledger_admit(self, segment_key: str) -> int:
         self._db.execute(
             "INSERT INTO ledger_inflight(segment_key, count) VALUES (?, 1) "
@@ -425,6 +506,7 @@ class Store:
         self._db.commit()
         return int(row[0]) if row else 0
 
+    @_locked
     def ledger_complete(self, segment_key: str) -> int:
         self._db.execute(
             "UPDATE ledger_inflight SET count = MAX(0, count - 1) WHERE segment_key=?",
@@ -436,12 +518,14 @@ class Store:
         self._db.commit()
         return int(row[0]) if row else 0
 
+    @_locked
     def ledger_inflight(self, segment_key: str) -> int:
         row = self._db.execute(
             "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
         ).fetchone()
         return int(row[0]) if row else 0
 
+    @_locked
     def ledger_mark_halted(self, run_id: str, reason: str = "") -> None:
         self._db.execute(
             "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 1, ?) "
@@ -451,18 +535,21 @@ class Store:
         )
         self._db.commit()
 
+    @_locked
     def ledger_is_halted(self, run_id: str) -> bool:
         row = self._db.execute(
             "SELECT halted FROM ledger_halt WHERE run_id=?", (run_id,),
         ).fetchone()
         return bool(row and row[0])
 
+    @_locked
     def ledger_halt_reason(self, run_id: str) -> str | None:
         row = self._db.execute(
             "SELECT halt_reason FROM ledger_halt WHERE run_id=?", (run_id,),
         ).fetchone()
         return row[0] if row else None
 
+    @_locked
     def ledger_clear_halt(self, run_id: str) -> None:
         self._db.execute(
             "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 0, NULL) "
@@ -473,6 +560,7 @@ class Store:
 
     # ---- trajectory hint index -------------------------------------------- #
 
+    @_locked
     def save_trajectory_snapshot(self, run_id: str, window_json: str) -> None:
         self._db.execute(
             "REPLACE INTO run_trajectory_snapshots(run_id, window_json, saved_at) VALUES (?,?,?)",
@@ -480,6 +568,7 @@ class Store:
         )
         self._db.commit()
 
+    @_locked
     def enqueue_trajectory_build(
         self,
         *,
@@ -504,6 +593,7 @@ class Store:
         )
         self._db.commit()
 
+    @_locked
     def drain_trajectory_build_queue(
         self, *, limit: int = 8, max_age_days: int = 30, max_entries_per_scope: int = 500,
     ) -> int:
@@ -552,6 +642,7 @@ class Store:
                 self._db.commit()
         return done
 
+    @_locked
     def _insert_trajectory_index(
         self,
         *,
@@ -583,6 +674,7 @@ class Store:
         self._prune_trajectory_scope(scope_key, max_age_days=max_age_days, max_entries=max_entries_per_scope)
         self._db.commit()
 
+    @_locked
     def _prune_trajectory_scope(
         self, scope_key: str, *, max_age_days: int, max_entries: int,
     ) -> None:
@@ -605,6 +697,7 @@ class Store:
                 (scope_key, overflow),
             )
 
+    @_locked
     def lookup_trajectory_index(
         self,
         *,
@@ -656,6 +749,7 @@ class Store:
             "match": match,
         }
 
+    @_locked
     def get_trajectory_index_by_run(self, source_run_id: str) -> dict[str, Any] | None:
         row = self._db.execute(
             "SELECT * FROM trajectory_index WHERE source_run_id=? ORDER BY indexed_at DESC LIMIT 1",

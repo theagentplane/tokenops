@@ -39,31 +39,31 @@ def run(goal: str, complete_fn):
     ),
     (
         "02-register-run",
-        "Step 1 — entry_task_run_scope (entry agent)",
+        "Step 1 — instrument_app + tokenops_run",
         '''\
-from tokenops.control import entry_task_run_scope
-from tokenops.control.context import current_registration
+from tokenops import ControlPlaneClient, instrument_app, tokenops_run
 
-# UI POST /v1/tasks with no run_id → entry registers via plane
-with entry_task_run_scope(store, headers=headers, payload=payload, service=AGENT):
-    reg = current_registration()
-    run_id = reg.run_id  # ControlPlaneClient → POST /v1/runs
+client = ControlPlaneClient.from_env()
+
+# UI POST /v1/tasks with task only → entry registers via plane
+with tokenops_run(client=client) as bound:
+    run_id = bound.registration.run_id
+
+instrument_app(app, service=AGENT, intent="triad_plan",
+               provider=cfg.provider, model=cfg.model)
 ''',
     ),
     (
         "03-governance-scope",
-        "Step 3 — governance_scope + shared store",
+        "Step 3 — bound handle (no nested scopes)",
         '''\
-with downstream_run_scope(store, headers=headers, service=AGENT):
-    attr = build_attribution(current_registration(), service=AGENT)
-    governor = build_governor(
-        store.governance_config_for(AGENT),
-        price, ApplyControls(),
-        store=store,  # shared SQLite ledger
-        enforce=True,
+with tokenops_run(client=client) as bound:
+    governed = wrap_complete(
+        bound.governor, bound.controls, bound.attr,
+        provider=cfg.provider, model=cfg.model,
+        dispatch=complete, service=AGENT,
     )
-    with governance_scope(governor, attr, provider=..., model=...):
-        ...
+    agent.run(..., complete_fn=governed)
 ''',
     ),
     (
@@ -74,7 +74,7 @@ from tokenops.control import wrap_complete
 from tokenops.providers import complete
 
 governed = wrap_complete(
-    governor, controls, attr,
+    bound.governor, bound.controls, bound.attr,
     provider=cfg.provider, model=cfg.model,
     dispatch=complete, service=AGENT,
 )
@@ -97,7 +97,7 @@ from tokenops.control import install_crossing_hook
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
 
-install_crossing_hook()  # once per process
+install_crossing_hook()  # once per process (also via instrument_app)
 ''',
     ),
 ]
@@ -172,14 +172,34 @@ def main() -> int:
         svg_path.write_text(svg, encoding="utf-8")
         print(f"wrote {svg_path.relative_to(ROOT)}")
 
-        png = _png_from_svg_like(code, title)
-        if png:
-            png_path = OUT / f"{slug}.png"
-            png_path.write_bytes(png)
-            print(f"wrote {png_path.relative_to(ROOT)}")
+        # PNG via subprocess so ImageFormatter/font SIGFPE cannot kill SVG writes.
+        import subprocess
+
+        probe = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from scripts.render_field_guide_snippets import SNIPPETS, _png_from_svg_like, OUT\n"
+                    f"slug, title, code = next(s for s in SNIPPETS if s[0] == {slug!r})\n"
+                    "code = code.rstrip() + chr(10)\n"
+                    "png = _png_from_svg_like(code, title)\n"
+                    "path = OUT / f'{slug}.png'\n"
+                    "import sys\n"
+                    "if png:\n"
+                    "    path.write_bytes(png)\n"
+                    "    print('wrote', path)\n"
+                    "else:\n"
+                    "    print('skip')\n"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
+        )
+        if probe.returncode == 0 and "wrote" in (probe.stdout or ""):
+            print(f"wrote docs/guides/assets/{slug}.png")
         else:
-            # Fallback: strip SVG to a minimal HTML screenshot is heavy;
-            # keep SVG as the committed visual when PNG fonts are missing.
             print(f"PNG not generated for {slug} (SVG only)", file=sys.stderr)
     return 0
 

@@ -7,6 +7,11 @@ exactly the brownfield control channel, with no change to agent logic.
 
 The adapter **duck-types** the step object (reads ``.action`` / ``.query`` / ``.tokens``),
 so ``tokenops.control`` never imports agent code — the dependency stays one-way.
+
+LLM path: ``wrap_complete`` / ``wrap_stream`` keep pre_call (MUTATE / HALT / RETRY) in
+TokenOps, but dispatch goes through Chronicle ``wrap_llm`` so LIVE record +
+``on_crossing`` fire. The TokenOps crossing hook projects crossings →
+``Governor.observe`` — do not also ``emit_observation`` here (double-billing).
 """
 
 from __future__ import annotations
@@ -16,10 +21,11 @@ import itertools
 import json
 from collections.abc import Callable, Sequence
 
+from chronicle import wrap_llm
+
 from tokenops.control.context import current_span
-from tokenops.control.boundary import emit_observation, observation_from_crossing
-from tokenops.control.context import current_governance, current_registration
 from tokenops.control.core import Attribution, CallRequest, Observation, Usage
+from tokenops.control.crossing import install_crossing_hook
 
 
 def tool_signature(name: str, args) -> str:
@@ -208,26 +214,18 @@ def wrap_complete(
     """Wrap a ``complete(provider, model, messages)`` entry point for **pre_call** governance
     and the **RETRY** actuator.
 
-    After each dispatch the model output is observed (where ``output_runaway`` fires). If a
-    policy sets ``controls.retry`` (degenerate output), the call is re-issued with a tighter
-    output cap and raised frequency/presence penalties — bounded by ``max_call_retries`` and
-    by the policy's own retry budget (it switches to INJECT once exhausted)."""
+    Dispatch is traced via Chronicle ``wrap_llm`` (LIVE envelope + ``on_crossing``).
+    TokenOps observes through the crossing hook — not a second ``emit_observation``.
+
+    After each traced dispatch, ``output_runaway`` may set ``controls.retry``; the call is
+    re-issued with a tighter output cap and raised frequency/presence penalties — bounded
+    by ``max_call_retries`` and by the policy's own retry budget (INJECT once exhausted).
+    """
+    install_crossing_hook()
     estimate = est_input_fn or _estimate_input_tokens
     seg = f"run:{attr.run_id}"
-
-    def _observe_llm(response, use_model, messages) -> None:
-        if current_governance() is not None and current_registration() is not None:
-            emit_observation(
-                observation_from_crossing(
-                    boundary_id=f"{service or attr.agent}.chat",
-                    kind="llm",
-                    service=service or attr.agent,
-                    input_state={"message_count": len(messages)},
-                    result=response,
-                    provider=provider,
-                    model=use_model,
-                )
-            )
+    boundary_id = f"{service or attr.agent}.chat"
+    traced = wrap_llm(boundary_id, dispatch)
 
     def governed(p: str, m: str, messages) -> object:
         controls.begin_call()
@@ -250,8 +248,8 @@ def wrap_complete(
             attempt = 0
             while True:
                 controls.retry = False
-                response = dispatch(p, use_model, messages, max_output_tokens=cap, **penalties)
-                _observe_llm(response, use_model, messages)  # may set controls.retry (RETRY)
+                # Chronicle records + on_crossing → Governor.observe (when bound)
+                response = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
                 if controls.retry and attempt < max_call_retries:
                     attempt += 1
                     cap = _tighten_cap(cap)
@@ -319,21 +317,30 @@ def wrap_stream(
     """Streaming variant of ``wrap_complete`` that owns the **CANCEL** actuator.
 
     Streams the visible output, and the moment it detects degeneration it **cancels the
-    stream mid-flight** (saving the rest of the tokens), then observes the partial output so
-    ``output_runaway`` decides RETRY (re-stream, tighter) or INJECT (after its budget). No
-    HALT — the breakers backstop any hard stop."""
+    stream mid-flight** (saving the rest of the tokens). The assembled result is traced
+    via Chronicle ``wrap_llm`` so ``on_crossing`` → ``output_runaway`` can RETRY
+    (re-stream, tighter) or INJECT. No HALT — the breakers backstop any hard stop.
+    """
+    install_crossing_hook()
     seg = f"run:{attr.run_id}"
     estimate = _estimate_input_tokens
+    boundary_id = f"{service or attr.agent}.chat"
+    cancel_flag = {"cancelled": False}
 
-    def _observe_llm(response, use_model, messages) -> None:
-        if current_governance() is not None and current_registration() is not None:
-            emit_observation(
-                observation_from_crossing(
-                    boundary_id=f"{service or attr.agent}.chat", kind="llm",
-                    service=service or attr.agent, input_state={"message_count": len(messages)},
-                    result=response, provider=provider, model=use_model,
-                )
-            )
+    def _stream_once(p, use_model, messages, max_output_tokens=None, **penalties):
+        cancelled, text = _stream_and_watch(
+            stream_dispatch, p, use_model, messages,
+            cap=max_output_tokens, penalties=penalties,
+            ngram=ngram, repeats=repeats, check_every=check_every,
+        )
+        cancel_flag["cancelled"] = cancelled
+        return _StreamResult(
+            content=text,
+            input_tokens=estimate(messages),
+            output_tokens=max(1, len(text) // 4),
+        )
+
+    traced = wrap_llm(boundary_id, _stream_once)
 
     def governed(p: str, m: str, messages) -> object:
         controls.begin_call()
@@ -354,16 +361,11 @@ def wrap_stream(
             attempt = 0
             while True:
                 controls.retry = False
-                cancelled, text = _stream_and_watch(
-                    stream_dispatch, p, use_model, messages, cap=cap, penalties=penalties,
-                    ngram=ngram, repeats=repeats, check_every=check_every,
-                )
-                if cancelled and on_cancel:
+                cancel_flag["cancelled"] = False
+                resp = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
+                if cancel_flag["cancelled"] and on_cancel:
                     on_cancel()
-                resp = _StreamResult(content=text, input_tokens=estimate(messages),
-                                     output_tokens=max(1, len(text) // 4))
-                _observe_llm(resp, use_model, messages)  # output_runaway → RETRY/INJECT
-                if (cancelled or controls.retry) and attempt < max_call_retries:
+                if (cancel_flag["cancelled"] or controls.retry) and attempt < max_call_retries:
                     attempt += 1
                     cap = _tighten_cap(cap)
                     penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}

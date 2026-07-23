@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from tokenops.control.attribution import _build_attribution
+
 import time
 
 import pytest
 
-from tokenops.control import ApplyControls, build_governor, build_attribution, wrap_complete
+from tokenops.control import ApplyControls, build_governor, wrap_complete
 from tokenops.control.core import BoundaryStep, Observation, Usage
 from tokenops.control.models import PolicyInstance, RunRecord, RunRegistration
 from tokenops.control.trajectory.enqueue import enqueue_completed_run
@@ -98,7 +100,7 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
     reg_b = store.register_run(
         RunRegistration(run_id="run-b", intent="pricing_research", user_dims={"user_id": "bob"}),
     )
-    attr_b = build_attribution(reg_b, service="research")
+    attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
         RunRecord(
             run_id="run-b", agent="research", status="running", task=PARAPHRASE,
@@ -136,7 +138,7 @@ def test_trajectory_hint_no_hint_on_cold_start(store):
     reg = store.register_run(
         RunRegistration(run_id="run-cold", intent="pricing_research", user_dims={"user_id": "carol"}),
     )
-    attr = build_attribution(reg, service="research")
+    attr = _build_attribution(reg, service="research")
     store.create_run(
         RunRecord(
             run_id="run-cold", agent="research", status="running",
@@ -179,7 +181,7 @@ def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
     reg_b = store.register_run(
         RunRegistration(run_id="run-b2", intent="pricing_research", user_dims={"user_id": "bob"}),
     )
-    attr_b = build_attribution(reg_b, service="research")
+    attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
         RunRecord(run_id="run-b2", agent="research", status="running", task=TASK, started_at=time.time()),
     )
