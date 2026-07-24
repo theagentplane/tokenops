@@ -6,6 +6,7 @@ import os
 
 from fastapi import FastAPI
 
+from tokenops import __version__
 from tokenops.control.http import mount_run_registration
 from tokenops.control.store import Store
 
@@ -23,7 +24,7 @@ def create_app(store: Store | None = None) -> FastAPI:
     """
     store = store or Store(os.environ.get("TOKENOPS_DB", "tokenops.db"))
 
-    app = FastAPI(title="TokenOps Control Plane", version="0.1.0")
+    app = FastAPI(title="TokenOps Control Plane", version=__version__)
     app.state.store = store
 
     @app.get("/health")
