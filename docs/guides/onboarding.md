@@ -132,7 +132,8 @@ The **agent** (via `instrument_app` / `tokenops_run` kwargs), not the UI. Client
 
 ### When do I need Chronicle `@boundary`?
 
-When tools (search, fetch, etc.) should appear on the ledger / be governed. Without `@boundary` + the crossing hook, TokenOps only sees LLM calls you put through `wrap_complete`.
+- **LLM calls:** `@boundary(..., kind="llm")` under `tokenops_run` runs **pre_call** (via `on_enter`) and observe — enough for LLM-only stacks without `wrap_complete`.
+- **Tools** (search, fetch, etc.): still need `@boundary` + the crossing hook so they appear on the ledger / are governed. Without that, TokenOps only sees LLM crossings you decorate (or put through `wrap_complete`).
 
 ### Embedded Store vs `TOKENOPS_URL`?
 
