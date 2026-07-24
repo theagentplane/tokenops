@@ -9,8 +9,7 @@ from chronicle import boundary
 from conftest import toy_price
 from tokenops.control import ApplyControls, Halt, build_governor, install_crossing_hook
 from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import clear, run_scope, _governance_scope
-from tokenops.control.context import SpanContext
+from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
