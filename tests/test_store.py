@@ -6,7 +6,14 @@ import pytest
 
 from conftest import toy_price
 from tokenops.control import build_governor
-from tokenops.control.models import BudgetSpec, PolicyInstance, RunRecord, Segment
+from tokenops.control.ledger import LIFETIME, RUN_TOTAL_BUDGET
+from tokenops.control.models import (
+    BudgetSpec,
+    PolicyInstance,
+    RunRecord,
+    RunRegistration,
+    Segment,
+)
 from tokenops.control.store import Store
 
 
@@ -75,6 +82,59 @@ def test_run_records_and_problematic_filter(store):
     problematic = store.list_runs(problematic_only=True)
     assert [r.run_id for r in problematic] == ["r2"]
     assert problematic[0].halt_reason == "budget exhausted"
+
+
+def test_register_run_creates_dashboard_row(store):
+    """Registration alone must surface on the Admin Dashboard (list_runs / get_run)."""
+    store.register_run(
+        RunRegistration(
+            run_id="reg-only",
+            intent="summarize",
+            user_dims={"team": "growth"},
+        )
+    )
+    got = store.get_run("reg-only")
+    assert got is not None
+    assert got.agent == "summarize"
+    assert got.status == "running"
+    assert got.task == "summarize"
+    assert got.dims == {"team": "growth"}
+    assert got.cost_micros == 0
+    listed = store.list_runs()
+    assert [r.run_id for r in listed] == ["reg-only"]
+
+    store.ledger_add_spent(RUN_TOTAL_BUDGET.budget_id, "run:reg-only", LIFETIME, 12_345)
+    assert store.get_run("reg-only").cost_micros == 12_345
+    assert store.list_runs()[0].cost_micros == 12_345
+
+    # Explicit create_run after register remains REPLACE-safe.
+    store.create_run(
+        RunRecord(
+            run_id="reg-only",
+            agent="summarize",
+            status="completed",
+            cost_micros=99,
+            dims={"team": "growth"},
+            task="summarize",
+        )
+    )
+    after = store.get_run("reg-only")
+    assert after.status == "completed"
+    assert after.cost_micros == 12_345  # ledger still overlays
+
+    store.ledger_mark_halted("reg-only", reason="budget exhausted")
+    halted = store.get_run("reg-only")
+    assert halted.status == "halted"
+    assert halted.halt_reason == "budget exhausted"
+
+    store.ledger_clear_halt("reg-only")
+    cleared = store.get_run("reg-only")
+    assert cleared.halt_reason is None
+    assert cleared.status == "halted"  # clear does not invent a new status
+
+    store.register_run(RunRegistration(run_id="no-intent"))
+    assert store.get_run("no-intent").agent == "agent"
+    assert store.get_run("no-intent").task is None
 
 
 def test_seed_default_governance_if_empty(tmp_path, monkeypatch):
