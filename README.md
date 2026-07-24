@@ -92,33 +92,37 @@ make db-reset          # optional: clean SQLite + seed governance from default.y
 make run               # control plane :7700 + Admin/Dashboard :8501
 ```
 
-Wire governance into an agent: `instrument_app` once, then `tokenops_run` per request.
-The UI sends **task only**; intent / mode come from agent config on `instrument_app`.
+**Platform surface** (framework-agnostic): open a run, wrap completions, propagate the run id.
+TokenOps does not require `agent.run`, A2A, or a particular HTTP helper.
 
 ```python
-from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import wrap_complete, with_governance_errors
+from tokenops import ControlPlaneClient, tokenops_run
+from tokenops.control import wrap_complete
 from tokenops.providers import complete
 
 client = ControlPlaneClient.from_env()  # TOKENOPS_URL or embedded Store
 
-async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-    with tokenops_run(client=client) as bound:
-        governed = wrap_complete(
-            bound.governor, bound.controls, bound.attr,
-            provider=provider, model=model,
-            dispatch=complete, service="planner",
-        )
-        run_agent(..., complete_fn=governed)
-
-app = create_a2a_app(..., handler=with_governance_errors(handler))
-instrument_app(app, service="planner", intent="triad_plan",
-               provider=provider, model=model)
+with tokenops_run(
+    client=client,
+    headers=incoming_headers,   # may include X-TokenOps-Run-Id
+    payload={"task": task},
+    service="myagent",
+    intent="my_intent",
+) as bound:
+    governed = wrap_complete(
+        bound.governor, bound.controls, bound.attr,
+        provider="openai", model="gpt-4o-mini",
+        dispatch=complete, service="myagent",
+    )
+    # Call governed(...) anywhere you would have called the model.
+    resp = governed("openai", "gpt-4o-mini", messages)
 ```
 
-**Non-FastAPI:** TokenOps does not yet ship middleware for other frameworks. Use
-`bind_request_context(RequestContext(headers=..., payload=..., service=...))` then
-`with tokenops_run():`, or pass those kwargs explicitly to `tokenops_run`.
+**FastAPI (optional):** `instrument_app(app, service=..., intent=..., provider=..., model=...)`
+once so middleware binds request context; then `with tokenops_run(client=client) as bound:` with fewer kwargs.
+
+**Non-FastAPI:** pass kwargs as above, or `bind_request_context(RequestContext(...))` then
+`tokenops_run(client=client)`.
 
 Point agents at the plane and share one DB:
 
@@ -129,7 +133,8 @@ make control-plane               # :7700
 make ui                          # Admin + Dashboard :8501
 ```
 
-New here? [Onboarding guide](docs/guides/onboarding.md) (prereqs, bare-min integrate, FAQ, current limits).
+New here? [Onboarding guide](docs/guides/onboarding.md) (platform integrate, FAQ, current limits).
+Demo/A2A bench shape is documented there as an appendix only.
 
 Full integration checklist: [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md) · triad deep dive: [`docs/guides/field-guide-add-tokenops.md`](docs/guides/field-guide-add-tokenops.md).
 
@@ -237,7 +242,7 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 
 ## Documentation
 
-- [Onboarding](docs/guides/onboarding.md) — prereqs, bare-min integrate, FAQ, current limits
+- [Onboarding](docs/guides/onboarding.md) — platform integrate, FAQ, current limits (demo shape is an appendix)
 - [Field guide](docs/guides/field-guide-add-tokenops.md) — triad deep dive + screenshots
 - [Control plane status](docs/control-plane-status.md)
 - [Architecture](docs/architecture.md)

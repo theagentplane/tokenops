@@ -13,9 +13,15 @@ description: >-
 
 Copyable procedure for GitHub Copilot, Claude Code, Cursor, or any assistant.
 
+- **Platform contract (read first):** [`docs/guides/onboarding.md`](../../docs/guides/onboarding.md)
 - **Core library:** [theagentplane/tokenops](https://github.com/theagentplane/tokenops) (`pip install`)
-- **Runnable reference (triad / two-agent):** in-repo `examples/triad/`, `examples/agents/` —
+- **Runnable reference only (triad / two-agent):** `examples/triad/`, `examples/agents/` —
   field guide `docs/guides/field-guide-add-tokenops.md`
+
+TokenOps does **not** require `agent.run`, `create_a2a_app`, or A2A. Those appear in
+`examples/` as one host shape. The platform surface is: `ControlPlaneClient` →
+`tokenops_run` → `wrap_complete` → propagate `X-TokenOps-Run-Id`.
+
 
 ## Plane vs agent (do not conflate)
 
@@ -46,38 +52,60 @@ hits that ledger once — **no parent cost rollup**.
 ## Checklist
 
 ```
-TokenOps integration:
-- [ ] 1. instrument_app(app, service=..., intent=..., provider=..., model=...)
-- [ ] 2. Handler: with tokenops_run(client=client) as bound:
-- [ ] 3. Propagate X-TokenOps-Run-Id (+ parent span) on every A2A hop
-- [ ] 4. LLM: wrap_complete(bound.governor, bound.controls, bound.attr, ...)
-- [ ] 5. Tools: Chronicle @boundary (+ crossing hook via instrument_app)
+TokenOps integration (platform):
+- [ ] 1. ControlPlaneClient.from_env()
+- [ ] 2. with tokenops_run(...) as bound:   # register-or-join
+- [ ] 3. governed = wrap_complete(bound.governor, bound.controls, bound.attr, ...)
+- [ ] 4. Call governed(...) wherever you call the model (any framework)
+- [ ] 5. Propagate X-TokenOps-Run-Id (+ parent span) on every hop
 - [ ] 6. Do NOT re-bill child spend on the parent (shared ledger already has it)
-- [ ] 7. Keep agent.py vanilla (injectable complete_fn / tools)
-- [ ] 8. UI sends task only; agent owns intent/mode
+- [ ] 7. Agent owns intent/mode; callers send work (task) only
+Optional:
+- [ ] instrument_app (FastAPI RequestContext + crossing hook)
+- [ ] Chronicle @boundary on tools
+- [ ] with_governance_errors only if you want Halt/Throttled → HTTP JSON
 ```
 
-## Step 1 — Instrument + tokenops_run
+## Step 1 — tokenops_run + wrap_complete (required)
 
 ```python
-from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import wrap_complete, with_governance_errors
+from tokenops import ControlPlaneClient, tokenops_run
+from tokenops.control import wrap_complete
 from tokenops.providers import complete
 
 client = ControlPlaneClient.from_env()
 
-async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-    with tokenops_run(client=client) as bound:
-        governed = wrap_complete(
-            bound.governor, bound.controls, bound.attr,
-            provider=cfg.provider, model=cfg.model,
-            dispatch=complete, service=AGENT,
-        )
-        agent.run(..., complete_fn=governed)
+with tokenops_run(
+    client=client,
+    headers=incoming_headers,
+    payload=payload,
+    service=AGENT,
+    intent="triad_plan",
+) as bound:
+    governed = wrap_complete(
+        bound.governor, bound.controls, bound.attr,
+        provider=cfg.provider, model=cfg.model,
+        dispatch=complete, service=AGENT,
+    )
+    resp = governed(cfg.provider, cfg.model, messages)
+```
 
-app = create_a2a_app(..., handler=with_governance_errors(handler))
+### FastAPI (optional)
+
+```python
+from tokenops import instrument_app
+
 instrument_app(app, service=AGENT, intent="triad_plan",
                provider=cfg.provider, model=cfg.model)
+# then: with tokenops_run(client=client) as bound:  # context from middleware
+```
+
+### Demo / A2A host shape (examples only — not required)
+
+```python
+from tokenops.control import with_governance_errors
+# examples.a2a.server.create_a2a_app + handler=with_governance_errors(...)
+# injectable agent.run(..., complete_fn=governed) — local bench convention
 ```
 
 UI / bench clients should **not** call `/v1/runs` for the default flow — see
@@ -127,7 +155,8 @@ governed = wrap_complete(
     provider=cfg.provider, model=cfg.model,
     dispatch=complete, service=AGENT,
 )
-agent.run(..., complete_fn=governed)
+resp = governed(cfg.provider, cfg.model, messages)
+# Or inject governed into your framework — no required agent.run API.
 ```
 
 ## Step 5 — Tool boundaries + crossing hook
