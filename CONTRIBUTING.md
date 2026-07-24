@@ -19,7 +19,7 @@ cp .env.example .env  # optional API keys for live demos
 Install [Git LFS](https://git-lfs.com) if you need local copies of demo videos /
 the product deck (tracked as LFS pointers).
 
-Optional local hooks (same checks as CI):
+Optional local hooks (same checks as CI — ruff + mypy):
 
 ```bash
 pre-commit install
