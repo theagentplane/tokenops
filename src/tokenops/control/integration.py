@@ -233,38 +233,44 @@ def wrap_complete(
     traced = wrap_llm(boundary_id, dispatch)
 
     def governed(p: str, m: str, messages) -> object:
-        controls.begin_call()
-        request = CallRequest(
-            attr=attr,
-            provider=provider,
-            model=m,
-            estimated_input_tokens=estimate(messages),
-            max_output_tokens=controls.call.max_output_tokens,
-        )
-        governor.pre_call(request)
+        from tokenops.control.crossing import reset_wrap_owns_precall, wrap_owns_precall
 
-        use_model = controls.call.model_override or m
-        messages = consume_carry(controls, messages)
-        if controls.call.compact:  # deep prompt compaction
-            messages = _compact_messages(messages)
-
-        governor.ledger.admit(seg)
+        owns = wrap_owns_precall(True)
         try:
-            cap = controls.call.max_output_tokens
-            penalties: dict = {}
-            attempt = 0
-            while True:
-                controls.retry = False
-                # Chronicle records + on_crossing → Governor.observe (when bound)
-                response = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
-                if controls.retry and attempt < max_call_retries:
-                    attempt += 1
-                    cap = _tighten_cap(cap)
-                    penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}
-                    continue
-                return response
+            controls.begin_call()
+            request = CallRequest(
+                attr=attr,
+                provider=provider,
+                model=m,
+                estimated_input_tokens=estimate(messages),
+                max_output_tokens=controls.call.max_output_tokens,
+            )
+            governor.pre_call(request)
+
+            use_model = controls.call.model_override or m
+            messages = consume_carry(controls, messages)
+            if controls.call.compact:  # deep prompt compaction
+                messages = _compact_messages(messages)
+
+            governor.ledger.admit(seg)
+            try:
+                cap = controls.call.max_output_tokens
+                penalties: dict = {}
+                attempt = 0
+                while True:
+                    controls.retry = False
+                    # Chronicle records + on_crossing → Governor.observe (when bound)
+                    response = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
+                    if controls.retry and attempt < max_call_retries:
+                        attempt += 1
+                        cap = _tighten_cap(cap)
+                        penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}
+                        continue
+                    return response
+            finally:
+                governor.ledger.complete(seg)
         finally:
-            governor.ledger.complete(seg)
+            reset_wrap_owns_precall(owns)
 
     return governed
 
@@ -366,39 +372,45 @@ def wrap_stream(
     traced = wrap_llm(boundary_id, _stream_once)
 
     def governed(p: str, m: str, messages) -> object:
-        controls.begin_call()
-        governor.pre_call(
-            CallRequest(
-                attr=attr,
-                provider=provider,
-                model=m,
-                estimated_input_tokens=estimate(messages),
-                max_output_tokens=controls.call.max_output_tokens,
-            )
-        )
-        use_model = controls.call.model_override or m
-        messages = consume_carry(controls, messages)
-        if controls.call.compact:  # deep prompt compaction
-            messages = _compact_messages(messages)
+        from tokenops.control.crossing import reset_wrap_owns_precall, wrap_owns_precall
 
-        governor.ledger.admit(seg)
+        owns = wrap_owns_precall(True)
         try:
-            cap = controls.call.max_output_tokens
-            penalties: dict = {}
-            attempt = 0
-            while True:
-                controls.retry = False
-                cancel_flag["cancelled"] = False
-                resp = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
-                if cancel_flag["cancelled"] and on_cancel:
-                    on_cancel()
-                if (cancel_flag["cancelled"] or controls.retry) and attempt < max_call_retries:
-                    attempt += 1
-                    cap = _tighten_cap(cap)
-                    penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}
-                    continue
-                return resp
+            controls.begin_call()
+            governor.pre_call(
+                CallRequest(
+                    attr=attr,
+                    provider=provider,
+                    model=m,
+                    estimated_input_tokens=estimate(messages),
+                    max_output_tokens=controls.call.max_output_tokens,
+                )
+            )
+            use_model = controls.call.model_override or m
+            messages = consume_carry(controls, messages)
+            if controls.call.compact:  # deep prompt compaction
+                messages = _compact_messages(messages)
+
+            governor.ledger.admit(seg)
+            try:
+                cap = controls.call.max_output_tokens
+                penalties: dict = {}
+                attempt = 0
+                while True:
+                    controls.retry = False
+                    cancel_flag["cancelled"] = False
+                    resp = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
+                    if cancel_flag["cancelled"] and on_cancel:
+                        on_cancel()
+                    if (cancel_flag["cancelled"] or controls.retry) and attempt < max_call_retries:
+                        attempt += 1
+                        cap = _tighten_cap(cap)
+                        penalties = {"frequency_penalty": 1.0, "presence_penalty": 0.6}
+                        continue
+                    return resp
+            finally:
+                governor.ledger.complete(seg)
         finally:
-            governor.ledger.complete(seg)
+            reset_wrap_owns_precall(owns)
 
     return governed
