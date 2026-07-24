@@ -32,6 +32,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any, TypeVar
 
+from tokenops.control.ledger import LIFETIME, RUN_TOTAL_BUDGET
 from tokenops.control.models import (
     BudgetSpec,
     PolicyInstance,
@@ -377,6 +378,18 @@ class Store:
             (reg.run_id, reg.intent, json.dumps(reg.user_dims), reg.mode.value, time.time()),
         )
         self._db.commit()
+        # Dashboard reads ``runs``; registration alone must make the run visible.
+        # Explicit create_run/update_run remain for richer status/cost/steps (REPLACE-safe).
+        agent = reg.intent or "agent"
+        self.create_run(
+            RunRecord(
+                run_id=reg.run_id,
+                agent=agent,
+                status="running",
+                dims=dict(reg.user_dims),
+                task=reg.intent or None,
+            )
+        )
         return reg
 
     @_locked
@@ -484,7 +497,7 @@ class Store:
     @_locked
     def get_run(self, run_id: str) -> RunRecord | None:
         row = self._db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
-        return _run(row) if row else None
+        return self._run_with_ledger_cost(row) if row else None
 
     @_locked
     def list_runs(self, *, problematic_only: bool = False, limit: int = 200) -> list[RunRecord]:
@@ -492,7 +505,19 @@ class Store:
         if problematic_only:
             sql += " WHERE status IN ('halted','throttled','error')"
         sql += " ORDER BY started_at DESC LIMIT ?"
-        return [_run(r) for r in self._db.execute(sql, (limit,))]
+        return [self._run_with_ledger_cost(r) for r in self._db.execute(sql, (limit,))]
+
+    def _run_with_ledger_cost(self, row: sqlite3.Row) -> RunRecord:
+        """Build a RunRecord; prefer ``__run_total__`` ledger spend when present."""
+        rec = _run(row)
+        spent_row = self._db.execute(
+            "SELECT spent_micros FROM ledger_spent "
+            "WHERE budget_id=? AND segment_key=? AND period=?",
+            (RUN_TOTAL_BUDGET.budget_id, f"run:{rec.run_id}", LIFETIME),
+        ).fetchone()
+        if spent_row is not None:
+            rec.cost_micros = int(spent_row[0])
+        return rec
 
     @_locked
     def run_tag_keys(self, *, limit: int = 500) -> list[str]:
@@ -581,6 +606,11 @@ class Store:
             "halt_reason=COALESCE(excluded.halt_reason, ledger_halt.halt_reason)",
             (run_id, reason or None),
         )
+        # Keep dashboard row in sync when present; ignore missing runs rows.
+        self._db.execute(
+            "UPDATE runs SET status='halted', halt_reason=? WHERE run_id=?",
+            (reason or None, run_id),
+        )
         self._db.commit()
 
     @_locked
@@ -604,6 +634,11 @@ class Store:
         self._db.execute(
             "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 0, NULL) "
             "ON CONFLICT(run_id) DO UPDATE SET halted=0, halt_reason=NULL",
+            (run_id,),
+        )
+        # Clear halt_reason only — do not invent a completed/running status.
+        self._db.execute(
+            "UPDATE runs SET halt_reason=NULL WHERE run_id=?",
             (run_id,),
         )
         self._db.commit()

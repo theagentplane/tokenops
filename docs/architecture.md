@@ -71,7 +71,8 @@ graph TD
 UI: POST /v1/tasks  (task only; no run_id)
   ├─ instrument_app binds RequestContext (service, intent, provider, model)
   ├─ with tokenops_run(client=…):  →  register-or-join + SpanContext + governance
-  ├─ store/client.create_run(RunRecord status="running")
+  │     register_run also upserts a dashboard runs row (status="running")
+  ├─ optional create_run/update_run for richer status/cost/steps (not required for visibility)
   │
   ├─ agent.run(…, complete_fn=wrap_complete(bound.…))
   │     pre_call  → worst-case / concurrency detectors

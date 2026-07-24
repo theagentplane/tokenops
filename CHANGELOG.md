@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-24
+
+### Fixed
+
+- `register_run` now upserts a dashboard `runs` row so Admin list/detail show the run
+  without a separate `create_run`. Ledger spend overlays `cost_micros`; halt/clear
+  keep the dashboard row in sync.
+
 ## [0.1.2] - 2026-07-24
 
 ### Added
