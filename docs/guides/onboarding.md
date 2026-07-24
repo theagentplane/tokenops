@@ -29,7 +29,7 @@ Chronicle records decision boundaries; TokenOps observes them for cost/governanc
 | Need | Notes |
 |------|--------|
 | **Python 3.10+** | Required |
-| **`pip install agent-tokenops`** | Import is still `tokenops`. Pulls Chronicle ≥0.1.3, FastAPI, httpx, provider clients, etc. |
+| **`pip install agent-tokenops`** | Import is still `tokenops`. Pulls Chronicle ≥0.2.0, FastAPI, httpx, provider clients, etc. |
 | **Control plane + shared DB** *(multi-process)* | `TOKENOPS_URL` (e.g. `http://localhost:7700`) and `TOKENOPS_DB` shared by plane + agents. Seed governance once (`make db-reset`). |
 | **Or embedded Store** *(single-process / tests)* | Omit `TOKENOPS_URL` or set `TOKENOPS_EMBEDDED=1`. |
 | **LLM API keys** | Only for real model calls — not required for TokenOps itself or offline tests. |
