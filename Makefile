@@ -19,7 +19,7 @@ install:
 lint:
 	$(PYTHON) -m ruff check src tests examples
 	$(PYTHON) -m ruff format --check src tests examples
-	$(PYTHON) -m mypy
+	$(PYTHON) -m mypy --python-version $$( $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])' )
 
 format:
 	$(PYTHON) -m ruff check --fix src tests examples
