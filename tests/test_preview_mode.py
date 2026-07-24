@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
 import pytest
 
 from tokenops.control import (
@@ -13,6 +11,7 @@ from tokenops.control import (
     build_governance_stack,
     wrap_complete,
 )
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import GovernanceMode, PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
@@ -50,16 +49,23 @@ def test_preview_mode_records_actions_without_halting(store):
     )
     cfg = store.governance_config_for("research")
     gov, controls = build_governance_stack(
-        cfg, build_price_book(), store=store, mode=GovernanceMode.PREVIEW,
+        cfg,
+        build_price_book(),
+        store=store,
+        mode=GovernanceMode.PREVIEW,
     )
     assert isinstance(controls, PreviewControls)
     gov.ledger.open_run("preview-run")
 
     attr = _build_attribution(reg, service="research")
     governed = wrap_complete(
-        gov, controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_complete, service="research",
+        gov,
+        controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_complete,
+        service="research",
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
@@ -76,15 +82,22 @@ def test_enforce_mode_still_halts(store):
     reg = store.register_run(RunRegistration(run_id="enforce-run", intent="demo"))
     cfg = store.governance_config_for("research")
     gov, controls = build_governance_stack(
-        cfg, build_price_book(), store=store, mode=GovernanceMode.ENFORCE,
+        cfg,
+        build_price_book(),
+        store=store,
+        mode=GovernanceMode.ENFORCE,
     )
     gov.ledger.open_run("enforce-run")
 
     attr = _build_attribution(reg, service="research")
     governed = wrap_complete(
-        gov, controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_complete, service="research",
+        gov,
+        controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_complete,
+        service="research",
     )
 
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
@@ -97,7 +110,7 @@ def test_enforce_mode_still_halts(store):
 
 
 def test_registration_persists_mode(store):
-    reg = store.register_run(
+    store.register_run(
         RunRegistration(run_id="r-mode", intent="x", mode=GovernanceMode.PREVIEW),
     )
     loaded = store.resolve_run("r-mode")

@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind
 from tokenops.control.policies import tool_output_cap
 from tokenops.control.policies._util import est_tokens
-from conftest import make_attr, make_step, FakeView
 
 
 def test_large_structured_payload_offloaded():
     det, pol = tool_output_cap.build(cap_tokens=100)
     big = {"rows": [{"k": i, "v": "x" * 20} for i in range(100)]}
     assert est_tokens(big) >= 100  # structured → /2.8
-    sig = det.observe(make_attr(), make_step(node_type="tool", boundary_id="search", output=big), FakeView())
+    sig = det.observe(
+        make_attr(), make_step(node_type="tool", boundary_id="search", output=big), FakeView()
+    )
     assert sig.severity.value == "warn"
     action = pol.decide(sig, FakeView())
     assert action.kind is ActionKind.INJECT and "handle=store://" in action.inject_message
@@ -20,8 +22,18 @@ def test_large_structured_payload_offloaded():
 
 def test_small_payload_passes():
     det, _ = tool_output_cap.build(cap_tokens=8000)
-    assert det.observe(make_attr(), make_step(node_type="tool", boundary_id="search",
-                                              output={"snippet": "ok", "completeness": 0.9}), FakeView()) is None
+    assert (
+        det.observe(
+            make_attr(),
+            make_step(
+                node_type="tool",
+                boundary_id="search",
+                output={"snippet": "ok", "completeness": 0.9},
+            ),
+            FakeView(),
+        )
+        is None
+    )
 
 
 def test_divisor_is_content_aware():
@@ -32,4 +44,7 @@ def test_divisor_is_content_aware():
 
 def test_only_tool_nodes():
     det, _ = tool_output_cap.build(cap_tokens=1)
-    assert det.observe(make_attr(), make_step(node_type="llm", output={"text": "x" * 999}), FakeView()) is None
+    assert (
+        det.observe(make_attr(), make_step(node_type="llm", output={"text": "x" * 999}), FakeView())
+        is None
+    )

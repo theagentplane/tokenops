@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Mapping
+from collections.abc import Mapping
 
 from examples.a2a.messages import parse_findings
 from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.types import StepEvent, TokenUsage
+from examples.app_config import load_config
 from examples.triad.messages import parse_outline, parse_questions, write_response
 from examples.triad.writer.agent import WriterAgent
-
-from examples.app_config import load_config
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
 from tokenops.control import (
     Halt,
@@ -65,14 +64,25 @@ def build_app():
                 token_usage.output_tokens += event.tokens.output_tokens
 
             governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=complete, service=AGENT,
+                governor,
+                controls,
+                attr,
+                provider=cfg.provider,
+                model=cfg.model,
+                dispatch=complete,
+                service=AGENT,
             )
 
             status, halt_reason, answer = "completed", None, ""
             try:
                 answer = await asyncio.to_thread(
-                    agent.run, task, findings, outline, questions, on_step, governed,
+                    agent.run,
+                    task,
+                    findings,
+                    outline,
+                    questions,
+                    on_step,
+                    governed,
                 )
             except Halt as halt:
                 status, halt_reason = "halted", halt.action.reason
@@ -89,7 +99,10 @@ def build_app():
                 )
 
             response = write_response(
-                answer, token_usage, steps, cost_micros=governor.ledger.cost_micros(run_id),
+                answer,
+                token_usage,
+                steps,
+                cost_micros=governor.ledger.cost_micros(run_id),
             )
             response.update(run_id=run_id, status=status)
             if halt_reason:

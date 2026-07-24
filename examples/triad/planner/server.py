@@ -13,22 +13,22 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Mapping
+from collections.abc import Mapping
+
+from chronicle.session import reset_session
 
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.types import StepEvent, TokenUsage
+from examples.app_config import load_config
 from examples.triad.client import delegate_researcher, delegate_writer
 from examples.triad.messages import plan_response
 from examples.triad.planner.agent import PlannerAgent
-from chronicle.session import reset_session
-
-from examples.app_config import load_config
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
 from tokenops.control import (
-    Halt,
     Action,
     ActionKind,
+    Halt,
     governance_events_payload,
     halt_detector_from_events,
     mount_run_registration,
@@ -83,8 +83,13 @@ def build_app():
                 token_usage.output_tokens += event.tokens.output_tokens
 
             governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=complete, service=AGENT,
+                governor,
+                controls,
+                attr,
+                provider=cfg.provider,
+                model=cfg.model,
+                dispatch=complete,
+                service=AGENT,
             )
 
             status, halt_reason = "completed", None
@@ -95,7 +100,10 @@ def build_app():
 
             try:
                 questions, outline = await asyncio.to_thread(
-                    agent.run, goal, on_step, governed,
+                    agent.run,
+                    goal,
+                    on_step,
+                    governed,
                 )
                 steps.append(
                     StepEvent(
@@ -105,16 +113,18 @@ def build_app():
                     )
                 )
                 remaining = governor.ledger.budget_left(
-                    "run_llm_cap", f"run:{run_id}", LIFETIME,
+                    "run_llm_cap",
+                    f"run:{run_id}",
+                    LIFETIME,
                 )
-                if (
-                    "run_llm_cap" in governor.ledger._budget_by_id
-                    and remaining <= 0
-                ):
-                    raise Halt(Action(
-                        kind=ActionKind.HALT, run_id=run_id,
-                        reason="no budget remaining; refusing to delegate",
-                    ))
+                if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
+                    raise Halt(
+                        Action(
+                            kind=ActionKind.HALT,
+                            run_id=run_id,
+                            reason="no budget remaining; refusing to delegate",
+                        )
+                    )
 
                 findings, res_tokens, res_steps, _res_cost = await delegate_researcher(
                     cfg.researcher_url,
@@ -134,16 +144,18 @@ def build_app():
                     )
                 )
                 remaining = governor.ledger.budget_left(
-                    "run_llm_cap", f"run:{run_id}", LIFETIME,
+                    "run_llm_cap",
+                    f"run:{run_id}",
+                    LIFETIME,
                 )
-                if (
-                    "run_llm_cap" in governor.ledger._budget_by_id
-                    and remaining <= 0
-                ):
-                    raise Halt(Action(
-                        kind=ActionKind.HALT, run_id=run_id,
-                        reason="no budget remaining; refusing to delegate to writer",
-                    ))
+                if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
+                    raise Halt(
+                        Action(
+                            kind=ActionKind.HALT,
+                            run_id=run_id,
+                            reason="no budget remaining; refusing to delegate to writer",
+                        )
+                    )
 
                 answer, wr_tokens, wr_steps, _wr_cost = await delegate_writer(
                     cfg.writer_url,

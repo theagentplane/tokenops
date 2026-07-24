@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from conftest import toy_price
 from tokenops.control.config import build_governor
 from tokenops.control.models import BudgetSpec, PolicyInstance
 from tokenops.control.store import Store
-from conftest import toy_price
 
 
 def test_governance_config_for_filters_by_agent(tmp_path):

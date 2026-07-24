@@ -6,7 +6,8 @@ wrap handlers here so Halt/Throttled map to HTTP responses.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any
 
 import httpx
 from chronicle.session import reset_session
@@ -15,7 +16,11 @@ from fastapi.responses import JSONResponse, Response
 
 from tokenops.control.core import Halt
 from tokenops.control.engine import Throttled
-from tokenops.control.models import RunAlreadyRegisteredError, RunRegistration, parse_governance_mode
+from tokenops.control.models import (
+    RunAlreadyRegisteredError,
+    RunRegistration,
+    parse_governance_mode,
+)
 from tokenops.control.store import Store, new_id
 
 Handler = Callable[[dict[str, Any], Mapping[str, str]], Awaitable[dict[str, Any] | Response]]
@@ -44,7 +49,10 @@ def mount_run_registration(app: FastAPI, store: Store) -> None:
         try:
             reg = store.register_run(
                 RunRegistration(
-                    run_id=run_id, intent=intent, user_dims=user_dims, mode=mode,
+                    run_id=run_id,
+                    intent=intent,
+                    user_dims=user_dims,
+                    mode=mode,
                 )
             )
         except RunAlreadyRegisteredError as exc:
@@ -60,7 +68,8 @@ def with_governance_errors(handler: Handler) -> Handler:
     """Wrap a task handler so Halt → 200 halted and Throttled → 429."""
 
     async def wrapped(
-        payload: dict[str, Any], headers: Mapping[str, str],
+        payload: dict[str, Any],
+        headers: Mapping[str, str],
     ) -> dict[str, Any] | Response:
         try:
             return await handler(payload, headers)

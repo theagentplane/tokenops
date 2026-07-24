@@ -68,11 +68,16 @@ class ToolFixDetector(Detector):
         suggestion = did_you_mean(name, self.registry)
         sev = Severity.TRIP if count >= self.k else Severity.WARN
         return Signal(
-            detector=self.name, severity=sev, run_id=attr.run_id,
+            detector=self.name,
+            severity=sev,
+            run_id=attr.run_id,
             reason=f"invalid tool call '{name}' ({problem}); attempt {count}/{self.k}",
             evidence={
-                "name": name, "problem": problem, "count": count,
-                "did_you_mean": suggestion, "available_tools": sorted(self.registry),
+                "name": name,
+                "problem": problem,
+                "count": count,
+                "did_you_mean": suggestion,
+                "available_tools": sorted(self.registry),
             },
         )
 
@@ -82,12 +87,17 @@ class ToolFixPolicy(Policy):
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         if signal.severity is Severity.TRIP:
-            return Action(kind=ActionKind.HALT, run_id=signal.run_id,
-                          reason=f"tool_fix: {signal.evidence['count']} identical bad calls — halting")
+            return Action(
+                kind=ActionKind.HALT,
+                run_id=signal.run_id,
+                reason=f"tool_fix: {signal.evidence['count']} identical bad calls — halting",
+            )
         ev = signal.evidence
         hint = f" did_you_mean={ev['did_you_mean']}" if ev.get("did_you_mean") else ""
         return Action(
-            kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.INJECT,
+            run_id=signal.run_id,
+            reason=signal.reason,
             replace_tool_result=True,  # deep: substitute the synthetic error for the bad tool's result
             inject_message=(
                 f"ERROR: {ev['problem']} for tool '{ev['name']}'.{hint} "

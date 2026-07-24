@@ -16,6 +16,6 @@ Canonical per-policy docs live under [`docs/policies/`](../policies/). Product o
 | `output_runaway` | [output_runaway.md](../policies/output_runaway.md) |
 | `trajectory_hint` | [trajectory_hint.md](../policies/trajectory_hint.md) |
 
-Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE): see [`CONTROL_PLANE.md`](../../CONTROL_PLANE.md) and [`docs/governance-policy.md`](../governance-policy.md).
+Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE): see [`docs/control-plane-status.md`](../control-plane-status.md) and [`docs/governance-policy.md`](../governance-policy.md).
 
 [Principles](./principles.md) · [Comparison](./comparison.md) · [Shared ledger](./shared-ledger.md)

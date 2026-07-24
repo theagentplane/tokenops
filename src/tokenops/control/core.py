@@ -21,9 +21,10 @@ Design rules:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Mapping, Protocol, Sequence, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 __all__ = [
     "Micros",
@@ -56,6 +57,7 @@ NodeType = Literal["llm", "tool", "delegate"]
 # =========================================================================== #
 # Value objects                                                               #
 # =========================================================================== #
+
 
 @dataclass(frozen=True, kw_only=True)
 class Usage:
@@ -100,6 +102,7 @@ class Attribution:
 # =========================================================================== #
 # Telemetry: Observation (IN) -> BoundaryStep (stored)                         #
 # =========================================================================== #
+
 
 @dataclass(frozen=True, kw_only=True)
 class Observation:
@@ -171,6 +174,7 @@ class CallRequest:
 # =========================================================================== #
 # Decisions: Signal (detect) -> Action (decide) -> apply (OUT)                 #
 # =========================================================================== #
+
 
 class Severity(str, Enum):
     """How strongly a detector reacts. ``WARN`` invites a corrective response;
@@ -246,6 +250,7 @@ class Halt(BaseException):
 # Read-only ledger view (Attribute -> Enforce)                                 #
 # =========================================================================== #
 
+
 @runtime_checkable
 class LedgerView(Protocol):
     """Read-only run state Attribute hands to Enforce. Detectors read, never write.
@@ -276,6 +281,7 @@ class LedgerView(Protocol):
 # =========================================================================== #
 # Extension points: Detector, Policy (ABCs with no-op defaults)                #
 # =========================================================================== #
+
 
 class Detector(ABC):
     """A breaker / signal source. Each hook is ``(input, read-only view) -> Signal | None``.

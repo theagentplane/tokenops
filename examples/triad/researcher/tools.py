@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+
+from chronicle import InputState, boundary
 
 from examples.agents.research.tools import core
 from examples.agents.types import CorpusProfile, StepCallback, StepEvent
-from chronicle import InputState, boundary
 
 
 def make_search_tool(

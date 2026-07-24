@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind
 from tokenops.control.policies import tool_fix
-from conftest import make_attr, make_step, FakeView
 
 
 def _tool_step(name, args=None):

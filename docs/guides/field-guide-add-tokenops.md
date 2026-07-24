@@ -4,7 +4,7 @@ This walkthrough mirrors how TokenOps was wired into the **Planner → Researche
 bench under [`examples/triad/`](../../examples/triad/). Code screenshots below were generated with
 `python scripts/render_field_guide_snippets.py` → [`docs/guides/assets/`](assets/).
 
-Related docs: [CONTROL_PLANE.md](../../CONTROL_PLANE.md),
+Related docs: [control-plane status](../control-plane-status.md),
 [control-plane-deploy.md](../control-plane-deploy.md),
 [run-attribution.md](../run-attribution.md).
 Copilot skill: [integrate-tokenops](../../.cursor/skills/integrate-tokenops/SKILL.md).

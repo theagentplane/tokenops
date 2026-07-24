@@ -45,6 +45,7 @@ docker compose -f docker-compose.examples.yml -f docker-compose.triad.yml up --b
 
 ```
 examples/
+  run.py / run_triad.py / run_brief.py  # demo orchestrators (make demo*)
   a2a/          # shared HTTP helpers
   agents/       # research + summarize
   triad/        # planner + researcher + writer

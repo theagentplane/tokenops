@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tokenops.env import load_env
 from examples.app_config import load_config
+from tokenops.env import load_env
 
 load_env()
 

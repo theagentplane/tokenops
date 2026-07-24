@@ -5,14 +5,18 @@ from __future__ import annotations
 import pytest
 
 from tokenops.control.attribution import (
+    _build_attribution,
     begin_downstream_run,
     begin_entry_run,
-    _build_attribution,
     require_registration,
 )
 from tokenops.control.context import RUN_ID_HEADER, clear, current_registration, current_span
 from tokenops.control.integration import step_to_observation
-from tokenops.control.models import RunAlreadyRegisteredError, RunNotRegisteredError, RunRegistration
+from tokenops.control.models import (
+    RunAlreadyRegisteredError,
+    RunNotRegisteredError,
+    RunRegistration,
+)
 from tokenops.control.store import Store
 
 
@@ -24,7 +28,9 @@ def store(tmp_path):
 
 
 def test_register_and_resolve(store):
-    reg = store.register_run(RunRegistration(run_id="r1", intent="frontier", user_dims={"Country": "US"}))
+    reg = store.register_run(
+        RunRegistration(run_id="r1", intent="frontier", user_dims={"Country": "US"})
+    )
     assert reg.intent == "frontier"
     resolved = store.resolve_run("r1")
     assert resolved.user_dims["Country"] == "US"
@@ -84,7 +90,9 @@ def test_begin_downstream_resolves_registration(store):
 
 
 def test_build_attribution_maps_service_and_user_dims(store):
-    reg = RunRegistration(run_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"})
+    reg = RunRegistration(
+        run_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"}
+    )
     attr = _build_attribution(reg, service="research")
     assert attr.run_id == "r1"
     assert attr.agent == "research"
@@ -104,8 +112,15 @@ def test_step_to_observation_boundary_tags():
 
     from conftest import make_attr
 
-    step = SimpleNamespace(action="model", agent="research", detail="d", tokens=SimpleNamespace(input_tokens=1, output_tokens=2))
-    obs = step_to_observation(step, make_attr(), ts=1.0, provider="openai", model="gpt-4o-mini", service="research")
+    step = SimpleNamespace(
+        action="model",
+        agent="research",
+        detail="d",
+        tokens=SimpleNamespace(input_tokens=1, output_tokens=2),
+    )
+    obs = step_to_observation(
+        step, make_attr(), ts=1.0, provider="openai", model="gpt-4o-mini", service="research"
+    )
     assert obs.boundary_tags["node_type"] == "llm"
     assert obs.boundary_tags["provider"] == "openai"
     assert obs.boundary_tags["model"] == "gpt-4o-mini"

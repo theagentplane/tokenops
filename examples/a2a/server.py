@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any
 
 import httpx
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-import uvicorn
 
 from examples.a2a.cards import agent_card
 

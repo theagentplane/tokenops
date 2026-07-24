@@ -38,17 +38,26 @@ class ContextCompactionDetector(Detector):
 
     def pre_call(self, request: CallRequest, view: LedgerView) -> Signal | None:
         est = request.estimated_input_tokens
-        recent_llm = [s for s in view.recent(request.attr.run_id, self.window)
-                      if s.node_type == "llm" and s.usage is not None]
-        rising = (
-            len(recent_llm) >= 2
-            and all(a.usage.input <= b.usage.input for a, b in zip(recent_llm, recent_llm[1:]))
-            and recent_llm[-1].usage.input > recent_llm[0].usage.input
-        )
+        recent_llm = [
+            s
+            for s in view.recent(request.attr.run_id, self.window)
+            if s.node_type == "llm" and s.usage is not None
+        ]
+        rising = False
+        if len(recent_llm) >= 2:
+            rising = all(
+                (a.usage.input if a.usage else 0) <= (b.usage.input if b.usage else 0)
+                for a, b in zip(recent_llm, recent_llm[1:])
+            ) and (recent_llm[-1].usage.input if recent_llm[-1].usage else 0) > (
+                recent_llm[0].usage.input if recent_llm[0].usage else 0
+            )
         if est >= self.ctx_max or (rising and est >= self.ctx_max // 2):
             return Signal(
-                detector=self.name, severity=Severity.WARN, run_id=request.attr.run_id,
-                reason=f"est_input {est} vs ctx_max {self.ctx_max}" + (" (rising)" if rising else ""),
+                detector=self.name,
+                severity=Severity.WARN,
+                run_id=request.attr.run_id,
+                reason=f"est_input {est} vs ctx_max {self.ctx_max}"
+                + (" (rising)" if rising else ""),
                 evidence={"est_input": est, "ctx_max": self.ctx_max, "rising": rising},
             )
         return None
@@ -65,12 +74,18 @@ class ContextCompactionPolicy(Policy):
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         if not self.has_hook:
-            return Action(kind=ActionKind.ALLOW, run_id=signal.run_id,
-                          reason=f"{signal.reason} (no assembly hook — telemetry only)")
+            return Action(
+                kind=ActionKind.ALLOW,
+                run_id=signal.run_id,
+                reason=f"{signal.reason} (no assembly hook — telemetry only)",
+            )
         return Action(
-            kind=ActionKind.MUTATE, run_id=signal.run_id, reason=signal.reason, compact=True,
+            kind=ActionKind.MUTATE,
+            run_id=signal.run_id,
+            reason=signal.reason,
+            compact=True,
             inject_message="COMPACT: move volatile values below the static prefix, dedup tool "
-                           "outputs by hash, summarize filler; pin system/schema/constraints/state.",
+            "outputs by hash, summarize filler; pin system/schema/constraints/state.",
         )
 
 

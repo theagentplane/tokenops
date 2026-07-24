@@ -42,7 +42,9 @@ class PreCallWorstCaseDetector(Detector):
 
     name = "pre_call_worst_case"
 
-    def __init__(self, budget: Budget, price: PriceFn, default_max_output: int = DEFAULT_MAX_OUTPUT) -> None:
+    def __init__(
+        self, budget: Budget, price: PriceFn, default_max_output: int = DEFAULT_MAX_OUTPUT
+    ) -> None:
         self.budget = budget
         self._price = price
         self.default_max_output = default_max_output
@@ -59,26 +61,31 @@ class PreCallWorstCaseDetector(Detector):
             else self.default_max_output
         )
         try:
-            projected = (
-                self._price(request.provider, request.model, Usage(input=request.estimated_input_tokens))
-                + self._price(request.provider, request.model, Usage(output=capped_out))
-            )
+            projected = self._price(
+                request.provider, request.model, Usage(input=request.estimated_input_tokens)
+            ) + self._price(request.provider, request.model, Usage(output=capped_out))
         except Exception as exc:  # unknown price → fail closed (HALT), never assume 0
             return Signal(
-                detector=self.name, severity=Severity.TRIP, run_id=request.attr.run_id,
+                detector=self.name,
+                severity=Severity.TRIP,
+                run_id=request.attr.run_id,
                 reason=f"unknown price for {request.provider}/{request.model}; failing closed ({exc})",
                 evidence={"fail_closed": True},
             )
 
         if projected >= left:
             return Signal(
-                detector=self.name, severity=Severity.TRIP, run_id=request.attr.run_id,
+                detector=self.name,
+                severity=Severity.TRIP,
+                run_id=request.attr.run_id,
                 reason=f"worst-case {projected} ≥ remaining budget {left} (micros)",
                 evidence={"projected": projected, "left": left, "capped_out": capped_out},
             )
         if request.max_output_tokens is None:
             return Signal(
-                detector=self.name, severity=Severity.WARN, run_id=request.attr.run_id,
+                detector=self.name,
+                severity=Severity.WARN,
+                run_id=request.attr.run_id,
                 reason=f"output cap unset; bounding to {self.default_max_output} so priced cap == enforced cap",
                 evidence={"set_cap": self.default_max_output, "projected": projected, "left": left},
             )
@@ -92,12 +99,17 @@ class PreCallWorstCasePolicy(Policy):
         if signal.severity is Severity.TRIP:
             return Action(kind=ActionKind.HALT, run_id=signal.run_id, reason=signal.reason)
         # WARN → bound the output so the worst case we priced is the one enforced.
-        cap = int(signal.evidence.get("set_cap", DEFAULT_MAX_OUTPUT))
+        raw_cap = signal.evidence.get("set_cap", DEFAULT_MAX_OUTPUT)
+        cap = int(raw_cap) if isinstance(raw_cap, (int, float, str)) else DEFAULT_MAX_OUTPUT
         return Action(
-            kind=ActionKind.MUTATE, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.MUTATE,
+            run_id=signal.run_id,
+            reason=signal.reason,
             max_output_tokens=cap,
         )
 
 
-def build(budget: Budget, price: PriceFn, default_max_output: int = DEFAULT_MAX_OUTPUT) -> tuple[Detector, Policy]:
+def build(
+    budget: Budget, price: PriceFn, default_max_output: int = DEFAULT_MAX_OUTPUT
+) -> tuple[Detector, Policy]:
     return PreCallWorstCaseDetector(budget, price, default_max_output), PreCallWorstCasePolicy()

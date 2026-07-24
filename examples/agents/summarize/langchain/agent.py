@@ -21,12 +21,15 @@ class LangChainSummarizeAgent:
     def __init__(self, config: SummarizeServerConfig) -> None:
         self._config = config
         self._llm = _get_chat_model(config.provider, config.model)
-        self._chain = ChatPromptTemplate.from_messages(
-            [
-                ("system", "You are a concise summarizer."),
-                ("user", "{prompt}"),
-            ]
-        ) | self._llm
+        self._chain = (
+            ChatPromptTemplate.from_messages(
+                [
+                    ("system", "You are a concise summarizer."),
+                    ("user", "{prompt}"),
+                ]
+            )
+            | self._llm
+        )
 
     def run(
         self,

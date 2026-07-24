@@ -12,10 +12,10 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
-
 from examples.agents.research.tools import core as search_core
 from examples.agents.research.tools.core import SearchResult
+from fastapi.testclient import TestClient
+
 from tokenops.control.models import BudgetSpec, PolicyInstance
 from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
@@ -50,11 +50,13 @@ def _client(monkeypatch, tmp_path, policies, budgets=(), model=None):
     s.close()
     monkeypatch.setattr(search_core, "search", _search)
     from examples.agents.research.native import server as srv
+
     if model is not None:
         monkeypatch.setattr(srv, "complete", model)
 
     async def _fake_delegate(*a, **k):  # summarize server isn't running in-test
         from examples.agents.types import TokenUsage
+
         return ("summary", TokenUsage(), [], 0)
 
     monkeypatch.setattr(srv, "delegate_summarize", _fake_delegate)
@@ -62,14 +64,19 @@ def _client(monkeypatch, tmp_path, policies, budgets=(), model=None):
 
 
 def _always_search(provider, model, messages, max_output_tokens=None, **kw):
-    return ModelResponse(content='{"action": "search", "query": "pricing"}', input_tokens=820, output_tokens=45)
+    return ModelResponse(
+        content='{"action": "search", "query": "pricing"}', input_tokens=820, output_tokens=45
+    )
 
 
 # 1) step_cap → HALT
 def test_step_cap_halts(monkeypatch, tmp_path):
-    srv, client = _client(monkeypatch, tmp_path,
-                          [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
-                          model=_always_search)
+    srv, client = _client(
+        monkeypatch,
+        tmp_path,
+        [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
+        model=_always_search,
+    )
     body = _run(client)
     assert body["status"] == "halted" and "step" in body["halt_reason"].lower()
     assert body["cost_micros"] > 0
@@ -78,9 +85,12 @@ def test_step_cap_halts(monkeypatch, tmp_path):
 # 2) cost_budget → HALT
 def test_cost_budget_halts(monkeypatch, tmp_path):
     srv, client = _client(
-        monkeypatch, tmp_path,
+        monkeypatch,
+        tmp_path,
         [PolicyInstance(id="p", template="cost_budget", budget_id="cap", agent="research")],
-        budgets=[BudgetSpec(id="cap", limit_micros=250, dimension="run")],  # ~150 micros/call → halts on 2nd
+        budgets=[
+            BudgetSpec(id="cap", limit_micros=250, dimension="run")
+        ],  # ~150 micros/call → halts on 2nd
         model=_always_search,
     )
     body = _run(client)
@@ -92,21 +102,39 @@ def test_cancel_retry_streaming(monkeypatch, tmp_path):
     monkeypatch.setenv("TOKENOPS_STREAM", "1")
     calls = {"n": 0}
 
-    def fake_stream(provider, model, messages, *, max_output_tokens=None, frequency_penalty=None, presence_penalty=None):
-        i = calls["n"]; calls["n"] += 1
-        if i < 2:                       # degenerate — gets cancelled mid-stream
+    def fake_stream(
+        provider,
+        model,
+        messages,
+        *,
+        max_output_tokens=None,
+        frequency_penalty=None,
+        presence_penalty=None,
+    ):
+        i = calls["n"]
+        calls["n"] += 1
+        if i < 2:  # degenerate — gets cancelled mid-stream
             for _ in range(100):
                 yield "loop "
-        else:                           # clean decision ends the agent loop
+        else:  # clean decision ends the agent loop
             yield '{"action": "finish"}'
 
-    srv, client = _client(monkeypatch, tmp_path,
-                          [PolicyInstance(id="p", template="output_runaway",
-                                          params={"repeats": 4, "max_retries": 2}, agent="research")])
+    srv, client = _client(
+        monkeypatch,
+        tmp_path,
+        [
+            PolicyInstance(
+                id="p",
+                template="output_runaway",
+                params={"repeats": 4, "max_retries": 2},
+                agent="research",
+            )
+        ],
+    )
     monkeypatch.setattr(srv, "stream_complete", fake_stream)
     body = _run(client)
-    assert body["status"] == "completed"   # CANCEL + RETRY recovered, no crash
-    assert calls["n"] == 3                  # 2 cancelled streams + 1 clean retry
+    assert body["status"] == "completed"  # CANCEL + RETRY recovered, no crash
+    assert calls["n"] == 3  # 2 cancelled streams + 1 clean retry
     assert body["cost_micros"] > 0
 
 
@@ -118,33 +146,54 @@ def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
         # search on the first call, finish on the second
         n = search_then_finish.n = getattr(search_then_finish, "n", 0) + 1
         action = "search" if n == 1 else "finish"
-        return ModelResponse(content=f'{{"action": "{action}", "query": "pricing"}}',
-                             input_tokens=100, output_tokens=10)
+        return ModelResponse(
+            content=f'{{"action": "{action}", "query": "pricing"}}',
+            input_tokens=100,
+            output_tokens=10,
+        )
 
-    srv, client = _client(monkeypatch, tmp_path,
-                          [PolicyInstance(id="p", template="tool_output_cap",
-                                          params={"cap_tokens": 1000}, agent="research")],
-                          model=search_then_finish)
+    srv, client = _client(
+        monkeypatch,
+        tmp_path,
+        [
+            PolicyInstance(
+                id="p", template="tool_output_cap", params={"cap_tokens": 1000}, agent="research"
+            )
+        ],
+        model=search_then_finish,
+    )
     # patch the search AFTER _client (which sets a small default) so the result is oversized
-    monkeypatch.setattr(search_core, "search",
-                        lambda q, profile="healthy": SearchResult(query=q, snippet=big, completeness=0.2, source="test"))
+    monkeypatch.setattr(
+        search_core,
+        "search",
+        lambda q, profile="healthy": SearchResult(
+            query=q, snippet=big, completeness=0.2, source="test"
+        ),
+    )
     body = _run(client)
     assert body["status"] == "completed"
     snippets = [f["snippet"] for f in body["findings"]]
-    assert any(s.startswith("TOOL OUTPUT OFFLOADED") for s in snippets)  # deep swap landed in context
+    assert any(
+        s.startswith("TOOL OUTPUT OFFLOADED") for s in snippets
+    )  # deep swap landed in context
 
 
 # 5) custom tag flows onto the persisted RunRecord (segmentation backbone)
 def test_run_dims_persisted_for_segmentation(monkeypatch, tmp_path):
     import os
+
     from tokenops.control.store import Store
-    srv, client = _client(monkeypatch, tmp_path,
-                          [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
-                          model=_always_search)
+
+    srv, client = _client(
+        monkeypatch,
+        tmp_path,
+        [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
+        model=_always_search,
+    )
     body = _run(client, user_dims={"user_id": "alice", "team": "growth"})
     run_id = body["run_id"]
     s = Store(os.environ["TOKENOPS_DB"], auto_seed=False)
     rec = s.get_run(run_id)
-    assert rec.dims.get("team") == "growth"          # custom tag persisted on the run
-    assert "team" in s.run_tag_keys()                # dashboard can group by it
+    assert rec.dims.get("team") == "growth"  # custom tag persisted on the run
+    assert "team" in s.run_tag_keys()  # dashboard can group by it
     s.close()

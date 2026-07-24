@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from tokenops.control.core import BoundaryStep
 from tokenops.control.models import RunRecord, RunRegistration
 from tokenops.control.trajectory.gates import structural_index_eligible
-from tokenops.control.trajectory.scope import input_hash, input_simhash, normalize_input, scope_key, simhash_as_sqlite
+from tokenops.control.trajectory.scope import (
+    input_hash,
+    input_simhash,
+    normalize_input,
+    scope_key,
+    simhash_as_sqlite,
+)
 from tokenops.control.trajectory.serialize import window_to_json
 
 if TYPE_CHECKING:
@@ -20,7 +27,7 @@ def _scope_has_none(registration: RunRegistration, scope_dims: Sequence[str], ag
 
 
 def enqueue_completed_run(
-    store: "Store",
+    store: Store,
     *,
     rec: RunRecord,
     registration: RunRegistration,

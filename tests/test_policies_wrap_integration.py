@@ -13,6 +13,7 @@ import time
 import chronicle.session as chronicle_session
 import pytest
 
+from conftest import toy_price
 from tokenops.control import (
     ActionKind,
     ApplyControls,
@@ -40,7 +41,6 @@ from tokenops.control.policies import (
     tool_output_cap,
 )
 from tokenops.providers.types import ModelResponse
-from conftest import toy_price
 
 
 def _reg(run_id: str) -> RunRegistration:
@@ -200,7 +200,9 @@ def test_it_step_cap_halts_at_max_steps():
 
     _with_scope(gov, attr, "r-sc", run)
     assert gov.ledger.is_halted("r-sc")
-    assert len(calls) == 2  # second call dispatches then observe HALTs; or halt on observe of step 2
+    assert (
+        len(calls) == 2
+    )  # second call dispatches then observe HALTs; or halt on observe of step 2
 
 
 def test_it_concurrency_cap_rejects_when_inflight_saturated():
@@ -384,8 +386,8 @@ def test_it_output_runaway_retries_then_succeeds():
 def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
     """trajectory_hint is opt-in + store-backed; seed index then wrap_complete."""
     from tokenops.control.models import RunRecord
-    from tokenops.control.store import Store
     from tokenops.control.policies.trajectory_hint import build as build_hint
+    from tokenops.control.store import Store
     from tokenops.control.trajectory.scope import (
         input_hash,
         input_simhash,

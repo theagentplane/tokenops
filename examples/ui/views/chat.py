@@ -4,11 +4,11 @@ from typing import Any
 
 import streamlit as st
 
-from examples.a2a.client import check_health_sync, submit_task_sync, submit_task_sync_with_meta
-from tokenops.control.models import GovernanceMode
+from examples.a2a.client import check_health_sync, submit_task_sync_with_meta
 from examples.agents.types import RunResult
 from examples.app_config import load_config
 from examples.ui.demo_chips import CHIPS, ChipId, live_governance_banner, prepare_chip_governance
+from tokenops.control.models import GovernanceMode
 from tokenops.ui.store_client import get_store
 from tokenops.ui.theme import GOLD, page_shell, status_pill
 
@@ -84,7 +84,9 @@ def _render_assistant_turn(msg: dict[str, Any]) -> None:
         cost_micros = int(result.get("cost_micros", 0))
         # Simulator uses research_cost_micros + summarize_cost_micros; live uses cost_micros.
         if not cost_micros:
-            cost_micros = int(result.get("research_cost_micros", 0)) + int(result.get("summarize_cost_micros", 0))
+            cost_micros = int(result.get("research_cost_micros", 0)) + int(
+                result.get("summarize_cost_micros", 0)
+            )
         show_cost = bool(result.get("show_cost", False)) or "cost_micros" in result
         if show_cost:
             total = cost_micros / 1_000_000
@@ -154,7 +156,9 @@ def _run_live_prompt(prompt: str, *, governance_mode: GovernanceMode) -> None:
             governance_mode=governance_mode,
         )
         payload = _result_payload(result, {**meta, "show_cost": show_cost})
-        _append_assistant(result.summary or "_No summary returned._", result=payload, governance=governance_line)
+        _append_assistant(
+            result.summary or "_No summary returned._", result=payload, governance=governance_line
+        )
     except Exception as exc:
         _append_assistant(f"Run failed: {exc}")
 
@@ -230,7 +234,7 @@ for col, chip in zip(chip_cols, CHIPS):
             st.rerun()
 
 st.markdown(
-    "<p class=\"chip-hint\">"
+    '<p class="chip-hint">'
     "<b>Left</b>: hard stop (cost cap) · <b>Right</b>: minimize (cost guard)"
     "</p>",
     unsafe_allow_html=True,

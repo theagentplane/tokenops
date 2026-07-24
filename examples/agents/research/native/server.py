@@ -3,21 +3,21 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from typing import Mapping
+from collections.abc import Mapping
+
+from chronicle.session import reset_session
 
 from examples.a2a.client import delegate_summarize
 from examples.a2a.messages import bench_corpus_profile, task_response
 from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.research.native.agent import NativeResearchAgent
 from examples.agents.types import RunResult, StepEvent, TokenUsage
-from chronicle.session import reset_session
-
 from examples.app_config import load_config
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
 from tokenops.control import (
-    Halt,
     Action,
     ActionKind,
+    Halt,
     governance_events_payload,
     halt_detector_from_events,
     mount_run_registration,
@@ -78,13 +78,23 @@ def build_app():
             # non-streaming wrap (RETRY still recovers runaway output after the fact).
             if os.environ.get("TOKENOPS_STREAM") == "1":
                 governed = wrap_stream(
-                    governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                    stream_dispatch=stream_complete, service=AGENT,
+                    governor,
+                    controls,
+                    attr,
+                    provider=cfg.provider,
+                    model=cfg.model,
+                    stream_dispatch=stream_complete,
+                    service=AGENT,
                 )
             else:
                 governed = wrap_complete(
-                    governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                    dispatch=complete, service=AGENT,
+                    governor,
+                    controls,
+                    attr,
+                    provider=cfg.provider,
+                    model=cfg.model,
+                    dispatch=complete,
+                    service=AGENT,
                 )
 
             status, halt_reason, summary, findings = "completed", None, "", []
@@ -97,18 +107,22 @@ def build_app():
                     governed,
                     service=AGENT,
                 )
-                steps.append(StepEvent(agent="research", action="delegate", detail="calling summarize agent"))
-                remaining = governor.ledger.budget_left(
-                    "run_llm_cap", f"run:{run_id}", LIFETIME,
+                steps.append(
+                    StepEvent(agent="research", action="delegate", detail="calling summarize agent")
                 )
-                if (
-                    "run_llm_cap" in governor.ledger._budget_by_id
-                    and remaining <= 0
-                ):
-                    raise Halt(Action(
-                        kind=ActionKind.HALT, run_id=run_id,
-                        reason="no budget remaining; refusing to delegate",
-                    ))
+                remaining = governor.ledger.budget_left(
+                    "run_llm_cap",
+                    f"run:{run_id}",
+                    LIFETIME,
+                )
+                if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
+                    raise Halt(
+                        Action(
+                            kind=ActionKind.HALT,
+                            run_id=run_id,
+                            reason="no budget remaining; refusing to delegate",
+                        )
+                    )
                 summary, sum_tokens, sum_steps, _sum_cost = await delegate_summarize(
                     cfg.summarize_url,
                     task,
@@ -154,9 +168,13 @@ def build_app():
                             max_entries_per_scope=int(p.get("max_entries_per_scope", 500)),
                         )
 
-            result = RunResult(findings=findings, summary=summary, steps=steps, token_usage=token_usage)
+            result = RunResult(
+                findings=findings, summary=summary, steps=steps, token_usage=token_usage
+            )
             response = task_response(result)
-            response.update(run_id=run_id, status=status, cost_micros=governor.ledger.cost_micros(run_id))
+            response.update(
+                run_id=run_id, status=status, cost_micros=governor.ledger.cost_micros(run_id)
+            )
             if halt_reason:
                 response["halt_reason"] = halt_reason
             response["governance_events"] = governance_events_payload(controls)

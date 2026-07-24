@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "bench" / "demo-assets"
+ASSETS = ROOT / "examples" / "demo-assets"
 SCREENSHOTS = ASSETS / "screenshots"
 VIDEOS = ASSETS / "videos"
 TABLES = ASSETS / "tables"

@@ -20,7 +20,9 @@ def _register(
     mode: GovernanceMode | str | None = None,
 ) -> dict:
     return ControlPlaneClient.from_env().register_run(
-        intent=intent, user_dims=user_dims or {}, mode=mode,
+        intent=intent,
+        user_dims=user_dims or {},
+        mode=mode,
     )
 
 
@@ -65,7 +67,10 @@ def submit_goal_sync_with_meta(
     The Planner registers the run on the control plane when ``X-TokenOps-Run-Id``
     is absent — clients should not call ``/v1/runs`` themselves for the triad UI.
     """
-    if not (os.environ.get("TOKENOPS_URL") or "").strip() and os.environ.get("TOKENOPS_EMBEDDED") != "1":
+    if (
+        not (os.environ.get("TOKENOPS_URL") or "").strip()
+        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
+    ):
         os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = task_request(task=goal, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
@@ -100,7 +105,10 @@ async def delegate_researcher(
 ) -> tuple[list[Finding], TokenUsage, list[StepEvent], int]:
     """Delegate to researcher. Headers come from ambient context when omitted."""
     payload = research_request(
-        task, questions, outline=outline, bench={"corpus_profile": corpus_profile},
+        task,
+        questions,
+        outline=outline,
+        bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
     if run_id:

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import copy
 import threading
-from typing import Callable
+from collections.abc import Callable
 
 _LOCK = threading.Lock()
 _CACHE: dict[tuple[str, str], dict] = {}
@@ -41,8 +41,7 @@ def clear_governance_config_cache(
         to_drop = [
             key
             for key in _CACHE
-            if (store_path is None or key[0] == store_path)
-            and (agent is None or key[1] == agent)
+            if (store_path is None or key[0] == store_path) and (agent is None or key[1] == agent)
         ]
         for key in to_drop:
             del _CACHE[key]

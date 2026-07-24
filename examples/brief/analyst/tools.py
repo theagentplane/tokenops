@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Callable
-
 from chronicle import InputState, boundary
 from langchain_core.tools import StructuredTool
 

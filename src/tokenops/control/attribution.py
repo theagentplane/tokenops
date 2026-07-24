@@ -7,7 +7,8 @@ not these helpers directly. Boundaries call :func:`require_registration`.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from tokenops.control.context import (
     BoundRun,
@@ -77,11 +78,18 @@ def begin_entry_run(
     run_id: str | None = None,
 ) -> BoundRun:
     """Register a new run and bind request context. Entry boundary only."""
-    rid = run_id or header_run_id(headers) or str(payload.get("run_id") or "").strip() or new_id("run")
+    rid = (
+        run_id
+        or header_run_id(headers)
+        or str(payload.get("run_id") or "").strip()
+        or new_id("run")
+    )
     intent = str(payload.get("intent", ""))
     user_dims = _coerce_user_dims(payload.get("user_dims"))
     reg = store.register_run(RunRegistration(run_id=rid, intent=intent, user_dims=user_dims))
-    span = SpanContext(span_id=new_id("span"), service=service, parent_span_id=header_parent_span_id(headers))
+    span = SpanContext(
+        span_id=new_id("span"), service=service, parent_span_id=header_parent_span_id(headers)
+    )
     bind_registration(reg)
     bind_span(span)
     return BoundRun(registration=reg, span=span)
@@ -186,7 +194,9 @@ def begin_entry_task_run(
     if plane.embedded:
         plane = ControlPlaneClient(store=store)
     registered = plane.register_run(
-        intent=resolved_intent, user_dims=resolved_dims, mode=resolved_mode,
+        intent=resolved_intent,
+        user_dims=resolved_dims,
+        mode=resolved_mode,
     )
     merged = {str(k): str(v) for k, v in headers.items()}
     merged[RUN_ID_HEADER] = str(registered["run_id"])

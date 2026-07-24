@@ -7,16 +7,17 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Mapping
+from collections.abc import Mapping
 
 from chronicle.session import reset_session
+
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
 from examples.brief.client import delegate_analyst, delegate_editor
-from examples.brief.messages import scout_response
 from examples.brief.langchain_bridge import GovernedChatModel, make_langchain_dispatch
+from examples.brief.messages import scout_response
 from examples.brief.scout.agent import ScoutAgent
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
 from tokenops.control import (
@@ -75,8 +76,13 @@ def build_app():
                 token_usage.output_tokens += event.tokens.output_tokens
 
             governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=make_langchain_dispatch(cfg.provider, cfg.model), service=AGENT,
+                governor,
+                controls,
+                attr,
+                provider=cfg.provider,
+                model=cfg.model,
+                dispatch=make_langchain_dispatch(cfg.provider, cfg.model),
+                service=AGENT,
             )
             llm = GovernedChatModel(governed, provider=cfg.provider, model=cfg.model)
 
@@ -88,19 +94,27 @@ def build_app():
 
             try:
                 angles, sections = await asyncio.to_thread(
-                    agent.run, topic, on_step, llm,
+                    agent.run,
+                    topic,
+                    on_step,
+                    llm,
                 )
                 steps.append(
                     StepEvent(agent="scout", action="delegate", detail="calling analyst agent")
                 )
                 remaining = governor.ledger.budget_left(
-                    "run_llm_cap", f"run:{run_id}", LIFETIME,
+                    "run_llm_cap",
+                    f"run:{run_id}",
+                    LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
-                    raise Halt(Action(
-                        kind=ActionKind.HALT, run_id=run_id,
-                        reason="no budget remaining; refusing to delegate",
-                    ))
+                    raise Halt(
+                        Action(
+                            kind=ActionKind.HALT,
+                            run_id=run_id,
+                            reason="no budget remaining; refusing to delegate",
+                        )
+                    )
 
                 findings, an_tokens, an_steps, _ = await delegate_analyst(
                     cfg.analyst_url,
@@ -116,13 +130,18 @@ def build_app():
                     StepEvent(agent="scout", action="delegate", detail="calling editor agent")
                 )
                 remaining = governor.ledger.budget_left(
-                    "run_llm_cap", f"run:{run_id}", LIFETIME,
+                    "run_llm_cap",
+                    f"run:{run_id}",
+                    LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
-                    raise Halt(Action(
-                        kind=ActionKind.HALT, run_id=run_id,
-                        reason="no budget remaining; refusing to delegate to editor",
-                    ))
+                    raise Halt(
+                        Action(
+                            kind=ActionKind.HALT,
+                            run_id=run_id,
+                            reason="no budget remaining; refusing to delegate to editor",
+                        )
+                    )
 
                 brief, ed_tokens, ed_steps, _ = await delegate_editor(
                     cfg.editor_url,

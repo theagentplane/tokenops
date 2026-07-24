@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind
 from tokenops.control.policies import output_runaway
-from conftest import make_attr, make_step, FakeView
 
 
 def _llm(text):
@@ -19,7 +19,12 @@ def test_degenerate_output_detected():
 
 def test_clean_output_passes():
     det, _ = output_runaway.build()
-    assert det.observe(make_attr(), _llm("A concise unique summary of the pricing findings."), FakeView()) is None
+    assert (
+        det.observe(
+            make_attr(), _llm("A concise unique summary of the pricing findings."), FakeView()
+        )
+        is None
+    )
 
 
 def test_bounded_retry_then_inject_never_halt():
@@ -36,4 +41,6 @@ def test_bounded_retry_then_inject_never_halt():
 
 def test_only_llm_with_text():
     det, _ = output_runaway.build()
-    assert det.observe(make_attr(), make_step(node_type="tool", output={"x": "y"}), FakeView()) is None
+    assert (
+        det.observe(make_attr(), make_step(node_type="tool", output={"x": "y"}), FakeView()) is None
+    )

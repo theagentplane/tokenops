@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
 import time
 
 import pytest
 
+from conftest import toy_price
 from tokenops.control import ApplyControls, build_governor, wrap_complete
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.core import BoundaryStep, Observation, Usage
 from tokenops.control.models import PolicyInstance, RunRecord, RunRegistration
 from tokenops.control.trajectory.enqueue import enqueue_completed_run
 from tokenops.control.trajectory.scope import input_hash
-from conftest import make_attr, toy_price
-
 
 HINT_GOVERNANCE = {
     "governance": {
@@ -39,7 +37,9 @@ PARAPHRASE = "enterprise research saas pricing models and subscription tiers"
 
 def _fake_dispatch(calls: list):
     def dispatch(provider, model, messages, max_output_tokens=None):
-        calls.append({"model": model, "messages": list(messages), "max_output_tokens": max_output_tokens})
+        calls.append(
+            {"model": model, "messages": list(messages), "max_output_tokens": max_output_tokens}
+        )
         from tokenops.providers.types import ModelResponse
 
         return ModelResponse(content="ok", input_tokens=10, output_tokens=5)
@@ -49,11 +49,15 @@ def _fake_dispatch(calls: list):
 
 def _tool_step(step: int = 1) -> BoundaryStep:
     return BoundaryStep(
-        step=step, ts=float(step), node_type="tool", boundary_id="search",
+        step=step,
+        ts=float(step),
+        node_type="tool",
+        boundary_id="search",
         cum_spent_micros=12_000,
         input={"name": "search", "args": {"query": "pricing"}},
         output={"snippet": "tier list"},
-        signature="sig1", result_hash="rh1",
+        signature="sig1",
+        result_hash="rh1",
     )
 
 
@@ -81,8 +85,14 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
         RunRegistration(run_id="run-a", intent="pricing_research", user_dims={"user_id": "alice"}),
     )
     rec_a = RunRecord(
-        run_id="run-a", agent="research", status="completed", task=TASK,
-        cost_micros=120_000, steps=4, started_at=time.time(), ended_at=time.time(),
+        run_id="run-a",
+        agent="research",
+        status="completed",
+        task=TASK,
+        cost_micros=120_000,
+        steps=4,
+        started_at=time.time(),
+        ended_at=time.time(),
     )
     store.create_run(rec_a)
     window_a = [_tool_step(1), _tool_step(2)]
@@ -103,7 +113,10 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
     attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
         RunRecord(
-            run_id="run-b", agent="research", status="running", task=PARAPHRASE,
+            run_id="run-b",
+            agent="research",
+            status="running",
+            task=PARAPHRASE,
             started_at=time.time(),
         ),
     )
@@ -115,9 +128,13 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
 
     calls: list = []
     governed = wrap_complete(
-        gov, gov.controls, attr_b,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_dispatch(calls), service="research",
+        gov,
+        gov.controls,
+        attr_b,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_dispatch(calls),
+        service="research",
     )
 
     governed("openai", "gpt-4o-mini", [{"role": "user", "content": PARAPHRASE}])
@@ -136,12 +153,16 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
 def test_trajectory_hint_no_hint_on_cold_start(store):
     """First-ever run for a task gets no hint injected."""
     reg = store.register_run(
-        RunRegistration(run_id="run-cold", intent="pricing_research", user_dims={"user_id": "carol"}),
+        RunRegistration(
+            run_id="run-cold", intent="pricing_research", user_dims={"user_id": "carol"}
+        ),
     )
     attr = _build_attribution(reg, service="research")
     store.create_run(
         RunRecord(
-            run_id="run-cold", agent="research", status="running",
+            run_id="run-cold",
+            agent="research",
+            status="running",
             task="brand new unique task about widget inventory",
             started_at=time.time(),
         ),
@@ -152,11 +173,19 @@ def test_trajectory_hint_no_hint_on_cold_start(store):
 
     calls: list = []
     governed = wrap_complete(
-        gov, gov.controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_dispatch(calls), service="research",
+        gov,
+        gov.controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_dispatch(calls),
+        service="research",
     )
-    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "brand new unique task about widget inventory"}])
+    governed(
+        "openai",
+        "gpt-4o-mini",
+        [{"role": "user", "content": "brand new unique task about widget inventory"}],
+    )
 
     assert len(calls) == 1
     assert len(calls[0]["messages"]) == 1  # no hint turn appended
@@ -168,13 +197,23 @@ def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
         RunRegistration(run_id="run-a2", intent="pricing_research", user_dims={"user_id": "alice"}),
     )
     rec_a = RunRecord(
-        run_id="run-a2", agent="research", status="completed", task=TASK,
-        cost_micros=120_000, steps=4, started_at=time.time(), ended_at=time.time(),
+        run_id="run-a2",
+        agent="research",
+        status="completed",
+        task=TASK,
+        cost_micros=120_000,
+        steps=4,
+        started_at=time.time(),
+        ended_at=time.time(),
     )
     store.create_run(rec_a)
     enqueue_completed_run(
-        store, rec=rec_a, registration=reg_a, agent="research",
-        window=[_tool_step()], policy_params=HINT_GOVERNANCE["governance"]["policies"]["trajectory_hint"],
+        store,
+        rec=rec_a,
+        registration=reg_a,
+        agent="research",
+        window=[_tool_step()],
+        policy_params=HINT_GOVERNANCE["governance"]["policies"]["trajectory_hint"],
     )
     store.drain_trajectory_build_queue(max_age_days=30)
 
@@ -183,7 +222,9 @@ def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
     )
     attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
-        RunRecord(run_id="run-b2", agent="research", status="running", task=TASK, started_at=time.time()),
+        RunRecord(
+            run_id="run-b2", agent="research", status="running", task=TASK, started_at=time.time()
+        ),
     )
 
     gov = build_governor(HINT_GOVERNANCE, toy_price, ApplyControls(), store=store)
@@ -191,20 +232,31 @@ def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
 
     calls: list = []
     governed = wrap_complete(
-        gov, gov.controls, attr_b,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_dispatch(calls), service="research",
+        gov,
+        gov.controls,
+        attr_b,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_dispatch(calls),
+        service="research",
     )
 
     governed("openai", "gpt-4o-mini", [{"role": "user", "content": TASK}])
     assert len(calls[0]["messages"]) == 2  # task + hint
 
     # Record one LLM step so step_count > 0 for the next call.
-    gov.observe(Observation(
-        attr=attr_b, node_type="llm", boundary_id="research.chat", ts=time.time(),
-        provider="openai", model="gpt-4o-mini", usage=Usage(input=10, output=5),
-        output={"text": "ok"},
-    ))
+    gov.observe(
+        Observation(
+            attr=attr_b,
+            node_type="llm",
+            boundary_id="research.chat",
+            ts=time.time(),
+            provider="openai",
+            model="gpt-4o-mini",
+            usage=Usage(input=10, output=5),
+            output={"text": "ok"},
+        )
+    )
 
     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "follow up"}])
     assert len(calls[1]["messages"]) == 1  # no second hint

@@ -113,11 +113,10 @@ def observation_from_crossing(
             result_hash = _hash(result)
         tags.setdefault("tool", name)
     elif node_type == "delegate":
-        rolled_up = int(
-            getattr(result, "rolled_up_cost_micros", 0)
-            or input_state.get("rolled_up_cost_micros", 0)
-            or 0
-        )
+        raw_roll = getattr(result, "rolled_up_cost_micros", None)
+        if raw_roll is None:
+            raw_roll = input_state.get("rolled_up_cost_micros", 0)
+        rolled_up = int(raw_roll) if isinstance(raw_roll, (int, float, str)) else 0
         output = dict(result) if isinstance(result, dict) else {"result": str(result)}
 
     return Observation(

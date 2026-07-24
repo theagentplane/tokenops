@@ -226,11 +226,11 @@ TokenOps is early (0.x). Near-term:
 - Remote observe / decide (fatter plane) for multi-host stacks.
 - Documentation site.
 
-Status of each control-plane job: [`CONTROL_PLANE.md`](CONTROL_PLANE.md). Ideas welcome via GitHub issues.
+Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md). Ideas welcome via GitHub issues.
 
 ## Documentation
 
-- [Control plane status](CONTROL_PLANE.md)
+- [Control plane status](docs/control-plane-status.md)
 - [Architecture](docs/architecture.md)
 - [Run attribution](docs/run-attribution.md)
 - [Control plane deploy](docs/control-plane-deploy.md)
@@ -240,11 +240,13 @@ Status of each control-plane job: [`CONTROL_PLANE.md`](CONTROL_PLANE.md). Ideas 
 
 ## Contributing
 
-Issues and PRs are welcome. Dev setup:
+Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
 
 ```bash
 make install
-python -m pytest -q
+make lint
+make test
 ```
 
 ## Contributors

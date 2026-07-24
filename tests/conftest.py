@@ -34,10 +34,17 @@ def make_attr(run_id: str = "run-1", **kw) -> Attribution:
     return Attribution(**base)
 
 
-def make_step(step: int = 1, *, node_type="llm", boundary_id="research.chat",
-              cum=0, **kw) -> BoundaryStep:
-    return BoundaryStep(step=step, ts=float(step), node_type=node_type,
-                        boundary_id=boundary_id, cum_spent_micros=cum, **kw)
+def make_step(
+    step: int = 1, *, node_type="llm", boundary_id="research.chat", cum=0, **kw
+) -> BoundaryStep:
+    return BoundaryStep(
+        step=step,
+        ts=float(step),
+        node_type=node_type,
+        boundary_id=boundary_id,
+        cum_spent_micros=cum,
+        **kw,
+    )
 
 
 @dataclass
@@ -53,14 +60,29 @@ class FakeView:
     _recent: list = field(default_factory=list)
     _window: list = field(default_factory=list)
 
-    def cost_micros(self, run_id): return self._cost
-    def step_count(self, run_id): return self._steps
-    def is_halted(self, run_id): return self._halted
-    def budget_left(self, budget_id, segment_key, period="lifetime"): return self._budget_left
-    def inflight(self, segment_key): return self._inflight
-    def velocity(self, run_id, m): return self._velocity
-    def recent(self, run_id, n): return self._recent[-n:]
-    def window(self, run_id): return self._window
+    def cost_micros(self, run_id):
+        return self._cost
+
+    def step_count(self, run_id):
+        return self._steps
+
+    def is_halted(self, run_id):
+        return self._halted
+
+    def budget_left(self, budget_id, segment_key, period="lifetime"):
+        return self._budget_left
+
+    def inflight(self, segment_key):
+        return self._inflight
+
+    def velocity(self, run_id, m):
+        return self._velocity
+
+    def recent(self, run_id, n):
+        return self._recent[-n:]
+
+    def window(self, run_id):
+        return self._window
 
 
 @dataclass

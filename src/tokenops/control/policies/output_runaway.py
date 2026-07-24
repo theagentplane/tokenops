@@ -53,7 +53,9 @@ class OutputRunawayDetector(Detector):
         dom = single_token_domination(text)
         if rep >= self.repeats or dom >= self.domination:
             return Signal(
-                detector=self.name, severity=Severity.WARN, run_id=attr.run_id,
+                detector=self.name,
+                severity=Severity.WARN,
+                run_id=attr.run_id,
                 reason=f"degenerate output: ngram×{rep}, domination {dom:.0%}",
                 evidence={"ngram_repeat": rep, "domination": dom},
             )
@@ -78,17 +80,23 @@ class OutputRunawayPolicy(Policy):
         if n < self.max_retries:
             self._retries[signal.run_id] += 1
             return Action(
-                kind=ActionKind.RETRY, run_id=signal.run_id,
+                kind=ActionKind.RETRY,
+                run_id=signal.run_id,
                 reason=f"retry {n + 1}/{self.max_retries}: raise frequency/presence penalties, "
-                       f"tighten max_output, logit_bias on looping tokens",
+                f"tighten max_output, logit_bias on looping tokens",
             )
         return Action(
-            kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.INJECT,
+            run_id=signal.run_id,
+            reason=signal.reason,
             inject_message="ERROR: generation degenerated (repetition) after bounded retries; "
-                           "proceed without this output.",
+            "proceed without this output.",
         )
 
 
-def build(*, n: int = 3, repeats: int = 4, domination: float = 0.5,
-          max_retries: int = 2) -> tuple[Detector, Policy]:
-    return OutputRunawayDetector(n=n, repeats=repeats, domination=domination), OutputRunawayPolicy(max_retries=max_retries)
+def build(
+    *, n: int = 3, repeats: int = 4, domination: float = 0.5, max_retries: int = 2
+) -> tuple[Detector, Policy]:
+    return OutputRunawayDetector(n=n, repeats=repeats, domination=domination), OutputRunawayPolicy(
+        max_retries=max_retries
+    )

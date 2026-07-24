@@ -35,7 +35,9 @@ class ConcurrencyCapDetector(Detector):
 
     name = "concurrency_cap"
 
-    def __init__(self, max_concurrent: int, dimension: Dimension = "run", tag_key: str | None = None) -> None:
+    def __init__(
+        self, max_concurrent: int, dimension: Dimension = "run", tag_key: str | None = None
+    ) -> None:
         self.max_concurrent = max_concurrent
         self.dimension = dimension
         self.tag_key = tag_key
@@ -47,7 +49,9 @@ class ConcurrencyCapDetector(Detector):
         n = view.inflight(sk)
         if n >= self.max_concurrent:
             return Signal(
-                detector=self.name, severity=Severity.TRIP, run_id=request.attr.run_id,
+                detector=self.name,
+                severity=Severity.TRIP,
+                run_id=request.attr.run_id,
                 reason=f"inflight {n} ≥ max_concurrent {self.max_concurrent} on {sk}",
                 evidence={"inflight": n, "max": self.max_concurrent, "segment": sk},
             )
@@ -66,14 +70,28 @@ class ConcurrencyCapPolicy(Policy):
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         if self.mode == "queue":
-            return Action(kind=ActionKind.QUEUE, run_id=signal.run_id, reason=signal.reason,
-                          retry_after_s=self.retry_after_s)
-        return Action(kind=ActionKind.REJECT, run_id=signal.run_id, reason=signal.reason,
-                      retry_after_s=self.retry_after_s)
+            return Action(
+                kind=ActionKind.QUEUE,
+                run_id=signal.run_id,
+                reason=signal.reason,
+                retry_after_s=self.retry_after_s,
+            )
+        return Action(
+            kind=ActionKind.REJECT,
+            run_id=signal.run_id,
+            reason=signal.reason,
+            retry_after_s=self.retry_after_s,
+        )
 
 
-def build(max_concurrent: int, *, dimension: Dimension = "run", tag_key: str | None = None,
-          mode: Mode = "reject", retry_after_s: float = 1.0) -> tuple[Detector, Policy]:
+def build(
+    max_concurrent: int,
+    *,
+    dimension: Dimension = "run",
+    tag_key: str | None = None,
+    mode: Mode = "reject",
+    retry_after_s: float = 1.0,
+) -> tuple[Detector, Policy]:
     return (
         ConcurrencyCapDetector(max_concurrent, dimension, tag_key),
         ConcurrencyCapPolicy(mode, retry_after_s),

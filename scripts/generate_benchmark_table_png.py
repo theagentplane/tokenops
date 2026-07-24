@@ -7,7 +7,7 @@ import html
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "bench" / "demo-assets" / "tables" / "overall_benchmark_table.png"
+OUT = ROOT / "examples" / "demo-assets" / "tables" / "overall_benchmark_table.png"
 
 # Theme (matches src/tokenops/ui/theme.py)
 GOLD = "#C9A227"
@@ -193,7 +193,7 @@ def main() -> int:
     from playwright.sync_api import sync_playwright
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ROOT / "bench" / "demo-assets" / "_code_html" / "overall_benchmark_table.html"
+    tmp = ROOT / "examples" / "demo-assets" / "_code_html" / "overall_benchmark_table.html"
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(_table_html())
 

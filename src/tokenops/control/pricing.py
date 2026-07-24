@@ -49,7 +49,9 @@ def build_price_book(rates: dict[str, Rate] | None = None) -> PriceFn:
     """
     table = dict(DEFAULT_RATES if rates is None else rates)
 
-    def price(provider: str, model: str, usage: Usage) -> Micros:
+    def price(provider: str, model: str, usage: object) -> Micros:
+        if not isinstance(usage, Usage):
+            raise TypeError(f"expected Usage, got {type(usage)!r}")
         rate = table.get(model)
         if rate is None:
             raise ValueError(

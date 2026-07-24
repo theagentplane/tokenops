@@ -6,13 +6,13 @@ import time
 
 import pytest
 
+from conftest import CollectingControls, FakeView, make_attr, toy_price
 from tokenops.control import ActionKind, CallRequest, build_governor
 from tokenops.control.core import BoundaryStep
 from tokenops.control.models import RunRecord, RunRegistration
 from tokenops.control.policies.trajectory_hint import build as build_trajectory_hint
 from tokenops.control.trajectory.enqueue import enqueue_completed_run
-from tokenops.control.trajectory.scope import input_hash, input_simhash, normalize_input, scope_key
-from conftest import CollectingControls, FakeView, make_attr, toy_price
+from tokenops.control.trajectory.scope import input_hash, scope_key
 
 HINT_CFG = {
     "governance": {
@@ -46,11 +46,15 @@ def store(tmp_path):
 
 def _tool_step(step: int = 1) -> BoundaryStep:
     return BoundaryStep(
-        step=step, ts=float(step), node_type="tool", boundary_id="search",
+        step=step,
+        ts=float(step),
+        node_type="tool",
+        boundary_id="search",
         cum_spent_micros=500,
         input={"name": "search", "args": {"query": "pricing"}},
         output={"snippet": "ok"},
-        signature="sig1", result_hash="rh1",
+        signature="sig1",
+        result_hash="rh1",
     )
 
 
@@ -63,11 +67,19 @@ def test_scope_key_from_registration():
 def test_enqueue_skipped_when_disabled(store):
     reg = RunRegistration(run_id="r1", intent="demo")
     rec = RunRecord(
-        run_id="r1", agent="research", status="completed", task="find pricing API docs",
-        cost_micros=1000, steps=5,
+        run_id="r1",
+        agent="research",
+        status="completed",
+        task="find pricing API docs",
+        cost_micros=1000,
+        steps=5,
     )
     assert not enqueue_completed_run(
-        store, rec=rec, registration=reg, agent="research", window=[_tool_step()],
+        store,
+        rec=rec,
+        registration=reg,
+        agent="research",
+        window=[_tool_step()],
         policy_params={"enabled": False},
     )
     assert store._db.execute("SELECT COUNT(*) FROM trajectory_build_queue").fetchone()[0] == 0
@@ -77,13 +89,21 @@ def test_enqueue_and_drain_builds_index(store):
     reg = RunRegistration(run_id="run-a", intent="demo")
     task = "find pricing API documentation"
     rec = RunRecord(
-        run_id="run-a", agent="research", status="completed", task=task,
-        cost_micros=50_000, steps=4,
+        run_id="run-a",
+        agent="research",
+        status="completed",
+        task=task,
+        cost_micros=50_000,
+        steps=4,
     )
     params = HINT_CFG["governance"]["policies"]["trajectory_hint"]
     assert enqueue_completed_run(
-        store, rec=rec, registration=reg, agent="research",
-        window=[_tool_step(), _tool_step(2)], policy_params=params,
+        store,
+        rec=rec,
+        registration=reg,
+        agent="research",
+        window=[_tool_step(), _tool_step(2)],
+        policy_params=params,
     )
     assert store.drain_trajectory_build_queue(max_age_days=30) == 1
 
@@ -107,18 +127,27 @@ def test_simhash_lookup_paraphrase(store):
     assert input_hash(task) != input_hash(paraphrase)
 
     rec = RunRecord(
-        run_id="run-a", agent="research", status="completed", task=task,
-        cost_micros=50_000, steps=3,
+        run_id="run-a",
+        agent="research",
+        status="completed",
+        task=task,
+        cost_micros=50_000,
+        steps=3,
     )
     params = HINT_CFG["governance"]["policies"]["trajectory_hint"]
     enqueue_completed_run(
-        store, rec=rec, registration=reg, agent="research",
-        window=[_tool_step()], policy_params=params,
+        store,
+        rec=rec,
+        registration=reg,
+        agent="research",
+        window=[_tool_step()],
+        policy_params=params,
     )
     store.drain_trajectory_build_queue(max_age_days=30)
 
     sk = scope_key(reg, "research", ["intent", "agent"])
-    from tokenops.control.trajectory.scope import input_simhash as ish, simhash_as_sqlite
+    from tokenops.control.trajectory.scope import input_simhash as ish
+    from tokenops.control.trajectory.scope import simhash_as_sqlite
 
     hit = store.lookup_trajectory_index(
         scope_key=sk,
@@ -135,13 +164,21 @@ def test_pre_call_injects_on_step_zero(store):
     reg = RunRegistration(run_id="prior", intent="demo")
     task = "find enterprise pricing limits"
     rec = RunRecord(
-        run_id="prior", agent="research", status="completed", task=task,
-        cost_micros=40_000, steps=5,
+        run_id="prior",
+        agent="research",
+        status="completed",
+        task=task,
+        cost_micros=40_000,
+        steps=5,
     )
     params = HINT_CFG["governance"]["policies"]["trajectory_hint"]
     enqueue_completed_run(
-        store, rec=rec, registration=reg, agent="research",
-        window=[_tool_step()], policy_params=params,
+        store,
+        rec=rec,
+        registration=reg,
+        agent="research",
+        window=[_tool_step()],
+        policy_params=params,
     )
     store.drain_trajectory_build_queue(max_age_days=30)
 
@@ -149,14 +186,20 @@ def test_pre_call_injects_on_step_zero(store):
     gov = build_governor(HINT_CFG, toy_price, controls, store=store)
     gov.ledger.open_run("run-new")
     store.create_run(
-        RunRecord(run_id="run-new", agent="research", status="running", task=task,
-                  started_at=time.time()),
+        RunRecord(
+            run_id="run-new", agent="research", status="running", task=task, started_at=time.time()
+        ),
     )
 
     attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
-    gov.pre_call(CallRequest(
-        attr=attr, provider="openai", model="gpt-4o-mini", primary_agent_turn=True,
-    ))
+    gov.pre_call(
+        CallRequest(
+            attr=attr,
+            provider="openai",
+            model="gpt-4o-mini",
+            primary_agent_turn=True,
+        )
+    )
     injects = controls.of_kind(ActionKind.INJECT)
     assert len(injects) == 1
     assert "trajectory hint" in (injects[0].inject_message or "").lower()
@@ -171,15 +214,24 @@ def test_no_inject_when_step_count_nonzero(store):
     gov = build_governor(HINT_CFG, toy_price, controls, store=store)
     gov.ledger.open_run("run-new")
     store.create_run(
-        RunRecord(run_id="run-new", agent="research", status="running",
-                  task="find enterprise pricing limits", started_at=time.time()),
+        RunRecord(
+            run_id="run-new",
+            agent="research",
+            status="running",
+            task="find enterprise pricing limits",
+            started_at=time.time(),
+        ),
     )
     attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
     view = FakeView(_steps=2)
     det, _ = build_trajectory_hint(store, enabled=True, max_age_days=30)
-    assert det.pre_call(
-        CallRequest(attr=attr, provider="openai", model="gpt-4o-mini"), view,
-    ) is None
+    assert (
+        det.pre_call(
+            CallRequest(attr=attr, provider="openai", model="gpt-4o-mini"),
+            view,
+        )
+        is None
+    )
 
 
 def test_trajectory_hint_requires_store():
@@ -191,13 +243,21 @@ def test_skip_inject_when_index_steps_below_min_index_steps(store):
     reg = RunRegistration(run_id="prior", intent="demo")
     task = "find enterprise pricing limits today"
     rec = RunRecord(
-        run_id="prior", agent="research", status="completed", task=task,
-        cost_micros=40_000, steps=2,
+        run_id="prior",
+        agent="research",
+        status="completed",
+        task=task,
+        cost_micros=40_000,
+        steps=2,
     )
     params = {**HINT_CFG["governance"]["policies"]["trajectory_hint"], "min_index_steps": 4}
     enqueue_completed_run(
-        store, rec=rec, registration=reg, agent="research",
-        window=[_tool_step()], policy_params=params,
+        store,
+        rec=rec,
+        registration=reg,
+        agent="research",
+        window=[_tool_step()],
+        policy_params=params,
     )
     store.drain_trajectory_build_queue(max_age_days=30)
 
@@ -211,11 +271,14 @@ def test_skip_inject_when_index_steps_below_min_index_steps(store):
     gov = build_governor(cfg, toy_price, controls, store=store)
     gov.ledger.open_run("run-new")
     store.create_run(
-        RunRecord(run_id="run-new", agent="research", status="running", task=task,
-                  started_at=time.time()),
+        RunRecord(
+            run_id="run-new", agent="research", status="running", task=task, started_at=time.time()
+        ),
     )
     attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
-    gov.pre_call(CallRequest(attr=attr, provider="openai", model="gpt-4o-mini", primary_agent_turn=True))
+    gov.pre_call(
+        CallRequest(attr=attr, provider="openai", model="gpt-4o-mini", primary_agent_turn=True)
+    )
     assert controls.of_kind(ActionKind.INJECT) == []
 
 
@@ -236,8 +299,12 @@ def test_tiered_hint_format():
     assert "LLM steps" not in short
 
     hit_long = TrajectoryHit(
-        source_run_id="run-y", step_count=14, cost_micros=200_000,
-        tool_sequence="a → b", step_summary="Full summary line.", match="simhash",
+        source_run_id="run-y",
+        step_count=14,
+        cost_micros=200_000,
+        tool_sequence="a → b",
+        step_summary="Full summary line.",
+        match="simhash",
     )
     assert hint_tier_for(14) == "full"
     full = format_hint(hit_long, tier="full")

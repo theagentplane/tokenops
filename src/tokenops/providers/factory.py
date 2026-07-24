@@ -15,25 +15,50 @@ def complete(
     # dependency (e.g. running OpenAI-only without the anthropic package installed).
     if provider == "anthropic":
         from tokenops.providers import anthropic
+
         # Anthropic has no frequency/presence penalty knobs; only the cap applies.
-        return anthropic.messages(model=model, messages=messages, max_output_tokens=max_output_tokens)
+        return anthropic.messages(
+            model=model, messages=messages, max_output_tokens=max_output_tokens
+        )
     from tokenops.providers import openai
-    return openai.chat(model=model, messages=messages, provider=provider,
-                       max_output_tokens=max_output_tokens,
-                       frequency_penalty=frequency_penalty, presence_penalty=presence_penalty)
+
+    return openai.chat(
+        model=model,
+        messages=messages,
+        provider=provider,
+        max_output_tokens=max_output_tokens,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
+    )
 
 
-def stream_complete(provider, model, messages, *, max_output_tokens=None,
-                    frequency_penalty=None, presence_penalty=None):
+def stream_complete(
+    provider,
+    model,
+    messages,
+    *,
+    max_output_tokens=None,
+    frequency_penalty=None,
+    presence_penalty=None,
+):
     """Yield visible output text chunks. Used by the CANCEL actuator (``wrap_stream``).
 
     Only OpenAI streaming is implemented; other providers fall back to a single chunk so the
     streaming wrap still functions (CANCEL simply has nothing to tear down)."""
     if provider == "anthropic":
         from tokenops.providers import anthropic
-        resp = anthropic.messages(model=model, messages=messages, max_output_tokens=max_output_tokens)
+
+        resp = anthropic.messages(
+            model=model, messages=messages, max_output_tokens=max_output_tokens
+        )
         yield resp.content
         return
     from tokenops.providers import openai
-    yield from openai.stream_chat(model, messages, max_output_tokens=max_output_tokens,
-                                  frequency_penalty=frequency_penalty, presence_penalty=presence_penalty)
+
+    yield from openai.stream_chat(
+        model,
+        messages,
+        max_output_tokens=max_output_tokens,
+        frequency_penalty=frequency_penalty,
+        presence_penalty=presence_penalty,
+    )

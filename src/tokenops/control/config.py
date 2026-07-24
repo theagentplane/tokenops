@@ -29,12 +29,13 @@ parameter raises at build time — never silently skipped.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from tokenops.control.engine import AgentControls, ApplyControls, Governor, PreviewControls
-from tokenops.control.models import GovernanceMode
 from tokenops.control.ledger import Budget, Ledger, PriceFn
+from tokenops.control.models import GovernanceMode
 from tokenops.control.policies import (
     concurrency_cap,
     context_compaction,
@@ -47,7 +48,6 @@ from tokenops.control.policies import (
     tool_fix,
     tool_output_cap,
 )
-
 
 if TYPE_CHECKING:
     from tokenops.control.store import Store
@@ -64,8 +64,9 @@ class _Ctx:
         try:
             return self.budgets[ref]
         except KeyError:
-            raise ValueError(f"policy references unknown budget {ref!r}; "
-                             f"known: {sorted(self.budgets)}") from None
+            raise ValueError(
+                f"policy references unknown budget {ref!r}; known: {sorted(self.budgets)}"
+            ) from None
 
 
 # Each adapter: (params, ctx) -> (Detector, Policy). Keeps build() signatures local to the
@@ -73,26 +74,41 @@ class _Ctx:
 _TEMPLATES = {
     "cost_budget": lambda p, c: cost_budget.build(c.budget(p["budget"])),
     "pre_call_worst_case": lambda p, c: pre_call_worst_case.build(
-        c.budget(p["budget"]), c.price, default_max_output=p.get("default_max_output", 1024)),
+        c.budget(p["budget"]), c.price, default_max_output=p.get("default_max_output", 1024)
+    ),
     "step_cap": lambda p, c: step_cap.build(p["max_steps"]),
     "concurrency_cap": lambda p, c: concurrency_cap.build(
-        p["max_concurrent"], dimension=p.get("dimension", "run"),
-        tag_key=p.get("tag_key"), mode=p.get("mode", "reject"),
-        retry_after_s=p.get("retry_after_s", 1.0)),
+        p["max_concurrent"],
+        dimension=p.get("dimension", "run"),
+        tag_key=p.get("tag_key"),
+        mode=p.get("mode", "reject"),
+        retry_after_s=p.get("retry_after_s", 1.0),
+    ),
     "tool_fix": lambda p, c: tool_fix.build(p["registry"], schema=p.get("schema"), k=p.get("k", 3)),
     "tool_output_cap": lambda p, c: tool_output_cap.build(p.get("cap_tokens", 8000)),
     "progress_guard": lambda p, c: progress_guard.build(
-        window=p.get("window", 6), repeats=p.get("repeats", 3),
-        max_corrections=p.get("max_corrections", 2), simhash_threshold=p.get("simhash_threshold", 4)),
+        window=p.get("window", 6),
+        repeats=p.get("repeats", 3),
+        max_corrections=p.get("max_corrections", 2),
+        simhash_threshold=p.get("simhash_threshold", 4),
+    ),
     "cost_guard": lambda p, c: cost_guard.build(
-        c.budget(p["budget"]), threshold=p.get("threshold", 0.8), mode=p.get("mode", "minimize"),
-        downgrade_to=p.get("downgrade_to"), velocity_micros_per_step=p.get("velocity_micros_per_step"),
-        velocity_m=p.get("velocity_m", 5)),
+        c.budget(p["budget"]),
+        threshold=p.get("threshold", 0.8),
+        mode=p.get("mode", "minimize"),
+        downgrade_to=p.get("downgrade_to"),
+        velocity_micros_per_step=p.get("velocity_micros_per_step"),
+        velocity_m=p.get("velocity_m", 5),
+    ),
     "context_compaction": lambda p, c: context_compaction.build(
-        p["ctx_max"], window=p.get("window", 4), has_hook=p.get("has_hook", True)),
+        p["ctx_max"], window=p.get("window", 4), has_hook=p.get("has_hook", True)
+    ),
     "output_runaway": lambda p, c: output_runaway.build(
-        n=p.get("n", 3), repeats=p.get("repeats", 4),
-        domination=p.get("domination", 0.5), max_retries=p.get("max_retries", 2)),
+        n=p.get("n", 3),
+        repeats=p.get("repeats", 4),
+        domination=p.get("domination", 0.5),
+        max_retries=p.get("max_retries", 2),
+    ),
 }
 
 

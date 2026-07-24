@@ -49,7 +49,9 @@ class LangChainResearchAgent:
         for step in range(1, cfg.max_steps + 1):
             prompt = prompts.decision_prompt(task, context, cfg.max_steps, step)
             response = self._llm.invoke(prompt)
-            content = response.content if isinstance(response.content, str) else str(response.content)
+            content = (
+                response.content if isinstance(response.content, str) else str(response.content)
+            )
             usage = getattr(response, "usage_metadata", None) or {}
             if on_step:
                 on_step(

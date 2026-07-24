@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from examples.app_config import AgentServerConfig
+from examples.ui.simulator import SimulationResult, run_simulation
 from tokenops.control.models import BudgetSpec, GovernanceMode, PolicyInstance
 from tokenops.control.store import Store
-from examples.ui.simulator import SimulationResult, run_simulation
 
 ChipId = Literal["cost_cap", "cost_guard"]
 

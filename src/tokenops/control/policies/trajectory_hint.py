@@ -25,7 +25,8 @@ Bench learnings (Phase 1):
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Literal
 
 from tokenops.control.core import (
     Action,
@@ -45,7 +46,6 @@ from tokenops.control.trajectory.scope import (
     normalize_input,
     scope_key,
     simhash_as_sqlite,
-    simhash_from_sqlite,
 )
 
 if TYPE_CHECKING:
@@ -181,20 +181,24 @@ class TrajectoryHintPolicy(Policy):
         ev = signal.evidence
         hit = TrajectoryHit(
             source_run_id=str(ev.get("source_run_id", "")),
-            step_count=int(ev.get("step_count", 0)),
-            cost_micros=int(ev.get("cost_micros", 0)),
+            step_count=int(str(ev.get("step_count", 0) or 0)),
+            cost_micros=int(str(ev.get("cost_micros", 0) or 0)),
             tool_sequence=str(ev.get("tool_sequence", "")),
             step_summary=str(ev.get("step_summary", "")),
             match=str(ev.get("match", "exact")),
         )
-        tier = str(ev.get("hint_tier", "full"))
+        raw_tier = str(ev.get("hint_tier", "full"))
+        allowed = ("sequence_only", "sequence_plus_pitfalls", "full")
+        tier: Literal["sequence_only", "sequence_plus_pitfalls", "full"] | None = (
+            raw_tier if raw_tier in allowed else None  # type: ignore[assignment]
+        )
         return Action(
             kind=ActionKind.INJECT,
             run_id=signal.run_id,
             reason=signal.reason,
             inject_message=format_hint(
                 hit,
-                tier=tier if tier in ("sequence_only", "sequence_plus_pitfalls", "full") else None,
+                tier=tier,
                 max_chars=self.hint_max_chars,
                 sequence_only_max_steps=self.sequence_only_max_steps,
                 sequence_plus_pitfalls_max_steps=self.sequence_plus_pitfalls_max_steps,

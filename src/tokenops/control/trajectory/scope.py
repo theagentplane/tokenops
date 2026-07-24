@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from tokenops.control.models import RunRegistration
 from tokenops.control.policies._util import simhash64
