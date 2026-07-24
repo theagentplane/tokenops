@@ -83,11 +83,16 @@ def on_enter(
     provider = str(state.get("provider") or gov_ctx.provider or "")
     model = str(state.get("model") or gov_ctx.model or "")
     raw_cap = state.get("max_output_tokens")
-    max_out: int | None
-    try:
-        max_out = int(raw_cap) if raw_cap is not None else None  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    max_out: int | None = None
+    if isinstance(raw_cap, bool):
         max_out = None
+    elif isinstance(raw_cap, int):
+        max_out = raw_cap
+    elif isinstance(raw_cap, str):
+        try:
+            max_out = int(raw_cap)
+        except ValueError:
+            max_out = None
 
     request = CallRequest(
         attr=gov_ctx.attr,

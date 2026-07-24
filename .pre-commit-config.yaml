@@ -17,3 +17,13 @@ repos:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
+
+  # Match CI / `make lint`: project mypy config from pyproject.toml.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: python -m mypy
+        language: system
+        pass_filenames: false
+        types: [python]
