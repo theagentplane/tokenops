@@ -34,7 +34,7 @@ Chronicle records decision boundaries; TokenOps observes them for cost/governanc
 | **Or embedded Store** *(single-process / tests)* | Omit `TOKENOPS_URL` or set `TOKENOPS_EMBEDDED=1`. |
 | **LLM API keys** | Only for real model calls — not required for TokenOps itself or offline tests. |
 | **FastAPI** | Only if you use `instrument_app`. Non-FastAPI: pass kwargs / `RequestContext` to `tokenops_run`. |
-| **Chronicle `@boundary`** | Only if tools should be governed; LLM-only stacks can stop at `wrap_complete`. |
+| **Chronicle `@boundary`** | Tools *and* LLM: `kind="llm"` runs pre_call via `on_enter`; tools stay observe-only. LLM-only stacks can use bare `@boundary(..., kind="llm")` under `tokenops_run` instead of `wrap_complete`. |
 
 You do **not** need A2A, `create_a2a_app`, LangChain, or the Admin UI for governance to work.
 
@@ -132,7 +132,8 @@ The **agent** (via `instrument_app` / `tokenops_run` kwargs), not the UI. Client
 
 ### When do I need Chronicle `@boundary`?
 
-When tools (search, fetch, etc.) should appear on the ledger / be governed. Without `@boundary` + the crossing hook, TokenOps only sees LLM calls you put through `wrap_complete`.
+- **LLM calls:** `@boundary(..., kind="llm")` under `tokenops_run` runs **pre_call** (via `on_enter`) and observe — enough for LLM-only stacks without `wrap_complete`.
+- **Tools** (search, fetch, etc.): still need `@boundary` + the crossing hook so they appear on the ledger / are governed. Without that, TokenOps only sees LLM crossings you decorate (or put through `wrap_complete`).
 
 ### Embedded Store vs `TOKENOPS_URL`?
 
