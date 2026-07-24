@@ -34,7 +34,7 @@ classifiers = [
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-  "agent-chronicle @ git+https://github.com/theagentplane/chronicle.git@feat/boundary-on-enter-precall",
+  "agent-chronicle>=0.3.0",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",
