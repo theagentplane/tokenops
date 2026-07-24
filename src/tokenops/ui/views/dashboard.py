@@ -53,14 +53,18 @@ with st.expander("Active governance (read-only)", expanded=False):
         st.warning("No policies configured — run `make db-reseed` or add them in Policy admin.")
     else:
         label = gov_agent or "(global)"
-        st.markdown(f"**{len(budgets)}** budget(s), **{len(policies)}** policy template(s) for `{label}`")
+        st.markdown(
+            f"**{len(budgets)}** budget(s), **{len(policies)}** policy template(s) for `{label}`"
+        )
         if budgets:
             st.markdown("**Budgets**")
             st.dataframe(
                 [
                     {
                         "id": b["id"],
-                        "limit_usd": None if b.get("limit_micros") is None else b["limit_micros"] / 1_000_000,
+                        "limit_usd": None
+                        if b.get("limit_micros") is None
+                        else b["limit_micros"] / 1_000_000,
                         "dimension": b.get("dimension", "run"),
                     }
                     for b in budgets
@@ -93,9 +97,13 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
     c4.metric("Avg $/run", f"${_usd(total_cost // max(1, len(runs))):.4f}")
 
     tag_keys = store.run_tag_keys()
-    group_by = st.selectbox("Segment by", ["agent"] + tag_keys, key="dash_group_by",
-                            help="Group runs by agent, or by any custom tag emitted on the run "
-                                 "(set tags in the Run simulator or via user_dims on /v1/runs).")
+    group_by = st.selectbox(
+        "Segment by",
+        ["agent"] + tag_keys,
+        key="dash_group_by",
+        help="Group runs by agent, or by any custom tag emitted on the run "
+        "(set tags in the Run simulator or via user_dims on /v1/runs).",
+    )
 
     def _seg(r) -> str:
         return r.agent if group_by == "agent" else (r.dims.get(group_by) or "—")
@@ -110,9 +118,14 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
     st.subheader(f"Cost by {group_by}")
     st.bar_chart(pd.DataFrame({"cost_usd": {s: _usd(m) for s, m in seg_cost.items()}}))
     st.dataframe(
-        pd.DataFrame([{group_by: s, "runs": seg_runs[s], "cost_usd": _usd(seg_cost[s])}
-                      for s in sorted(seg_cost)]),
-        use_container_width=True, hide_index=True,
+        pd.DataFrame(
+            [
+                {group_by: s, "runs": seg_runs[s], "cost_usd": _usd(seg_cost[s])}
+                for s in sorted(seg_cost)
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
     )
 
     st.subheader("Runs")
@@ -121,13 +134,23 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
     seg_values = ["(all)"] + sorted({_seg(r) for r in runs})
     pick = fcol2.selectbox(f"Filter by {group_by}", seg_values, key="dash_seg_filter")
     shown = [r for r in (problematic if only_bad else runs) if pick == "(all)" or _seg(r) == pick]
-    table = pd.DataFrame([{
-        "run_id": r.run_id, "agent": r.agent, "status": r.status,
-        "cost_usd": _usd(r.cost_micros), "steps": r.steps,
-        "duration_s": _duration(r), "dims": r.dims, "halt_reason": r.halt_reason or "",
-        "parent_run": r.parent_run or "",
-        "gov_events": len(r.governance_events or []),
-    } for r in shown])
+    table = pd.DataFrame(
+        [
+            {
+                "run_id": r.run_id,
+                "agent": r.agent,
+                "status": r.status,
+                "cost_usd": _usd(r.cost_micros),
+                "steps": r.steps,
+                "duration_s": _duration(r),
+                "dims": r.dims,
+                "halt_reason": r.halt_reason or "",
+                "parent_run": r.parent_run or "",
+                "gov_events": len(r.governance_events or []),
+            }
+            for r in shown
+        ]
+    )
     st.dataframe(table, use_container_width=True, hide_index=True)
 
 # ---- run detail picker (when not already focused) ------------------------ #
@@ -138,7 +161,9 @@ if not focus_run:
         "Inspect run",
         run_ids,
         index=default_idx,
-        format_func=lambda rid: f"{rid} · {store.get_run(rid).status if store.get_run(rid) else '?'}",
+        format_func=lambda rid: (
+            f"{rid} · {store.get_run(rid).status if store.get_run(rid) else '?'}"
+        ),
         key="dash_pick_run",
     )
     detail = store.get_run(pick_run)

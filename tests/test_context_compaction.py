@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind, CallRequest, Usage
 from tokenops.control.policies import context_compaction
-from conftest import make_attr, make_step, FakeView
 
 
 def _req(est):
-    return CallRequest(attr=make_attr(), provider="openai", model="gpt-4o-mini",
-                       estimated_input_tokens=est)
+    return CallRequest(
+        attr=make_attr(), provider="openai", model="gpt-4o-mini", estimated_input_tokens=est
+    )
 
 
 def test_trips_at_ctx_max_and_mutates():

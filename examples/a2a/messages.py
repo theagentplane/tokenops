@@ -38,8 +38,9 @@ def task_response(result: RunResult) -> dict[str, Any]:
     return {"type": "TaskResponse", **result.to_dict()}
 
 
-def summarize_request(task: str, findings: list[Finding], parent_run: str | None = None,
-                      user: str = "ui") -> dict[str, Any]:
+def summarize_request(
+    task: str, findings: list[Finding], parent_run: str | None = None, user: str = "ui"
+) -> dict[str, Any]:
     return {
         "type": "SummarizeRequest",
         "task": task,

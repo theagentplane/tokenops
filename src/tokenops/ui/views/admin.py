@@ -48,21 +48,26 @@ with seg_tab:
     _seg_key = edit_seg
 
     with st.form("seg"):
-        sid = st.text_input("Id", value=seg_prefill.id if seg_prefill else new_id("seg"), key=f"seg_id_{_seg_key}")
-        name = st.text_input("Name", value=seg_prefill.name if seg_prefill else "", placeholder="acme tenant")
+        sid = st.text_input(
+            "Id", value=seg_prefill.id if seg_prefill else new_id("seg"), key=f"seg_id_{_seg_key}"
+        )
+        name = st.text_input(
+            "Name", value=seg_prefill.name if seg_prefill else "", placeholder="acme tenant"
+        )
         dim = st.selectbox(
             "Dimension",
             DIMENSIONS,
             index=DIMENSIONS.index(seg_prefill.dimension) if seg_prefill else 0,
         )
-        tag_key = st.text_input("Tag key (only for dimension=tag)", value=seg_prefill.tag_key or "" if seg_prefill else "")
+        tag_key = st.text_input(
+            "Tag key (only for dimension=tag)",
+            value=seg_prefill.tag_key or "" if seg_prefill else "",
+        )
         col1, col2 = st.columns(2)
         save = col1.form_submit_button("Save segment", type="primary")
         delete = col2.form_submit_button("Delete", disabled=edit_seg == "(new)")
         if save and name:
-            store.upsert_segment(
-                Segment(id=sid, name=name, dimension=dim, tag_key=tag_key or None)
-            )
+            store.upsert_segment(Segment(id=sid, name=name, dimension=dim, tag_key=tag_key or None))
             st.success(f"Saved segment {name!r}")
             st.rerun()
         if delete and edit_seg != "(new)":
@@ -189,10 +194,20 @@ with policy_tab:
             key=f"policy_agent_{_pol_key}",
             placeholder="e.g. research",
         ).strip()
-        bud_default = pol_prefill.budget_id if pol_prefill and pol_prefill.budget_id in budget_options else "(none)"
+        bud_default = (
+            pol_prefill.budget_id
+            if pol_prefill and pol_prefill.budget_id in budget_options
+            else "(none)"
+        )
         budget_id = st.selectbox("Budget", budget_options, index=budget_options.index(bud_default))
-        seg_default = pol_prefill.segment_id if pol_prefill and pol_prefill.segment_id in segment_options else "(none)"
-        segment_id = st.selectbox("Segment", segment_options, index=segment_options.index(seg_default))
+        seg_default = (
+            pol_prefill.segment_id
+            if pol_prefill and pol_prefill.segment_id in segment_options
+            else "(none)"
+        )
+        segment_id = st.selectbox(
+            "Segment", segment_options, index=segment_options.index(seg_default)
+        )
         enabled = st.checkbox("Enabled", value=pol_prefill.enabled if pol_prefill else True)
         col1, col2 = st.columns(2)
         save = col1.form_submit_button("Save policy", type="primary")

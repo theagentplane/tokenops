@@ -13,7 +13,7 @@ from pathlib import Path
 
 import httpx
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 os.chdir(ROOT)
 os.environ.setdefault("PYTHONPATH", str(ROOT))
@@ -146,7 +146,9 @@ def main() -> int:
 
     print(f"Starting product UI (Admin + Dashboard) at http://localhost:{UI_PORT}")
     import pathlib
+
     import tokenops.ui as _tokenops_ui
+
     ui_app = pathlib.Path(_tokenops_ui.__file__).resolve().parent / "app.py"
     ui = subprocess.run(
         [

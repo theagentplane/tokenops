@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import FakeView, make_attr, make_step, toy_price
 from tokenops.control import ActionKind, Budget, Governor, Halt, Ledger, Observation, Usage
 from tokenops.control.policies import cost_budget
-from conftest import make_attr, make_step, toy_price, FakeView
-
 
 CAP = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="run")
 
 
 # ---- unit: detector + policy in isolation (FakeView) --------------------- #
+
 
 def test_detector_trips_when_exhausted():
     det, _ = cost_budget.build(CAP)
@@ -34,6 +34,7 @@ def test_policy_maps_trip_to_halt():
 
 # ---- e2e: through the Governor + real Ledger ----------------------------- #
 
+
 def test_e2e_sticky_halt_and_kill_switch():
     ledger = Ledger(budgets=[CAP], price=toy_price)
     gov = Governor(ledger)
@@ -42,10 +43,20 @@ def test_e2e_sticky_halt_and_kill_switch():
     ledger.open_run("run-1")
 
     def llm():
-        gov.observe(Observation(attr=attr, node_type="llm", boundary_id="chat", ts=1.0,
-                                provider="openai", model="gpt-4o-mini", usage=Usage(input=820, output=45)))
+        gov.observe(
+            Observation(
+                attr=attr,
+                node_type="llm",
+                boundary_id="chat",
+                ts=1.0,
+                provider="openai",
+                model="gpt-4o-mini",
+                usage=Usage(input=820, output=45),
+            )
+        )
 
-    llm(); llm()  # 9550 * 2 = 19100 < 20000
+    llm()
+    llm()  # 9550 * 2 = 19100 < 20000
     with pytest.raises(Halt):
         llm()  # 28650 ≥ 20000 → trip
     assert ledger.is_halted("run-1")

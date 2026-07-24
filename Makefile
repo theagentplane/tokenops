@@ -5,7 +5,8 @@
 	scout-server analyst-server editor-server \
 	stop-demo stop-triad stop-brief \
 	db-clear db-reseed db-reset \
-	dist check-dist
+	dist check-dist \
+	lint format test
 
 PYTHON ?= python3
 export PYTHONPATH := .$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -14,6 +15,18 @@ export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
 	$(PYTHON) -m pip install -e ".[dev,examples]"
+
+lint:
+	$(PYTHON) -m ruff check src tests examples
+	$(PYTHON) -m ruff format --check src tests examples
+	$(PYTHON) -m mypy
+
+format:
+	$(PYTHON) -m ruff check --fix src tests examples
+	$(PYTHON) -m ruff format src tests examples
+
+test:
+	$(PYTHON) -m pytest -q
 
 # Build sdist + wheel under dist/ (see RELEASING.md).
 dist:
@@ -83,13 +96,13 @@ bench-ui:
 	streamlit run examples/ui/app.py --server.port 8501
 
 demo: stop-demo
-	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/default.yaml} $(PYTHON) run.py
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/default.yaml} $(PYTHON) examples/run.py
 
 demo-triad: stop-triad
-	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) run_triad.py
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/triad.yaml} $(PYTHON) examples/run_triad.py
 
 demo-brief: stop-brief
-	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) run_brief.py
+	TOKENOPS_CONFIG=$${TOKENOPS_CONFIG:-examples/config/brief.yaml} $(PYTHON) examples/run_brief.py
 
 stop-demo:
 	@for port in 7700 8001 8002 8501; do \

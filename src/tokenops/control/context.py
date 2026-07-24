@@ -6,10 +6,11 @@ threading dims through every handler signature.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Iterator, Mapping
+from typing import Any
 
 from tokenops.control.core import Attribution
 from tokenops.control.models import RunRegistration
@@ -34,14 +35,14 @@ class BoundRun:
 
 _registration: ContextVar[RunRegistration | None] = ContextVar("run_registration", default=None)
 _span: ContextVar[SpanContext | None] = ContextVar("run_span", default=None)
-_governance: ContextVar["GovernanceContext | None"] = ContextVar("governance", default=None)
+_governance: ContextVar[GovernanceContext | None] = ContextVar("governance", default=None)
 
 
 @dataclass(frozen=True, kw_only=True)
 class GovernanceContext:
     """Bound governor + attribution for ``@boundary`` ingest within a request."""
 
-    governor: object
+    governor: Any
     attr: Attribution
     provider: str = ""
     model: str = ""

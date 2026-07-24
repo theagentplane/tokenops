@@ -84,9 +84,9 @@ class PolicyInstance:
     attached to a budget and/or segment."""
 
     id: str
-    template: str               # a key of control.config._TEMPLATES
+    template: str  # a key of control.config._TEMPLATES
     params: dict[str, Any] = field(default_factory=dict)
-    agent: str | None = None    # None = applies to every agent
+    agent: str | None = None  # None = applies to every agent
     budget_id: str | None = None
     segment_id: str | None = None
     enabled: bool = True

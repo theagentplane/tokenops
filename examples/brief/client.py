@@ -49,7 +49,10 @@ def submit_brief_sync_with_meta(
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[RunResult, dict[str, object]]:
     """POST the topic to Scout (entry). Scout registers the run when run_id is omitted."""
-    if not (os.environ.get("TOKENOPS_URL") or "").strip() and os.environ.get("TOKENOPS_EMBEDDED") != "1":
+    if (
+        not (os.environ.get("TOKENOPS_URL") or "").strip()
+        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
+    ):
         os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = task_request(task=topic, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
@@ -82,7 +85,10 @@ async def delegate_analyst(
     parent_span_id: str | None = None,
 ) -> tuple[list[Finding], TokenUsage, list[StepEvent], int]:
     payload = analyze_request(
-        topic, angles, sections=sections, bench={"corpus_profile": corpus_profile},
+        topic,
+        angles,
+        sections=sections,
+        bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
     if run_id:

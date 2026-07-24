@@ -1,4 +1,4 @@
-name: test
+name: ci
 
 on:
   push:
@@ -6,17 +6,23 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Install dependencies
@@ -24,5 +30,14 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -e ".[dev]"
 
-      - name: Test
+      - name: Ruff check
+        run: python -m ruff check src tests examples
+
+      - name: Ruff format
+        run: python -m ruff format --check src tests examples
+
+      - name: Mypy
+        run: python -m mypy
+
+      - name: Pytest
         run: python -m pytest -q

@@ -55,7 +55,7 @@ def max_ngram_repeat(text: str, n: int = 3) -> int:
     words = _WORD.findall(text)
     if len(words) < n:
         return 0
-    grams = Counter(tuple(words[i:i + n]) for i in range(len(words) - n + 1))
+    grams = Counter(tuple(words[i : i + n]) for i in range(len(words) - n + 1))
     return max(grams.values())
 
 

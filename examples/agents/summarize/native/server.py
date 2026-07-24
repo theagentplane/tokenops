@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Mapping
+from collections.abc import Mapping
 
 from examples.a2a.messages import parse_findings, summarize_response
 from examples.a2a.server import create_a2a_app, run_server
@@ -59,8 +59,13 @@ def build_app():
                 token_usage.output_tokens += event.tokens.output_tokens
 
             governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=complete, service=AGENT,
+                governor,
+                controls,
+                attr,
+                provider=cfg.provider,
+                model=cfg.model,
+                dispatch=complete,
+                service=AGENT,
             )
 
             status, halt_reason, summary = "completed", None, ""
@@ -81,7 +86,10 @@ def build_app():
                 )
 
             response = summarize_response(
-                summary, token_usage, steps, cost_micros=governor.ledger.cost_micros(run_id),
+                summary,
+                token_usage,
+                steps,
+                cost_micros=governor.ledger.cost_micros(run_id),
             )
             response.update(run_id=run_id, status=status)
             if halt_reason:

@@ -7,15 +7,19 @@ import anthropic
 from tokenops.providers.types import ModelResponse
 
 
-def messages(model: str, messages: list[dict[str, str]],
-             max_output_tokens: int | None = None) -> ModelResponse:
+def messages(
+    model: str, messages: list[dict[str, str]], max_output_tokens: int | None = None
+) -> ModelResponse:
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     system_parts = [m["content"] for m in messages if m["role"] == "system"]
     user_parts = [m["content"] for m in messages if m["role"] == "user"]
     system = "\n\n".join(system_parts) if system_parts else None
     user = "\n\n".join(user_parts)
-    kwargs: dict = {"model": model, "max_tokens": max_output_tokens or 2048,
-                    "messages": [{"role": "user", "content": user}]}
+    kwargs: dict = {
+        "model": model,
+        "max_tokens": max_output_tokens or 2048,
+        "messages": [{"role": "user", "content": user}],
+    }
     if system:
         kwargs["system"] = system
     response = client.messages.create(**kwargs)

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import replace
-from typing import Callable
 
-from tokenops.control.context import current_governance
+from chronicle import InputState, boundary
 
 from examples.agents.research import prompts
 from examples.agents.research.tools import core
 from examples.agents.types import CorpusProfile, Finding, StepCallback, StepEvent, TokenUsage
 from examples.app_config import AgentServerConfig
-from chronicle import InputState, boundary
+from tokenops.control.context import current_governance
 from tokenops.providers import complete
 
 

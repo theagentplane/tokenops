@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
 import chronicle.session as chronicle_session
 from chronicle import get_session
 
+from conftest import toy_price
 from tokenops.control import (
     ApplyControls,
     Governor,
@@ -14,10 +13,10 @@ from tokenops.control import (
     install_crossing_hook,
     wrap_complete,
 )
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.providers.types import ModelResponse
-from conftest import toy_price
 
 
 def _scripted(content: str = "hello", inp: int = 10, out: int = 5):
@@ -42,9 +41,13 @@ def test_wrap_complete_observes_via_crossing_hook_once():
 
     dispatch, calls = _scripted()
     governed = wrap_complete(
-        gov, controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=dispatch, service="research",
+        gov,
+        controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=dispatch,
+        service="research",
     )
 
     chronicle_session.reset_session().begin_trace("r-w4")
@@ -75,9 +78,13 @@ def test_wrap_complete_no_ledger_without_governance_scope():
 
     dispatch, _ = _scripted()
     governed = wrap_complete(
-        gov, controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=dispatch, service="research",
+        gov,
+        controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=dispatch,
+        service="research",
     )
 
     chronicle_session.reset_session().begin_trace("r-bare")

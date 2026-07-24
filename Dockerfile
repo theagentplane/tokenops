@@ -6,12 +6,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt pyproject.toml README.md ./
+COPY pyproject.toml README.md ./
 COPY src ./src
 COPY examples ./examples
 COPY benchmarking ./benchmarking
 COPY scripts ./scripts
-COPY run.py run_triad.py run_brief.py ./
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -e ".[examples]"

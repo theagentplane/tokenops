@@ -7,10 +7,14 @@ from openai import OpenAI
 from tokenops.providers.types import ModelResponse
 
 
-def chat(model: str, messages: list[dict[str, str]], provider: str = "openai",
-         max_output_tokens: int | None = None,
-         frequency_penalty: float | None = None,
-         presence_penalty: float | None = None) -> ModelResponse:
+def chat(
+    model: str,
+    messages: list[dict[str, str]],
+    provider: str = "openai",
+    max_output_tokens: int | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
+) -> ModelResponse:
     if provider == "openai":
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         kwargs: dict = {"model": model, "messages": messages}
@@ -32,13 +36,19 @@ def chat(model: str, messages: list[dict[str, str]], provider: str = "openai",
     # Anthropic via OpenAI-compatible path not used; delegate to anthropic module
     from tokenops.providers import anthropic as anthropic_provider
 
-    return anthropic_provider.messages(model=model, messages=messages, max_output_tokens=max_output_tokens)
+    return anthropic_provider.messages(
+        model=model, messages=messages, max_output_tokens=max_output_tokens
+    )
 
 
-def stream_chat(model: str, messages: list[dict[str, str]], *,
-                max_output_tokens: int | None = None,
-                frequency_penalty: float | None = None,
-                presence_penalty: float | None = None):
+def stream_chat(
+    model: str,
+    messages: list[dict[str, str]],
+    *,
+    max_output_tokens: int | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
+):
     """Yield visible output text chunks as they stream. The control plane's CANCEL tears
     this generator down mid-flight (``generator.close()``) to stop a runaway bleed."""
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))

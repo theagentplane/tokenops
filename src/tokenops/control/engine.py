@@ -20,8 +20,9 @@ this is what makes HALT sticky and idempotent across A2A.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from tokenops.control.core import (
     Action,
@@ -55,6 +56,7 @@ class Throttled(Exception):
 # OUT connector                                                               #
 # =========================================================================== #
 
+
 @runtime_checkable
 class AgentControls(Protocol):
     """Connector OUT — the single channel the control plane uses to act on a run. One
@@ -77,10 +79,13 @@ class RaiseControls:
             return
         if action.kind is ActionKind.HALT:
             raise Halt(action)
-        raise Halt(Action(
-            kind=ActionKind.HALT, run_id=action.run_id,
-            reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
-        ))
+        raise Halt(
+            Action(
+                kind=ActionKind.HALT,
+                run_id=action.run_id,
+                reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
+            )
+        )
 
 
 @dataclass
@@ -166,23 +171,20 @@ class PreviewControls(ApplyControls):
         return {
             "action_count": len(self.actions),
             "would_halt": any(a.kind is ActionKind.HALT for a in self.actions),
-            "actions": [
-                {"kind": a.kind.value, "reason": a.reason}
-                for a in self.actions
-            ],
+            "actions": [{"kind": a.kind.value, "reason": a.reason} for a in self.actions],
         }
 
 
 def policy_hint_from_reason(reason: str) -> str:
-  """Best-effort policy name for dashboard display."""
-  r = reason.lower()
-  if "worst-case" in r or "bounding to" in r or "output cap" in r:
-      return "pre_call_worst_case"
-  if "minimizing" in r or "budget pressure" in r:
-      return "cost_guard"
-  if "exhausted" in r or "no budget" in r:
-      return "cost_budget"
-  return "—"
+    """Best-effort policy name for dashboard display."""
+    r = reason.lower()
+    if "worst-case" in r or "bounding to" in r or "output cap" in r:
+        return "pre_call_worst_case"
+    if "minimizing" in r or "budget pressure" in r:
+        return "cost_guard"
+    if "exhausted" in r or "no budget" in r:
+        return "cost_budget"
+    return "—"
 
 
 def governance_events_payload(controls: ApplyControls | PreviewControls) -> list[dict[str, Any]]:
@@ -216,6 +218,7 @@ def halt_detector_from_events(events: Sequence[dict[str, Any]]) -> str | None:
 # =========================================================================== #
 # Governor — the harness                                                       #
 # =========================================================================== #
+
 
 class Governor:
     """Wires ledger + detectors + policies + OUT connector into the three moments.
@@ -252,21 +255,22 @@ class Governor:
 
     def pre_call(self, request: CallRequest) -> None:
         self._refuse_if_halted(request.attr.run_id)
-        signals = [s for d in self._detectors
-                   if (s := d.pre_call(request, self.ledger)) is not None]
+        signals = [
+            s for d in self._detectors if (s := d.pre_call(request, self.ledger)) is not None
+        ]
         self._enforce(signals)
 
     def observe(self, obs: Observation):
         self._refuse_if_halted(obs.attr.run_id)
         step = self.ledger.record(obs)  # Attribute: price → spent → append → steps++
-        signals = [s for d in self._detectors
-                   if (s := d.observe(obs.attr, step, self.ledger)) is not None]
+        signals = [
+            s for d in self._detectors if (s := d.observe(obs.attr, step, self.ledger)) is not None
+        ]
         self._enforce(signals)
         return step
 
     def tick(self, now: float) -> None:
-        signals = [s for d in self._detectors
-                   if (s := d.tick(now, self.ledger)) is not None]
+        signals = [s for d in self._detectors if (s := d.tick(now, self.ledger)) is not None]
         self._enforce(signals)
 
     # ---- internals -------------------------------------------------------- #
@@ -275,10 +279,13 @@ class Governor:
         """The IN-edge kill switch: once halted, every later call is refused — even if the
         agent caught the first Halt and kept going."""
         if self.ledger.is_halted(run_id):
-            self.controls.apply(Action(
-                kind=ActionKind.HALT, run_id=run_id,
-                reason="run already halted; refusing further calls",
-            ))
+            self.controls.apply(
+                Action(
+                    kind=ActionKind.HALT,
+                    run_id=run_id,
+                    reason="run already halted; refusing further calls",
+                )
+            )
 
     def _enforce(self, signals: Sequence[Signal]) -> None:
         for sig in sorted(signals, key=lambda s: _SEVERITY_RANK[s.severity], reverse=True):

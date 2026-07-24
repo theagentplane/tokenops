@@ -7,13 +7,13 @@ import streamlit as st
 import yaml
 
 from examples.app_config import load_config
-from tokenops.env import load_env
 from examples.ui.simulator import (
     SimulationResult,
     event_timeline,
     run_simulation,
     window_rows,
 )
+from tokenops.env import load_env
 from tokenops.ui.store_client import get_store
 from tokenops.ui.theme import page_shell
 
@@ -38,7 +38,9 @@ with st.sidebar:
     )
     if demo_scenario == "search_loop_trap":
         corpus_profile = "leak"
-        st.caption("Corpus: **leak** (fixed for this scenario). Set `SEARCH_BACKEND=corpus` before starting UI.")
+        st.caption(
+            "Corpus: **leak** (fixed for this scenario). Set `SEARCH_BACKEND=corpus` before starting UI."
+        )
     else:
         corpus_profile = st.selectbox("Corpus profile", ["healthy", "leak"], index=0)
     demo_mode = st.toggle("Demo mode (stub LLM)", value=True, help="No API key needed.")
@@ -55,13 +57,17 @@ with st.sidebar:
     country = st.text_input("Country", "US")
     user_id = st.text_input("user_id", "simulator")
     custom_tags_raw = st.text_area(
-        "Custom tags (key=value per line)", "team=growth", height=70,
+        "Custom tags (key=value per line)",
+        "team=growth",
+        height=70,
         help="Segment runs by any tag — group/filter them on the Dashboard.",
     )
 
     st.markdown("#### Agents")
     _default_steps = 12 if demo_scenario == "search_loop_trap" else 5
-    max_steps = st.number_input("Research max steps", min_value=1, max_value=50, value=_default_steps)
+    max_steps = st.number_input(
+        "Research max steps", min_value=1, max_value=50, value=_default_steps
+    )
     if demo_scenario == "search_loop_trap":
         st.caption("Use **max steps ≥ 8** so the stub can repeat search enough times.")
 
@@ -96,9 +102,7 @@ if start:
             from tokenops.control.models import GovernanceMode
 
             _sat = (
-                0.99
-                if demo_scenario == "search_loop_trap"
-                else cfg.research.satisfaction_threshold
+                0.99 if demo_scenario == "search_loop_trap" else cfg.research.satisfaction_threshold
             )
             result = run_simulation(
                 store,
@@ -247,7 +251,11 @@ with tab_trace:
 
 with tab_ctrl:
     st.subheader("Policy signals & actions")
-    ctrl_events = [e for e in result.events if e.category in ("pre_call", "signal", "action", "halt", "throttle")]
+    ctrl_events = [
+        e
+        for e in result.events
+        if e.category in ("pre_call", "signal", "action", "halt", "throttle")
+    ]
     if ctrl_events:
         st.dataframe(pd.DataFrame([e.to_row() for e in ctrl_events]), use_container_width=True)
     else:
@@ -257,13 +265,17 @@ with tab_ctrl:
     with col_r:
         st.subheader("Research ledger window")
         if result.research_window:
-            st.dataframe(pd.DataFrame(window_rows(result.research_window)), use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(window_rows(result.research_window)), use_container_width=True
+            )
         else:
             st.caption("Empty.")
     with col_s:
         st.subheader("Summarize ledger window")
         if result.summarize_window:
-            st.dataframe(pd.DataFrame(window_rows(result.summarize_window)), use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(window_rows(result.summarize_window)), use_container_width=True
+            )
         else:
             st.caption("Empty.")
 

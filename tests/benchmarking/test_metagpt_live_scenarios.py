@@ -6,14 +6,13 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-
 from benchmarking.metagpt.configs import (
     tokenops_config_for_run,
     tokenops_config_model_routing,
     tokenops_config_steering,
 )
 from benchmarking.metagpt.evaluate import evaluate_ab, policies_present
-from benchmarking.metagpt.scenario_expectations import EXPECTATIONS
+from benchmarking.metagpt.scenario_expectations import EXPECTATIONS, get_expectation
 from benchmarking.metagpt.scenarios_live import (
     ALL_SUITE,
     CAP_SUITE,
@@ -23,7 +22,6 @@ from benchmarking.metagpt.scenarios_live import (
     TRAP_SUITE,
     get_scenario,
 )
-from benchmarking.metagpt.scenario_expectations import get_expectation
 
 VENDOR_ROOT = Path(__file__).resolve().parents[2] / "benchmarking/metagpt/vendor"
 

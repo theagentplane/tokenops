@@ -13,7 +13,7 @@ from pathlib import Path
 _RUN_ID_RE = re.compile(r"run_[0-9a-f]{8}")
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "bench" / "demo-assets"
+ASSETS = ROOT / "examples" / "demo-assets"
 CODE_SHOTS = ASSETS / "code"
 VIDEOS = ASSETS / "videos"
 UI_BASE = "http://localhost:8501"

@@ -33,7 +33,9 @@ class AgentServerConfig:
     summarize_url: str = "http://localhost:8002"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: AgentServerConfig | None = None) -> AgentServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: AgentServerConfig | None = None
+    ) -> AgentServerConfig:
         base = defaults or cls()
         return cls(
             url=str(data.get("url", base.url)),
@@ -58,7 +60,9 @@ class SummarizeServerConfig:
     port: int = 8002
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: SummarizeServerConfig | None = None) -> SummarizeServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: SummarizeServerConfig | None = None
+    ) -> SummarizeServerConfig:
         base = defaults or cls()
         return SummarizeServerConfig(
             url=str(data.get("url", base.url)),
@@ -80,7 +84,9 @@ class PlannerServerConfig:
     writer_url: str = "http://localhost:8013"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: PlannerServerConfig | None = None) -> PlannerServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: PlannerServerConfig | None = None
+    ) -> PlannerServerConfig:
         base = defaults or cls()
         return cls(
             url=str(data.get("url", base.url)),
@@ -127,7 +133,9 @@ class WriterServerConfig:
     port: int = 8013
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: WriterServerConfig | None = None) -> WriterServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: WriterServerConfig | None = None
+    ) -> WriterServerConfig:
         base = defaults or cls()
         return cls(
             url=str(data.get("url", base.url)),
@@ -148,7 +156,9 @@ class ScoutServerConfig:
     editor_url: str = "http://localhost:8023"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: ScoutServerConfig | None = None) -> ScoutServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: ScoutServerConfig | None = None
+    ) -> ScoutServerConfig:
         base = defaults or cls()
         return cls(
             url=str(data.get("url", base.url)),
@@ -195,7 +205,9 @@ class EditorServerConfig:
     port: int = 8023
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], defaults: EditorServerConfig | None = None) -> EditorServerConfig:
+    def from_dict(
+        cls, data: dict[str, Any], defaults: EditorServerConfig | None = None
+    ) -> EditorServerConfig:
         base = defaults or cls()
         return cls(
             url=str(data.get("url", base.url)),

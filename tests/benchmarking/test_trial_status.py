@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from benchmarking.common.harness import RunOutcome
 from benchmarking.common.trial import TrialStatus, classify_trial, classify_win, showcase_pass
 
 

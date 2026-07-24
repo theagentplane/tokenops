@@ -11,29 +11,34 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from examples.agents.research.native.agent import NativeResearchAgent
-from examples.agents.summarize.native.agent import NativeSummarizeAgent
-from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from chronicle import Envelope
 from chronicle.session import reset_session
 
-from tokenops.control import install_crossing_hook
+from examples.agents.research.native.agent import NativeResearchAgent
+from examples.agents.summarize.native.agent import NativeSummarizeAgent
+from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.app_config import AgentServerConfig
-from tokenops.control.context import (
-    PARENT_SPAN_ID_HEADER,
-    RUN_ID_HEADER,
-)
 from tokenops import tokenops_run
 from tokenops.control import (
     ApplyControls,
     Halt,
     PreviewControls,
     build_governor,
+    install_crossing_hook,
     wrap_complete,
 )
+from tokenops.control.context import (
+    PARENT_SPAN_ID_HEADER,
+    RUN_ID_HEADER,
+)
 from tokenops.control.core import Action, BoundaryStep, CallRequest, Observation, Signal
-from tokenops.control.engine import Governor, Throttled, governance_events_payload, halt_detector_from_events
-from tokenops.control.models import GovernanceMode, RunRegistration, RunRecord
+from tokenops.control.engine import (
+    Governor,
+    Throttled,
+    governance_events_payload,
+    halt_detector_from_events,
+)
+from tokenops.control.models import GovernanceMode, RunRecord, RunRegistration
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
@@ -55,7 +60,22 @@ class TraceEvent:
             "category": self.category,
             "agent": self.agent,
             "title": self.title,
-            **{k: v for k, v in self.detail.items() if k in ("run_id", "span_id", "parent_span_id", "service", "kind", "severity", "action", "step", "cost_micros")},
+            **{
+                k: v
+                for k, v in self.detail.items()
+                if k
+                in (
+                    "run_id",
+                    "span_id",
+                    "parent_span_id",
+                    "service",
+                    "kind",
+                    "severity",
+                    "action",
+                    "step",
+                    "cost_micros",
+                )
+            },
         }
 
 
@@ -144,7 +164,9 @@ class _LoggingApplyControls(ApplyControls):
 
 
 class _TraceGovernor(Governor):
-    def __init__(self, ledger, controls: _LoggingApplyControls, *, agent: str, log: _TraceLog) -> None:
+    def __init__(
+        self, ledger, controls: _LoggingApplyControls, *, agent: str, log: _TraceLog
+    ) -> None:
         super().__init__(ledger, controls)
         self._agent = agent
         self._log = log
@@ -398,7 +420,11 @@ def run_simulation(
             headers = {RUN_ID_HEADER: run_id, PARENT_SPAN_ID_HEADER: parent_span_id}
             # Downstream hop — sequential tokenops_run (joins existing run_id).
             summarize_gov = _make_trace_governor(
-                store, "summarize", log, price, mode=governance_mode,
+                store,
+                "summarize",
+                log,
+                price,
+                mode=governance_mode,
             )
             with tokenops_run(
                 store=store,
@@ -409,60 +435,60 @@ def run_simulation(
                 governor=summarize_gov,
                 controls=summarize_gov.controls,
             ) as sum_bound:
-            log.emit(
-                "span",
-                "downstream span bound",
-                agent="summarize",
-                run_id=run_id,
-                span_id=sum_bound.span.span_id,
-                parent_span_id=sum_bound.span.parent_span_id,
-                service=sum_bound.span.service,
-            )
-            store.create_run(
-                RunRecord(
-                    run_id=run_id,
+                log.emit(
+                    "span",
+                    "downstream span bound",
                     agent="summarize",
-                    status="running",
-                    parent_span=parent_span_id,
-                    task=task,
-                    started_at=time.time(),
-                    dims={**user_dims, "intent": intent},
+                    run_id=run_id,
+                    span_id=sum_bound.span.span_id,
+                    parent_span_id=sum_bound.span.parent_span_id,
+                    service=sum_bound.span.service,
                 )
-            )
+                store.create_run(
+                    RunRecord(
+                        run_id=run_id,
+                        agent="summarize",
+                        status="running",
+                        parent_span=parent_span_id,
+                        task=task,
+                        started_at=time.time(),
+                        dims={**user_dims, "intent": intent},
+                    )
+                )
 
-            sum_dispatch = _demo_summarize_complete([0]) if demo_mode else None
-            if sum_dispatch is None:
-                from tokenops.providers import complete as live_complete
+                sum_dispatch = _demo_summarize_complete([0]) if demo_mode else None
+                if sum_dispatch is None:
+                    from tokenops.providers import complete as live_complete
 
-                sum_dispatch = live_complete
+                    sum_dispatch = live_complete
 
-            governed_sum = wrap_complete(
-                summarize_gov,
-                summarize_gov.controls,
-                sum_bound.attr,
-                provider=summarize_cfg.provider,
-                model=summarize_cfg.model,
-                dispatch=sum_dispatch,
-                service="summarize",
-            )
+                governed_sum = wrap_complete(
+                    summarize_gov,
+                    summarize_gov.controls,
+                    sum_bound.attr,
+                    provider=summarize_cfg.provider,
+                    model=summarize_cfg.model,
+                    dispatch=sum_dispatch,
+                    service="summarize",
+                )
 
-            summarize_agent = NativeSummarizeAgent(summarize_cfg)
+                summarize_agent = NativeSummarizeAgent(summarize_cfg)
 
-            def on_sum_step(event: StepEvent) -> None:
-                steps.append(event)
-                token_usage.input_tokens += event.tokens.input_tokens
-                token_usage.output_tokens += event.tokens.output_tokens
-                log.emit("step", event.action, agent="summarize", detail=event.detail)
+                def on_sum_step(event: StepEvent) -> None:
+                    steps.append(event)
+                    token_usage.input_tokens += event.tokens.input_tokens
+                    token_usage.output_tokens += event.tokens.output_tokens
+                    log.emit("step", event.action, agent="summarize", detail=event.detail)
 
-            summary = summarize_agent.run(task, findings, on_sum_step, governed_sum)
-            summarize_cost = summarize_gov.ledger.cost_micros(run_id)
-            store.update_run(
-                run_id,
-                status="completed",
-                cost_micros=summarize_cost,
-                steps=summarize_gov.ledger.step_count(run_id),
-                ended_at=time.time(),
-            )
+                summary = summarize_agent.run(task, findings, on_sum_step, governed_sum)
+                summarize_cost = summarize_gov.ledger.cost_micros(run_id)
+                store.update_run(
+                    run_id,
+                    status="completed",
+                    cost_micros=summarize_cost,
+                    steps=summarize_gov.ledger.step_count(run_id),
+                    ended_at=time.time(),
+                )
     except Halt as halt:
         status, halt_reason = "halted", halt.action.reason
         log.emit("halt", halt_reason or "halted", agent="research", run_id=run_id)
@@ -537,11 +563,17 @@ def _make_trace_governor(
 ) -> _TraceGovernor:
     enforce = mode != GovernanceMode.PREVIEW
     if enforce:
-        controls: _LoggingApplyControls | _LoggingPreviewControls = _LoggingApplyControls(log, agent)
+        controls: _LoggingApplyControls | _LoggingPreviewControls = _LoggingApplyControls(
+            log, agent
+        )
     else:
         controls = _LoggingPreviewControls(log, agent)
     base = build_governor(
-        store.governance_config_for(agent), price, controls, store=store, enforce=enforce,
+        store.governance_config_for(agent),
+        price,
+        controls,
+        store=store,
+        enforce=enforce,
     )
     gov = _TraceGovernor(base.ledger, controls, agent=agent, log=log)
     gov.enforce = enforce

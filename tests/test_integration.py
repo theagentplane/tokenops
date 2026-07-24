@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import make_attr, toy_price
 from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
-from conftest import make_attr, toy_price
 
 
 def test_budget_halts_governed_complete():
@@ -32,8 +32,11 @@ def test_budget_halts_governed_complete():
     reg = RunRegistration(run_id="live-1", intent="demo", user_dims={"user_id": "alice"})
 
     governed = wrap_complete(
-        gov, gov.controls, attr,
-        provider="openai", model="gpt-4o-mini",
+        gov,
+        gov.controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
         dispatch=fake_complete,
     )
 
@@ -41,7 +44,9 @@ def test_budget_halts_governed_complete():
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt):
                 for _ in range(20):
-                    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}])
+                    governed(
+                        "openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}]
+                    )
 
     assert gov.ledger.is_halted("live-1")
     # 9550 micros/model-call → halts once cumulative ≥ 20_000 (i.e. on the 3rd call)

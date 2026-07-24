@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from examples.agents.types import Finding, StepCallback, StepEvent, TokenUsage
-from examples.triad.writer.prompts import write_prompt
 from examples.app_config import WriterServerConfig
+from examples.triad.writer.prompts import write_prompt
 from tokenops.providers import complete
 
 

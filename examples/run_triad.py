@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start control plane + brief agents (Scout → Analyst → Editor)."""
+"""Start control plane + triad agents (Planner → Researcher → Writer) + product UI."""
 
 from __future__ import annotations
 
@@ -13,19 +13,11 @@ from pathlib import Path
 
 import httpx
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 os.chdir(ROOT)
 os.environ.setdefault("PYTHONPATH", str(ROOT))
-os.environ.setdefault("TOKENOPS_CONFIG", "examples/config/brief.yaml")
-
-# Load wiki .env before spawning children (installed tokenops.load_env may miss repo root).
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv(ROOT / ".env")
-except ImportError:
-    pass
+os.environ.setdefault("TOKENOPS_CONFIG", "examples/config/triad.yaml")
 
 sys.path.insert(0, str(ROOT))
 from tokenops.env import load_env  # noqa: E402
@@ -33,10 +25,11 @@ from tokenops.env import load_env  # noqa: E402
 load_env()
 
 PYTHON = sys.executable
+UI_PORT = 8501
 CONTROL_PLANE_URL = "http://localhost:7700"
-SCOUT_URL = "http://localhost:8021"
-ANALYST_URL = "http://localhost:8022"
-EDITOR_URL = "http://localhost:8023"
+PLANNER_URL = "http://localhost:8011"
+RESEARCHER_URL = "http://localhost:8012"
+WRITER_URL = "http://localhost:8013"
 
 _children: list[subprocess.Popen] = []
 
@@ -124,46 +117,52 @@ def main() -> int:
     from examples.app_config import load_config
 
     cfg = load_config()
-    for port in {7700, cfg.scout.port, cfg.analyst.port, cfg.editor.port}:
+    for port in {7700, cfg.planner.port, cfg.researcher.port, cfg.writer.port, UI_PORT}:
         _free_port(port)
 
     os.environ.setdefault("TOKENOPS_URL", CONTROL_PLANE_URL)
 
     print("Starting control plane...")
     _start_server("tokenops.server")
-    print("Starting editor server...")
-    _start_server("examples.servers.editor")
-    print("Starting analyst server...")
-    _start_server("examples.servers.analyst")
-    print("Starting scout server...")
-    _start_server("examples.servers.scout")
+    print("Starting writer server...")
+    _start_server("examples.servers.writer")
+    print("Starting researcher server...")
+    _start_server("examples.servers.researcher")
+    print("Starting planner server...")
+    _start_server("examples.servers.planner")
 
     print("Waiting for services...")
     try:
         _wait_for_health(CONTROL_PLANE_URL, "Control plane")
-        _wait_for_health(EDITOR_URL, "Editor")
-        _wait_for_health(ANALYST_URL, "Analyst")
-        _wait_for_health(SCOUT_URL, "Scout")
+        _wait_for_health(WRITER_URL, "Writer")
+        _wait_for_health(RESEARCHER_URL, "Researcher")
+        _wait_for_health(PLANNER_URL, "Planner")
     except RuntimeError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         _shutdown()
         return 1
 
-    print("Brief stack ready.")
-    print(f"  Scout (entry): {SCOUT_URL}")
-    print(f"  Analyst:       {ANALYST_URL}")
-    print(f"  Editor:        {EDITOR_URL}")
-    print(f"  Plane:         {CONTROL_PLANE_URL}")
-    print("Ctrl+C to stop.")
+    print(f"Starting product UI (Admin + Dashboard) at http://localhost:{UI_PORT}")
+    print("Triad entry: Planner at", PLANNER_URL)
+    import pathlib
 
-    while True:
-        for proc in _children:
-            code = proc.poll()
-            if code is not None:
-                print(f"Process exited early (pid={proc.pid}, code={code})", file=sys.stderr)
-                _shutdown()
-                return code or 1
-        time.sleep(1)
+    import tokenops.ui as _tokenops_ui
+
+    ui_app = pathlib.Path(_tokenops_ui.__file__).resolve().parent / "app.py"
+    ui = subprocess.run(
+        [
+            PYTHON,
+            "-m",
+            "streamlit",
+            "run",
+            str(ui_app),
+            f"--server.port={UI_PORT}",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+    )
+    _shutdown()
+    return ui.returncode
 
 
 if __name__ == "__main__":

@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from tokenops.control.http import post_run, post_run_sync
 from tokenops.control.models import (
@@ -127,7 +128,10 @@ class ControlPlaneClient:
             try:
                 reg = self._store.register_run(
                     RunRegistration(
-                        run_id=rid, intent=intent, user_dims=dims, mode=gov_mode,
+                        run_id=rid,
+                        intent=intent,
+                        user_dims=dims,
+                        mode=gov_mode,
                     )
                 )
             except RunAlreadyRegisteredError:
@@ -160,7 +164,10 @@ class ControlPlaneClient:
         gov_mode = _mode_value(mode)
         if self._store is not None:
             return self.register_run(
-                intent=intent, user_dims=dims, mode=gov_mode, run_id=run_id,
+                intent=intent,
+                user_dims=dims,
+                mode=gov_mode,
+                run_id=run_id,
             )
         assert self._url is not None
         payload: dict[str, Any] = {

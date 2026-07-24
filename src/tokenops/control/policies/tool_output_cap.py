@@ -55,11 +55,16 @@ class ToolOutputCapDetector(Detector):
         if est >= self.cap_tokens:
             count = len(step.output) if isinstance(step.output, (list, dict)) else None
             return Signal(
-                detector=self.name, severity=Severity.WARN, run_id=attr.run_id,
+                detector=self.name,
+                severity=Severity.WARN,
+                run_id=attr.run_id,
                 reason=f"tool '{step.boundary_id}' output ≈{est} tokens ≥ cap {self.cap_tokens}",
                 evidence={
-                    "est_tokens": est, "cap": self.cap_tokens,
-                    "size": est, "count": count, "handle": _handle(step.output),
+                    "est_tokens": est,
+                    "cap": self.cap_tokens,
+                    "size": est,
+                    "count": count,
+                    "handle": _handle(step.output),
                 },
             )
         return None
@@ -74,7 +79,9 @@ class ToolOutputCapPolicy(Policy):
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         ev = signal.evidence
         return Action(
-            kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.INJECT,
+            run_id=signal.run_id,
+            reason=signal.reason,
             replace_tool_result=True,  # deep: substitute the oversized payload with the descriptor
             inject_message=(
                 f"TOOL OUTPUT OFFLOADED: ~{ev['est_tokens']} tokens, count={ev['count']}, "

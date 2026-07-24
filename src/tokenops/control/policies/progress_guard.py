@@ -35,8 +35,14 @@ class ProgressGuardDetector(Detector):
 
     name = "progress_guard"
 
-    def __init__(self, *, window: int = 6, repeats: int = 3, max_corrections: int = 2,
-                 simhash_threshold: int = 4) -> None:
+    def __init__(
+        self,
+        *,
+        window: int = 6,
+        repeats: int = 3,
+        max_corrections: int = 2,
+        simhash_threshold: int = 4,
+    ) -> None:
         self.window = window
         self.repeats = repeats
         self.max_corrections = max_corrections
@@ -50,19 +56,27 @@ class ProgressGuardDetector(Detector):
         recent = view.recent(run_id, self.window)
         if step.node_type == "tool" and step.signature and step.result_hash:
             # unchanged RESULT, not merely a repeated call
-            same = sum(1 for s in recent
-                       if s.node_type == "tool"
-                       and s.signature == step.signature
-                       and s.result_hash == step.result_hash)
+            same = sum(
+                1
+                for s in recent
+                if s.node_type == "tool"
+                and s.signature == step.signature
+                and s.result_hash == step.result_hash
+            )
             return same >= self.repeats
         if step.node_type == "llm":
             text = step.output.get("text", "") if isinstance(step.output, dict) else ""
             if not text:
                 return False
             fp = simhash64(text)
-            near = sum(1 for s in recent
-                       if s.node_type == "llm" and isinstance(s.output, dict) and s.output.get("text")
-                       and hamming(simhash64(s.output["text"]), fp) <= self.simhash_threshold)
+            near = sum(
+                1
+                for s in recent
+                if s.node_type == "llm"
+                and isinstance(s.output, dict)
+                and s.output.get("text")
+                and hamming(simhash64(s.output["text"]), fp) <= self.simhash_threshold
+            )
             return near >= self.repeats
         return False
 
@@ -73,10 +87,16 @@ class ProgressGuardDetector(Detector):
         corr = self._corrections[attr.run_id]
         sev = Severity.TRIP if corr > self.max_corrections else Severity.WARN
         return Signal(
-            detector=self.name, severity=sev, run_id=attr.run_id,
+            detector=self.name,
+            severity=sev,
+            run_id=attr.run_id,
             reason=f"no progress: repeated result on '{step.boundary_id}'; correction {corr}",
-            evidence={"correction": corr, "max_corrections": self.max_corrections,
-                      "boundary_id": step.boundary_id, "signature": step.signature},
+            evidence={
+                "correction": corr,
+                "max_corrections": self.max_corrections,
+                "boundary_id": step.boundary_id,
+                "signature": step.signature,
+            },
         )
 
 
@@ -85,10 +105,15 @@ class ProgressGuardPolicy(Policy):
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         if signal.severity is Severity.TRIP:
-            return Action(kind=ActionKind.HALT, run_id=signal.run_id,
-                          reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress — halting")
+            return Action(
+                kind=ActionKind.HALT,
+                run_id=signal.run_id,
+                reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress — halting",
+            )
         return Action(
-            kind=ActionKind.INJECT, run_id=signal.run_id, reason=signal.reason,
+            kind=ActionKind.INJECT,
+            run_id=signal.run_id,
+            reason=signal.reason,
             inject_message=(
                 f"NO PROGRESS DETECTED on '{signal.evidence['boundary_id']}': you are repeating "
                 f"the same action with the same result. Change approach or finalize with what you have."
@@ -96,10 +121,15 @@ class ProgressGuardPolicy(Policy):
         )
 
 
-def build(*, window: int = 6, repeats: int = 3, max_corrections: int = 2,
-          simhash_threshold: int = 4) -> tuple[Detector, Policy]:
+def build(
+    *, window: int = 6, repeats: int = 3, max_corrections: int = 2, simhash_threshold: int = 4
+) -> tuple[Detector, Policy]:
     return (
-        ProgressGuardDetector(window=window, repeats=repeats, max_corrections=max_corrections,
-                              simhash_threshold=simhash_threshold),
+        ProgressGuardDetector(
+            window=window,
+            repeats=repeats,
+            max_corrections=max_corrections,
+            simhash_threshold=simhash_threshold,
+        ),
         ProgressGuardPolicy(),
     )

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from conftest import FakeView, make_attr
 from tokenops.control import ActionKind, CallRequest
 from tokenops.control.policies import concurrency_cap
-from conftest import make_attr, FakeView
 
 
 def _req():

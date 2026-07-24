@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
 import pytest
 
 from tokenops.control import (
@@ -12,6 +10,7 @@ from tokenops.control import (
     build_governor,
     wrap_complete,
 )
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
@@ -20,14 +19,22 @@ from tokenops.control.store import Store
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
     from tokenops.providers.types import ModelResponse
-    return ModelResponse(content='{"action": "search", "query": "x"}', input_tokens=10, output_tokens=2)
+
+    return ModelResponse(
+        content='{"action": "search", "query": "x"}', input_tokens=10, output_tokens=2
+    )
 
 
 def test_store_policy_halts_governed_complete(tmp_path):
     s = Store(str(tmp_path / "t.db"))
-    s.upsert_policy_instance(PolicyInstance(
-        id="pi", template="step_cap", params={"max_steps": 2}, agent="research",
-    ))
+    s.upsert_policy_instance(
+        PolicyInstance(
+            id="pi",
+            template="step_cap",
+            params={"max_steps": 2},
+            agent="research",
+        )
+    )
     reg = s.register_run(RunRegistration(run_id="run-1", intent="demo"))
     cfg = s.governance_config_for("research")
 
@@ -36,8 +43,11 @@ def test_store_policy_halts_governed_complete(tmp_path):
     gov.ledger.open_run("run-1")
 
     governed = wrap_complete(
-        gov, gov.controls, attr,
-        provider="openai", model="gpt-4o-mini",
+        gov,
+        gov.controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
         dispatch=_fake_complete,
     )
 

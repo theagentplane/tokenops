@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from examples.a2a.messages import parse_findings, task_response
+from examples.a2a.messages import task_response
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 
 

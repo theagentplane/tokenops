@@ -29,11 +29,11 @@ import sqlite3
 import threading
 import time
 import uuid
-from typing import Any, Callable, Sequence, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from tokenops.control.models import (
     BudgetSpec,
-    GovernanceMode,
     PolicyInstance,
     RunAlreadyRegisteredError,
     RunNotRegisteredError,
@@ -55,6 +55,7 @@ def _locked(fn: _F) -> _F:
             return fn(self, *args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
+
 
 def _known_policy_templates() -> frozenset[str]:
     from tokenops.control.config import _TEMPLATES
@@ -248,15 +249,24 @@ class Store:
 
     @_locked
     def upsert_policy_instance(self, pi: PolicyInstance) -> PolicyInstance:
-        if pi.template not in _known_policy_templates():  # fail closed — same rule as build_governor
+        if (
+            pi.template not in _known_policy_templates()
+        ):  # fail closed — same rule as build_governor
             raise ValueError(
                 f"unknown policy template {pi.template!r}; known: {sorted(_known_policy_templates())}"
             )
         self._db.execute(
             "REPLACE INTO policy_instances(id, template, params, agent, budget_id, segment_id, enabled) "
             "VALUES (?,?,?,?,?,?,?)",
-            (pi.id, pi.template, json.dumps(pi.params), pi.agent, pi.budget_id, pi.segment_id,
-             1 if pi.enabled else 0),
+            (
+                pi.id,
+                pi.template,
+                json.dumps(pi.params),
+                pi.agent,
+                pi.budget_id,
+                pi.segment_id,
+                1 if pi.enabled else 0,
+            ),
         )
         self._db.commit()
         self._invalidate_governance_config_cache()
@@ -269,7 +279,9 @@ class Store:
 
     @_locked
     def list_policy_instances(self) -> list[PolicyInstance]:
-        return [_policy(r) for r in self._db.execute("SELECT * FROM policy_instances ORDER BY template")]
+        return [
+            _policy(r) for r in self._db.execute("SELECT * FROM policy_instances ORDER BY template")
+        ]
 
     @_locked
     def delete_policy_instance(self, pid: str) -> None:
@@ -294,8 +306,14 @@ class Store:
     def clear_all(self) -> None:
         """Delete every row (runs, registrations, governance, ledger). Schema is preserved."""
         for table in (
-            "runs", "run_registrations", "policy_instances", "budgets", "segments",
-            "ledger_spent", "ledger_inflight", "ledger_halt",
+            "runs",
+            "run_registrations",
+            "policy_instances",
+            "budgets",
+            "segments",
+            "ledger_spent",
+            "ledger_inflight",
+            "ledger_halt",
         ):
             self._db.execute(f"DELETE FROM {table}")
         self._db.commit()
@@ -370,7 +388,9 @@ class Store:
 
     @_locked
     def get_run_registration(self, run_id: str) -> RunRegistration | None:
-        row = self._db.execute("SELECT * FROM run_registrations WHERE run_id=?", (run_id,)).fetchone()
+        row = self._db.execute(
+            "SELECT * FROM run_registrations WHERE run_id=?", (run_id,)
+        ).fetchone()
         return _registration(row) if row else None
 
     # ---- the bridge to build_governor ------------------------------------- #
@@ -389,15 +409,24 @@ class Store:
         from tokenops.control.governance_cache import get_cached_governance_config
 
         return get_cached_governance_config(
-            self.path, agent, lambda: self._assemble_governance_config(agent),
+            self.path,
+            agent,
+            lambda: self._assemble_governance_config(agent),
         )
 
     @_locked
     def _assemble_governance_config(self, agent: str) -> dict:
-        instances = [pi for pi in self.list_policy_instances()
-                     if pi.enabled and (pi.agent is None or pi.agent == agent)]
+        instances = [
+            pi
+            for pi in self.list_policy_instances()
+            if pi.enabled and (pi.agent is None or pi.agent == agent)
+        ]
         budget_ids = {pi.budget_id for pi in instances if pi.budget_id}
-        budgets = [_budget_dict(self.get_budget(bid)) for bid in budget_ids if self.get_budget(bid)]
+        budgets = []
+        for bid in budget_ids:
+            budget = self.get_budget(bid)
+            if budget is not None:
+                budgets.append(_budget_dict(budget))
 
         policies: dict[str, dict] = {}
         for pi in instances:
@@ -423,9 +452,21 @@ class Store:
             "REPLACE INTO runs(run_id, agent, status, parent_run, parent_span, halt_reason, detector, "
             "cost_micros, steps, started_at, ended_at, task, dims) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (rec.run_id, rec.agent, rec.status, rec.parent_run, rec.parent_span, rec.halt_reason,
-             rec.detector, rec.cost_micros, rec.steps, rec.started_at, rec.ended_at, rec.task,
-             json.dumps(rec.dims)),
+            (
+                rec.run_id,
+                rec.agent,
+                rec.status,
+                rec.parent_run,
+                rec.parent_span,
+                rec.halt_reason,
+                rec.detector,
+                rec.cost_micros,
+                rec.steps,
+                rec.started_at,
+                rec.ended_at,
+                rec.task,
+                json.dumps(rec.dims),
+            ),
         )
         self._db.commit()
         return rec
@@ -466,7 +507,11 @@ class Store:
 
     @_locked
     def ledger_add_spent(
-        self, budget_id: str, segment_key: str, period: str, delta: int,
+        self,
+        budget_id: str,
+        segment_key: str,
+        period: str,
+        delta: int,
     ) -> int:
         """Atomically increment a budget accumulator; return the new total."""
         self._db.execute(
@@ -501,7 +546,8 @@ class Store:
             (segment_key,),
         )
         row = self._db.execute(
-            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+            "SELECT count FROM ledger_inflight WHERE segment_key=?",
+            (segment_key,),
         ).fetchone()
         self._db.commit()
         return int(row[0]) if row else 0
@@ -513,7 +559,8 @@ class Store:
             (segment_key,),
         )
         row = self._db.execute(
-            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+            "SELECT count FROM ledger_inflight WHERE segment_key=?",
+            (segment_key,),
         ).fetchone()
         self._db.commit()
         return int(row[0]) if row else 0
@@ -521,7 +568,8 @@ class Store:
     @_locked
     def ledger_inflight(self, segment_key: str) -> int:
         row = self._db.execute(
-            "SELECT count FROM ledger_inflight WHERE segment_key=?", (segment_key,),
+            "SELECT count FROM ledger_inflight WHERE segment_key=?",
+            (segment_key,),
         ).fetchone()
         return int(row[0]) if row else 0
 
@@ -538,14 +586,16 @@ class Store:
     @_locked
     def ledger_is_halted(self, run_id: str) -> bool:
         row = self._db.execute(
-            "SELECT halted FROM ledger_halt WHERE run_id=?", (run_id,),
+            "SELECT halted FROM ledger_halt WHERE run_id=?",
+            (run_id,),
         ).fetchone()
         return bool(row and row[0])
 
     @_locked
     def ledger_halt_reason(self, run_id: str) -> str | None:
         row = self._db.execute(
-            "SELECT halt_reason FROM ledger_halt WHERE run_id=?", (run_id,),
+            "SELECT halt_reason FROM ledger_halt WHERE run_id=?",
+            (run_id,),
         ).fetchone()
         return row[0] if row else None
 
@@ -587,15 +637,26 @@ class Store:
             "cost_micros, step_count, enqueued_at, attempts"
             ") VALUES (?,?,?,?,?,?,?,?,?,0)",
             (
-                run_id, scope_key, input_hash, input_simhash, input_preview, task_text,
-                cost_micros, step_count, time.time(),
+                run_id,
+                scope_key,
+                input_hash,
+                input_simhash,
+                input_preview,
+                task_text,
+                cost_micros,
+                step_count,
+                time.time(),
             ),
         )
         self._db.commit()
 
     @_locked
     def drain_trajectory_build_queue(
-        self, *, limit: int = 8, max_age_days: int = 30, max_entries_per_scope: int = 500,
+        self,
+        *,
+        limit: int = 8,
+        max_age_days: int = 30,
+        max_entries_per_scope: int = 500,
     ) -> int:
         from tokenops.control.trajectory.compress import compress_trajectory
         from tokenops.control.trajectory.serialize import window_from_json
@@ -667,16 +728,32 @@ class Store:
             "step_summary, tool_sequence, cost_micros, step_count, quality_score, indexed_at"
             ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                row_id, scope_key, input_hash, input_simhash, input_preview, source_run_id,
-                step_summary, tool_sequence, cost_micros, step_count, quality_score, indexed_at,
+                row_id,
+                scope_key,
+                input_hash,
+                input_simhash,
+                input_preview,
+                source_run_id,
+                step_summary,
+                tool_sequence,
+                cost_micros,
+                step_count,
+                quality_score,
+                indexed_at,
             ),
         )
-        self._prune_trajectory_scope(scope_key, max_age_days=max_age_days, max_entries=max_entries_per_scope)
+        self._prune_trajectory_scope(
+            scope_key, max_age_days=max_age_days, max_entries=max_entries_per_scope
+        )
         self._db.commit()
 
     @_locked
     def _prune_trajectory_scope(
-        self, scope_key: str, *, max_age_days: int, max_entries: int,
+        self,
+        scope_key: str,
+        *,
+        max_age_days: int,
+        max_entries: int,
     ) -> None:
         cutoff = time.time() - max_age_days * 86400
         self._db.execute(
@@ -684,7 +761,8 @@ class Store:
             (scope_key, cutoff),
         )
         count = self._db.execute(
-            "SELECT COUNT(*) FROM trajectory_index WHERE scope_key=?", (scope_key,),
+            "SELECT COUNT(*) FROM trajectory_index WHERE scope_key=?",
+            (scope_key,),
         ).fetchone()[0]
         overflow = int(count) - max_entries
         if overflow > 0:
@@ -760,6 +838,7 @@ class Store:
 
 # ---- row -> model ---------------------------------------------------------- #
 
+
 def _registration(r: sqlite3.Row) -> RunRegistration:
     return RunRegistration(
         run_id=r["run_id"],
@@ -770,13 +849,23 @@ def _registration(r: sqlite3.Row) -> RunRegistration:
 
 
 def _segment(r: sqlite3.Row) -> Segment:
-    return Segment(id=r["id"], name=r["name"], dimension=r["dimension"],
-                   tag_key=r["tag_key"], match_value=r["match_value"])
+    return Segment(
+        id=r["id"],
+        name=r["name"],
+        dimension=r["dimension"],
+        tag_key=r["tag_key"],
+        match_value=r["match_value"],
+    )
 
 
 def _budget(r: sqlite3.Row) -> BudgetSpec:
-    return BudgetSpec(id=r["id"], limit_micros=r["limit_micros"], dimension=r["dimension"],
-                      tag_key=r["tag_key"], period=r["period"])
+    return BudgetSpec(
+        id=r["id"],
+        limit_micros=r["limit_micros"],
+        dimension=r["dimension"],
+        tag_key=r["tag_key"],
+        period=r["period"],
+    )
 
 
 def _budget_dict(b: BudgetSpec) -> dict:
@@ -787,9 +876,15 @@ def _budget_dict(b: BudgetSpec) -> dict:
 
 
 def _policy(r: sqlite3.Row) -> PolicyInstance:
-    return PolicyInstance(id=r["id"], template=r["template"], params=json.loads(r["params"]),
-                          agent=r["agent"], budget_id=r["budget_id"], segment_id=r["segment_id"],
-                          enabled=bool(r["enabled"]))
+    return PolicyInstance(
+        id=r["id"],
+        template=r["template"],
+        params=json.loads(r["params"]),
+        agent=r["agent"],
+        budget_id=r["budget_id"],
+        segment_id=r["segment_id"],
+        enabled=bool(r["enabled"]),
+    )
 
 
 def _run(r: sqlite3.Row) -> RunRecord:
@@ -801,11 +896,18 @@ def _run(r: sqlite3.Row) -> RunRecord:
     except json.JSONDecodeError:
         governance_events = []
     return RunRecord(
-        run_id=r["run_id"], agent=r["agent"], status=r["status"],
+        run_id=r["run_id"],
+        agent=r["agent"],
+        status=r["status"],
         parent_run=r["parent_run"],
         parent_span=r["parent_span"] if "parent_span" in keys else None,
-        halt_reason=r["halt_reason"], detector=r["detector"],
-        cost_micros=r["cost_micros"], steps=r["steps"], started_at=r["started_at"],
-        ended_at=r["ended_at"], task=r["task"], dims=dims,
+        halt_reason=r["halt_reason"],
+        detector=r["detector"],
+        cost_micros=r["cost_micros"],
+        steps=r["steps"],
+        started_at=r["started_at"],
+        ended_at=r["ended_at"],
+        task=r["task"],
+        dims=dims,
         governance_events=governance_events,
     )

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import toy_price
 from tokenops.control import build_governor
 from tokenops.control.models import BudgetSpec, PolicyInstance, RunRecord, Segment
-from tokenops.control.store import Store, new_id
-from conftest import toy_price
+from tokenops.control.store import Store
 
 
 @pytest.fixture
@@ -20,8 +20,9 @@ def store(tmp_path):
 def test_segment_budget_policy_crud(store):
     store.upsert_segment(Segment(id="seg_run", name="per run", dimension="run"))
     store.upsert_budget(BudgetSpec(id="run_llm_cap", limit_micros=20_000, dimension="run"))
-    store.upsert_policy_instance(PolicyInstance(id="pi1", template="cost_budget",
-                                                budget_id="run_llm_cap", agent="research"))
+    store.upsert_policy_instance(
+        PolicyInstance(id="pi1", template="cost_budget", budget_id="run_llm_cap", agent="research")
+    )
     assert store.get_segment("seg_run").dimension == "run"
     assert store.get_budget("run_llm_cap").limit_micros == 20_000
     assert store.get_policy_instance("pi1").template == "cost_budget"
@@ -35,10 +36,12 @@ def test_unknown_template_fails_closed(store):
 
 def test_governance_config_builds_a_governor(store):
     store.upsert_budget(BudgetSpec(id="run_llm_cap", limit_micros=20_000, dimension="run"))
-    store.upsert_policy_instance(PolicyInstance(id="pi1", template="cost_budget",
-                                                budget_id="run_llm_cap", agent="research"))
-    store.upsert_policy_instance(PolicyInstance(id="pi2", template="step_cap",
-                                                params={"max_steps": 5}))  # agent=None → all
+    store.upsert_policy_instance(
+        PolicyInstance(id="pi1", template="cost_budget", budget_id="run_llm_cap", agent="research")
+    )
+    store.upsert_policy_instance(
+        PolicyInstance(id="pi2", template="step_cap", params={"max_steps": 5})
+    )  # agent=None → all
     cfg = store.governance_config_for("research")
     # the assembled dict is exactly build_governor's input shape
     gov = build_governor(cfg, toy_price)
@@ -47,16 +50,25 @@ def test_governance_config_builds_a_governor(store):
 
 
 def test_agent_scoping(store):
-    store.upsert_policy_instance(PolicyInstance(id="pi", template="step_cap",
-                                                params={"max_steps": 3}, agent="summarize"))
+    store.upsert_policy_instance(
+        PolicyInstance(id="pi", template="step_cap", params={"max_steps": 3}, agent="summarize")
+    )
     assert store.governance_config_for("research")["governance"]["policies"] == {}
     assert "step_cap" in store.governance_config_for("summarize")["governance"]["policies"]
 
 
 def test_run_records_and_problematic_filter(store):
     store.create_run(RunRecord(run_id="r1", agent="research", status="completed", cost_micros=500))
-    store.create_run(RunRecord(run_id="r2", agent="research", status="halted",
-                               halt_reason="budget exhausted", detector="cost_budget", cost_micros=20_000))
+    store.create_run(
+        RunRecord(
+            run_id="r2",
+            agent="research",
+            status="halted",
+            halt_reason="budget exhausted",
+            detector="cost_budget",
+            cost_micros=20_000,
+        )
+    )
     store.update_run("r1", ended_at=123.0)
     assert store.get_run("r1").ended_at == 123.0
     assert len(store.list_runs()) == 2
@@ -105,10 +117,20 @@ def test_clear_and_reseed_governance(tmp_path):
 
 
 def test_run_dims_roundtrip_grouping_and_tag_keys(store):
-    store.create_run(RunRecord(run_id="a", agent="research", status="completed",
-                               cost_micros=300, dims={"team": "growth", "Country": "US"}))
-    store.create_run(RunRecord(run_id="b", agent="research", status="completed",
-                               cost_micros=100, dims={"team": "core"}))
+    store.create_run(
+        RunRecord(
+            run_id="a",
+            agent="research",
+            status="completed",
+            cost_micros=300,
+            dims={"team": "growth", "Country": "US"},
+        )
+    )
+    store.create_run(
+        RunRecord(
+            run_id="b", agent="research", status="completed", cost_micros=100, dims={"team": "core"}
+        )
+    )
     assert store.get_run("a").dims == {"team": "growth", "Country": "US"}
     assert set(store.run_tag_keys()) == {"team", "Country"}
     # group cost by the custom 'team' tag (what the dashboard does)
@@ -120,17 +142,21 @@ def test_run_dims_roundtrip_grouping_and_tag_keys(store):
 
 def test_dims_migration_on_legacy_db(tmp_path):
     import sqlite3
+
     # simulate a pre-dims runs table, then open with Store (which should migrate)
     db = str(tmp_path / "legacy.db")
     con = sqlite3.connect(db)
-    con.executescript("CREATE TABLE runs (run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, "
-                      "status TEXT NOT NULL, parent_run TEXT, halt_reason TEXT, detector TEXT, "
-                      "cost_micros INTEGER DEFAULT 0, steps INTEGER DEFAULT 0, "
-                      "started_at REAL DEFAULT 0, ended_at REAL, task TEXT);")
+    con.executescript(
+        "CREATE TABLE runs (run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, "
+        "status TEXT NOT NULL, parent_run TEXT, halt_reason TEXT, detector TEXT, "
+        "cost_micros INTEGER DEFAULT 0, steps INTEGER DEFAULT 0, "
+        "started_at REAL DEFAULT 0, ended_at REAL, task TEXT);"
+    )
     con.execute("INSERT INTO runs(run_id, agent, status) VALUES ('old','research','completed')")
-    con.commit(); con.close()
+    con.commit()
+    con.close()
     s = Store(db, auto_seed=False)
-    assert s.get_run("old").dims == {}            # migrated column, default empty
+    assert s.get_run("old").dims == {}  # migrated column, default empty
     s.create_run(RunRecord(run_id="new", agent="research", dims={"team": "x"}))
     assert s.get_run("new").dims == {"team": "x"}
     s.close()

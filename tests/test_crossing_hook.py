@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
 import chronicle.session as chronicle_session
 from chronicle import InputState, boundary, get_session
 from chronicle.session import ChronicleSession
 
+from conftest import toy_price
 from tokenops.control import (
     ApplyControls,
     build_governor,
     install_crossing_hook,
     on_crossing,
 )
-from tokenops.control.context import SpanContext, clear, _governance_scope, run_scope
+from tokenops.control.attribution import _build_attribution
+from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.crossing import _attach
 from tokenops.control.models import RunRegistration
 from tokenops.control.store import Store
-from conftest import toy_price
 
 
 def test_install_crossing_hook_is_idempotent():

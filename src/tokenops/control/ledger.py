@@ -45,8 +45,9 @@ from __future__ import annotations
 
 import threading
 from collections import defaultdict
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Literal, Sequence
+from typing import TYPE_CHECKING, Literal
 
 from tokenops.control.core import (
     Attribution,
@@ -76,6 +77,7 @@ UNLIMITED_LEFT: Micros = 1 << 62
 # Budget — a limit bound to a segment matcher (config template instantiates these)
 # =========================================================================== #
 
+
 @dataclass(frozen=True, kw_only=True)
 class Budget:
     """A spend limit attached to one segment dimension.
@@ -99,10 +101,14 @@ class Budget:
 #: The canonical run-total accumulator (Design A). Always present, unlimited, run-scoped —
 #: so the run total has exactly one home in ``spent`` and every run is covered by one
 #: definition. Never enforced against; ``cost_micros`` and ``cum_spent_micros`` read it.
-RUN_TOTAL_BUDGET = Budget(budget_id="__run_total__", limit_micros=None, dimension="run", period=LIFETIME)
+RUN_TOTAL_BUDGET = Budget(
+    budget_id="__run_total__", limit_micros=None, dimension="run", period=LIFETIME
+)
 
 
-def segment_key_for(attr: Attribution, dimension: Dimension, tag_key: str | None = None) -> str | None:
+def segment_key_for(
+    attr: Attribution, dimension: Dimension, tag_key: str | None = None
+) -> str | None:
     """Resolve the segment key for a dimension. The shared primitive any policy (budget or
     not — e.g. concurrency_cap) uses to scope itself.
 
@@ -133,6 +139,7 @@ def segment_key(attr: Attribution, budget: Budget) -> str | None:
 # Per-run ephemeral state                                                      #
 # =========================================================================== #
 
+
 @dataclass
 class RunState:
     """Ephemeral per-run state. The dict key in ``Ledger.runs`` is the run_id — there is
@@ -148,6 +155,7 @@ class RunState:
 # =========================================================================== #
 # The ledger (Attribute + LedgerView in one in-memory implementation)          #
 # =========================================================================== #
+
 
 class Ledger:
     """Attribute + LedgerView. Per-process run state (window, local step count); spend,
@@ -181,7 +189,11 @@ class Ledger:
         return self._spent[self._spent_key(budget_id, segment_key, period)]
 
     def _write_spent_delta(
-        self, budget_id: str, segment_key: str, period: str, delta: Micros,
+        self,
+        budget_id: str,
+        segment_key: str,
+        period: str,
+        delta: Micros,
     ) -> Micros:
         if self._store is not None:
             return self._store.ledger_add_spent(budget_id, segment_key, period, delta)
@@ -224,7 +236,9 @@ class Ledger:
             cost: Micros = 0
             if obs.node_type == "llm" and obs.usage is not None:
                 if self._price is None:
-                    raise RuntimeError("Ledger has no price book; cannot price an llm call (fail closed)")
+                    raise RuntimeError(
+                        "Ledger has no price book; cannot price an llm call (fail closed)"
+                    )
                 cost = self._price(obs.provider, obs.model, obs.usage)
             elif obs.node_type == "delegate":
                 cost = obs.rolled_up_cost_micros  # child run total rolls up into the parent
@@ -239,7 +253,9 @@ class Ledger:
 
             rs.steps += 1
             cum = self._read_spent(
-                RUN_TOTAL_BUDGET.budget_id, f"run:{obs.attr.run_id}", LIFETIME,
+                RUN_TOTAL_BUDGET.budget_id,
+                f"run:{obs.attr.run_id}",
+                LIFETIME,
             )
             step = BoundaryStep(
                 step=rs.steps,

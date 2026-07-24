@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from tokenops.control.attribution import _build_attribution
-
-import pytest
 import chronicle.session as chronicle_session
+import pytest
 from chronicle import get_session
 
+from conftest import toy_price
 from tokenops.control import (
     ApplyControls,
     Governor,
@@ -15,17 +14,21 @@ from tokenops.control import (
     install_crossing_hook,
     wrap_complete,
 )
+from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.models import RunRegistration
 from tokenops.providers.types import ModelResponse
-from conftest import toy_price
 
 
 def _bound(gov, attr, dispatch, *, service: str = "research"):
     return wrap_complete(
-        gov, gov.controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=dispatch, service=service,
+        gov,
+        gov.controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=dispatch,
+        service=service,
     )
 
 
@@ -73,6 +76,7 @@ def test_langchain_governed_chat_model_with_wrap_complete():
         pytest.skip(f"langchain adapter unavailable: {probe.stderr.strip() or probe.returncode}")
 
     from langchain_core.messages import HumanMessage
+
     from tokenops.adapters.langchain import GovernedChatModel
 
     install_crossing_hook()

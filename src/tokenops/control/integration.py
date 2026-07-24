@@ -121,7 +121,12 @@ def make_on_step(governor, attr: Attribution, *, provider: str, model: str, serv
 
     def on_step(ev) -> None:
         obs = step_to_observation(
-            ev, attr, ts=float(next(counter)), provider=provider, model=model, service=service,
+            ev,
+            attr,
+            ts=float(next(counter)),
+            provider=provider,
+            model=model,
+            service=service,
         )
         governor.observe(obs)
 
@@ -230,7 +235,9 @@ def wrap_complete(
     def governed(p: str, m: str, messages) -> object:
         controls.begin_call()
         request = CallRequest(
-            attr=attr, provider=provider, model=m,
+            attr=attr,
+            provider=provider,
+            model=m,
             estimated_input_tokens=estimate(messages),
             max_output_tokens=controls.call.max_output_tokens,
         )
@@ -275,8 +282,18 @@ class _StreamResult:
     output_tokens: int
 
 
-def _stream_and_watch(stream_dispatch, p, model, messages, *, cap, penalties,
-                      ngram: int, repeats: int, check_every: int) -> tuple[bool, str]:
+def _stream_and_watch(
+    stream_dispatch,
+    p,
+    model,
+    messages,
+    *,
+    cap,
+    penalties,
+    ngram: int,
+    repeats: int,
+    check_every: int,
+) -> tuple[bool, str]:
     """Consume the stream, watching for n-gram degeneration. On a hit, CANCEL — close the
     generator mid-flight to stop the token bleed — and return early."""
     from tokenops.control.policies._util import max_ngram_repeat
@@ -329,9 +346,15 @@ def wrap_stream(
 
     def _stream_once(p, use_model, messages, max_output_tokens=None, **penalties):
         cancelled, text = _stream_and_watch(
-            stream_dispatch, p, use_model, messages,
-            cap=max_output_tokens, penalties=penalties,
-            ngram=ngram, repeats=repeats, check_every=check_every,
+            stream_dispatch,
+            p,
+            use_model,
+            messages,
+            cap=max_output_tokens,
+            penalties=penalties,
+            ngram=ngram,
+            repeats=repeats,
+            check_every=check_every,
         )
         cancel_flag["cancelled"] = cancelled
         return _StreamResult(
@@ -344,11 +367,15 @@ def wrap_stream(
 
     def governed(p: str, m: str, messages) -> object:
         controls.begin_call()
-        governor.pre_call(CallRequest(
-            attr=attr, provider=provider, model=m,
-            estimated_input_tokens=estimate(messages),
-            max_output_tokens=controls.call.max_output_tokens,
-        ))
+        governor.pre_call(
+            CallRequest(
+                attr=attr,
+                provider=provider,
+                model=m,
+                estimated_input_tokens=estimate(messages),
+                max_output_tokens=controls.call.max_output_tokens,
+            )
+        )
         use_model = controls.call.model_override or m
         messages = consume_carry(controls, messages)
         if controls.call.compact:  # deep prompt compaction

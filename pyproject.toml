@@ -50,6 +50,10 @@ dev = [
   "pytest>=8.0",
   "build>=1.2",
   "twine>=6.0",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "pre-commit>=4.0",
+  "types-PyYAML>=6.0",
 ]
 examples = [
   "ddgs>=9.0",
@@ -72,6 +76,32 @@ markers = [
   "live: requires API keys or vendored frameworks",
 ]
 addopts = "-m 'not e2e and not live'"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "W"]
+ignore = [
+  "E501",  # line length — formatter
+  "E402",  # late imports (env load, optional deps, circular avoidance)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E731"]
+"examples/**/*.py" = ["E731"]
+"scripts/**/*.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "src"
+packages = ["tokenops"]
+ignore_missing_imports = true
+warn_unused_configs = true
+# Gradual typing: UI + adapters are Streamlit/LangChain-heavy; tighten later.
+exclude = "(?x)(tokenops/ui/|tokenops/adapters/)"
 
 [tool.setuptools.package-dir]
 "" = "src"

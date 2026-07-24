@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from conftest import make_attr, toy_price
 from tokenops.control.core import Observation, Usage
 from tokenops.control.governance_cache import (
     clear_governance_config_cache,
@@ -16,7 +17,6 @@ from tokenops.control.governance_cache import (
 from tokenops.control.ledger import Ledger
 from tokenops.control.models import PolicyInstance
 from tokenops.control.store import Store
-from conftest import make_attr, toy_price
 
 
 @pytest.fixture(autouse=True)

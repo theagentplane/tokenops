@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-
+from conftest import make_attr, toy_price
 from tokenops.control import Observation, Usage, build_governor
 from tokenops.control.ledger import LIFETIME
 from tokenops.control.store import Store
-from conftest import make_attr, toy_price
 
 GOV = {
     "governance": {

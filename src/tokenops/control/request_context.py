@@ -6,9 +6,10 @@ Middleware / tests bind headers, payload, and agent defaults so
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from tokenops.control.models import GovernanceMode
 

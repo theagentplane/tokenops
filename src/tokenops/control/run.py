@@ -9,24 +9,26 @@ callers need not pass ``store=`` (§6). Governance config is read via the client
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Mapping
 
 from tokenops.control.attribution import (
+    _build_attribution,
     begin_downstream_run,
     begin_entry_task_run,
     merge_registration_dims,
-    _build_attribution,
 )
 from tokenops.control.client import ControlPlaneClient
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
     BoundRun,
     SpanContext,
-    clear as clear_run_context,
     _governance_scope,
     run_scope,
+)
+from tokenops.control.context import (
+    clear as clear_run_context,
 )
 from tokenops.control.core import Attribution
 from tokenops.control.crossing import install_crossing_hook
@@ -225,12 +227,19 @@ def tokenops_run(
         if controls is not None:
             enforce = gov_mode is not GovernanceMode.PREVIEW
             gov = build_governor(
-                config, price_fn, controls, store=store_obj, enforce=enforce,
+                config,
+                price_fn,
+                controls,
+                store=store_obj,
+                enforce=enforce,
             )
             ctrl = controls
         else:
             gov, ctrl = build_governance_stack(
-                config, price_fn, store=store_obj, mode=gov_mode,
+                config,
+                price_fn,
+                store=store_obj,
+                mode=gov_mode,
             )
     else:
         gov = governor

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control import ApplyControls, build_governor, Halt, wrap_complete
+from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.ledger import RUN_TOTAL_BUDGET, LIFETIME, segment_key_for
+from tokenops.control.ledger import LIFETIME, RUN_TOTAL_BUDGET, segment_key_for
 from tokenops.control.models import PolicyInstance, RunRegistration
 from tokenops.control.pricing import build_price_book
 from tokenops.control.store import Store
@@ -15,6 +15,7 @@ from tokenops.control.store import Store
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
     from tokenops.providers.types import ModelResponse
+
     return ModelResponse(
         content='{"action": "search", "query": "pricing"}',
         input_tokens=820,
@@ -63,16 +64,22 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     gov.ledger.open_run("e2e-run-1")
 
     governed = wrap_complete(
-        gov, gov.controls, attr,
-        provider="openai", model="gpt-4o-mini",
-        dispatch=_fake_complete, service="research",
+        gov,
+        gov.controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=_fake_complete,
+        service="research",
     )
 
     with run_scope(reg, SpanContext(span_id="span-root", service="research")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             with pytest.raises(Halt) as exc:
                 for _ in range(20):
-                    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}])
+                    governed(
+                        "openai", "gpt-4o-mini", [{"role": "user", "content": "Research pricing"}]
+                    )
 
     assert "step" in exc.value.action.reason.lower()
     assert gov.ledger.is_halted("e2e-run-1")
@@ -81,7 +88,7 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     cost = gov.ledger.cost_micros("e2e-run-1")
     assert cost > 0
 
-    run_key = f"run:e2e-run-1"
+    run_key = "run:e2e-run-1"
     assert gov.ledger._spent[(RUN_TOTAL_BUDGET.budget_id, run_key, LIFETIME)] == cost
 
     window = gov.ledger.window("e2e-run-1")

@@ -59,7 +59,9 @@ class AnalystAgent:
                 ),
             ]
             response = chat.invoke(messages)
-            content = response.content if isinstance(response.content, str) else str(response.content)
+            content = (
+                response.content if isinstance(response.content, str) else str(response.content)
+            )
             usage = getattr(response, "usage_metadata", None) or {}
             if on_step:
                 on_step(
@@ -81,7 +83,11 @@ class AnalystAgent:
 
             query = str(decision.get("query") or (angles[0] if angles else topic))
             raw = fetch_tool.invoke(query) if action == "fetch" else search_tool.invoke(query)
-            entry = raw if isinstance(raw, dict) else {"query": query, "snippet": str(raw), "completeness": 0.5}
+            entry = (
+                raw
+                if isinstance(raw, dict)
+                else {"query": query, "snippet": str(raw), "completeness": 0.5}
+            )
 
             gov_ctx = current_governance()
             if gov_ctx is not None:
@@ -99,9 +105,9 @@ class AnalystAgent:
                     completeness=float(entry.get("completeness", 0.0)),
                 )
             )
-            if float(entry.get("completeness", 0)) >= cfg.satisfaction_threshold and len(findings) >= max(
-                1, len(angles)
-            ):
+            if float(entry.get("completeness", 0)) >= cfg.satisfaction_threshold and len(
+                findings
+            ) >= max(1, len(angles)):
                 break
 
         if not findings and angles:

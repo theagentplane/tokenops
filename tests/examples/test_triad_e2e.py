@@ -13,11 +13,11 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
-
+from examples.a2a import server as a2a_server
 from examples.agents.research.tools import core as search_core
 from examples.agents.research.tools.core import SearchResult
-from examples.a2a import server as a2a_server
+from fastapi.testclient import TestClient
+
 from tokenops.control.client import ControlPlaneClient
 from tokenops.control.context import RUN_ID_HEADER
 from tokenops.control.models import BudgetSpec, PolicyInstance
@@ -35,10 +35,12 @@ def _search(query, profile="healthy"):
 
 
 def _plan_then_done(provider, model, messages, max_output_tokens=None, **kw):
-    content = json.dumps({
-        "questions": ["What is mid-market CRM pricing?", "Seat vs usage pricing?"],
-        "outline": ["Pricing models", "Typical ranges", "Takeaways"],
-    })
+    content = json.dumps(
+        {
+            "questions": ["What is mid-market CRM pricing?", "Seat vs usage pricing?"],
+            "outline": ["Pricing models", "Typical ranges", "Takeaways"],
+        }
+    )
     return ModelResponse(content=content, input_tokens=120, output_tokens=40)
 
 
@@ -91,6 +93,7 @@ def _wire_apps(monkeypatch):
     from examples.triad.planner import server as planner_srv
     from examples.triad.researcher import server as researcher_srv
     from examples.triad.writer import server as writer_srv
+
     from tokenops.control.propagate import merge_propagation_headers
 
     monkeypatch.setattr(planner_srv, "complete", _plan_then_done)
@@ -174,7 +177,11 @@ def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
     assert rec is not None
     assert rec.status == "completed"
     assert rec.cost_micros > 0
-    reg = store.get_run_registration(body["run_id"]) if hasattr(store, "get_run_registration") else store.resolve_run(body["run_id"])
+    reg = (
+        store.get_run_registration(body["run_id"])
+        if hasattr(store, "get_run_registration")
+        else store.resolve_run(body["run_id"])
+    )
     assert reg.intent == "triad-demo"
     store.close()
 
@@ -201,7 +208,7 @@ def test_triad_cost_not_double_counted_without_parent_rollup(monkeypatch, tmp_pa
     from examples.triad.researcher import server as researcher_srv
     from examples.triad.writer import server as writer_srv
 
-    unit_price = lambda: (lambda provider, model, usage: int(usage.input) + int(usage.output))
+    unit_price = lambda: lambda provider, model, usage: int(usage.input) + int(usage.output)
     monkeypatch.setattr(planner_srv, "build_price_book", unit_price)
     monkeypatch.setattr(researcher_srv, "build_price_book", unit_price)
     monkeypatch.setattr(writer_srv, "build_price_book", unit_price)
@@ -246,7 +253,10 @@ def test_triad_per_agent_step_cap_only_on_researcher(monkeypatch, tmp_path):
         search_core,
         "search",
         lambda q, profile="healthy": SearchResult(
-            query=q, snippet="tiny", completeness=0.2, source="test",
+            query=q,
+            snippet="tiny",
+            completeness=0.2,
+            source="test",
         ),
     )
     from examples.triad.researcher import server as researcher_srv
@@ -281,7 +291,10 @@ def test_triad_step_cap_halts(monkeypatch, tmp_path):
         search_core,
         "search",
         lambda q, profile="healthy": SearchResult(
-            query=q, snippet="tiny", completeness=0.2, source="test",
+            query=q,
+            snippet="tiny",
+            completeness=0.2,
+            source="test",
         ),
     )
     from examples.triad.researcher import server as researcher_srv
@@ -325,7 +338,10 @@ def test_triad_cost_budget_halts_on_researcher(monkeypatch, tmp_path):
         search_core,
         "search",
         lambda q, profile="healthy": SearchResult(
-            query=q, snippet="tiny", completeness=0.2, source="test",
+            query=q,
+            snippet="tiny",
+            completeness=0.2,
+            source="test",
         ),
     )
     from examples.triad.researcher import server as researcher_srv

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Mapping
+from collections.abc import Mapping
 
 from examples.a2a.messages import parse_findings
 from examples.a2a.server import create_a2a_app, run_server
@@ -64,15 +64,26 @@ def build_app():
                 token_usage.output_tokens += event.tokens.output_tokens
 
             governed = wrap_complete(
-                governor, controls, attr, provider=cfg.provider, model=cfg.model,
-                dispatch=make_langchain_dispatch(cfg.provider, cfg.model), service=AGENT,
+                governor,
+                controls,
+                attr,
+                provider=cfg.provider,
+                model=cfg.model,
+                dispatch=make_langchain_dispatch(cfg.provider, cfg.model),
+                service=AGENT,
             )
             llm = GovernedChatModel(governed, provider=cfg.provider, model=cfg.model)
 
             status, halt_reason, brief = "completed", None, ""
             try:
                 brief = await asyncio.to_thread(
-                    agent.run, topic, findings, sections, angles, on_step, llm,
+                    agent.run,
+                    topic,
+                    findings,
+                    sections,
+                    angles,
+                    on_step,
+                    llm,
                 )
             except Halt as halt:
                 status, halt_reason = "halted", halt.action.reason
@@ -89,7 +100,10 @@ def build_app():
                 )
 
             response = edit_response(
-                brief, token_usage, steps, cost_micros=governor.ledger.cost_micros(run_id),
+                brief,
+                token_usage,
+                steps,
+                cost_micros=governor.ledger.cost_micros(run_id),
             )
             response.update(run_id=run_id, status=status)
             if halt_reason:

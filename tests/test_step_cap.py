@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import FakeView, make_attr, make_step, toy_price
 from tokenops.control import ActionKind, Budget, Governor, Halt, Ledger, Observation
 from tokenops.control.policies import step_cap
-from conftest import make_attr, make_step, toy_price, FakeView
 
 
 def test_detector_trips_at_cap():
@@ -27,17 +27,28 @@ def test_policy_halts():
 
 def test_e2e_halts_on_third_step():
     # tool crossings carry no cost, so this isolates step counting from budget.
-    ledger = Ledger(budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="run")], price=toy_price)
+    ledger = Ledger(
+        budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="run")], price=toy_price
+    )
     gov = Governor(ledger)
     gov.register(*step_cap.build(max_steps=3))
     attr = make_attr()
     ledger.open_run("run-1")
 
     def tool(i):
-        gov.observe(Observation(attr=attr, node_type="tool", boundary_id="search", ts=float(i),
-                                signature=f"s{i}", result_hash=f"r{i}"))
+        gov.observe(
+            Observation(
+                attr=attr,
+                node_type="tool",
+                boundary_id="search",
+                ts=float(i),
+                signature=f"s{i}",
+                result_hash=f"r{i}",
+            )
+        )
 
-    tool(1); tool(2)
+    tool(1)
+    tool(2)
     with pytest.raises(Halt):
         tool(3)
     assert ledger.step_count("run-1") == 3

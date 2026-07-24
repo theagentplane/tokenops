@@ -20,9 +20,7 @@ def _duration(r: RunRecord) -> float | None:
 def _status_banner(r: RunRecord) -> None:
     if r.status == "halted":
         # Intentional governance stop — not a crash.
-        st.warning(
-            f"**GOVERNANCE HALT** — {r.halt_reason or 'budget policy stopped the run'}"
-        )
+        st.warning(f"**GOVERNANCE HALT** — {r.halt_reason or 'budget policy stopped the run'}")
     elif r.status == "throttled":
         st.warning(f"**THROTTLED** — {r.halt_reason or 'no reason recorded'}")
     elif r.status == "completed":
@@ -110,7 +108,9 @@ def render_run_detail(store: Store, run: RunRecord) -> None:
 
     steer = [ev for ev in events if ev.get("kind") in ("inject", "mutate")]
     if steer:
-        with st.expander("Steering detail", expanded=any(ev.get("kind") == "inject" for ev in steer)):
+        with st.expander(
+            "Steering detail", expanded=any(ev.get("kind") == "inject" for ev in steer)
+        ):
             for ev in steer:
                 st.markdown(f"**{ev.get('policy', '—')}** · `{ev.get('kind')}`")
                 st.caption(ev.get("reason", ""))
