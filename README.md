@@ -22,7 +22,7 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 
 TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes — so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Onboarding](docs/guides/onboarding.md) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap)**
 
 ## Why TokenOps
 
@@ -74,8 +74,13 @@ pip install "agent-tokenops[examples]"
 pip install -e ".[dev,examples]"
 ```
 
-Requires Python 3.10+. PyPI name is `agent-tokenops`; import is still `tokenops`
-(same pattern as Chronicle). See [`RELEASING.md`](RELEASING.md) for releases.
+**Prerequisites:** Python 3.10+; `agent-tokenops`; either a running control plane
+(`TOKENOPS_URL` + shared `TOKENOPS_DB`) or `TOKENOPS_EMBEDDED=1` for single-process /
+tests. LLM API keys only for real model calls. FastAPI only if you use
+`instrument_app`.
+
+PyPI name is `agent-tokenops`; import is still `tokenops` (same pattern as Chronicle).
+See [`RELEASING.md`](RELEASING.md) for releases.
 
 ## Quick start
 
@@ -124,7 +129,9 @@ make control-plane               # :7700
 make ui                          # Admin + Dashboard :8501
 ```
 
-Full integration checklist: [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md) · field guide: [`docs/guides/field-guide-add-tokenops.md`](docs/guides/field-guide-add-tokenops.md).
+New here? [Onboarding guide](docs/guides/onboarding.md) (prereqs, bare-min integrate, FAQ, current limits).
+
+Full integration checklist: [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md) · triad deep dive: [`docs/guides/field-guide-add-tokenops.md`](docs/guides/field-guide-add-tokenops.md).
 
 ## Demos
 
@@ -230,11 +237,12 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 
 ## Documentation
 
+- [Onboarding](docs/guides/onboarding.md) — prereqs, bare-min integrate, FAQ, current limits
+- [Field guide](docs/guides/field-guide-add-tokenops.md) — triad deep dive + screenshots
 - [Control plane status](docs/control-plane-status.md)
 - [Architecture](docs/architecture.md)
 - [Run attribution](docs/run-attribution.md)
 - [Control plane deploy](docs/control-plane-deploy.md)
-- [Field guide](docs/guides/field-guide-add-tokenops.md)
 - [Examples](examples/README.md)
 - [Product: comparison](docs/product/comparison.md) · [shared ledger](docs/product/shared-ledger.md)
 

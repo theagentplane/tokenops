@@ -4,7 +4,7 @@ Governance for agent stacks: **register → measure → record → detect → de
 The agent (data plane) stays vanilla; the control plane taps boundary crossings and enforces on
 **cost** (micro-USD integers).
 
-Runnable A2A demos live in-repo under [`examples/`](examples/) (`make demo` / `demo-triad` / `demo-brief`).
+Newcomers: [onboarding guide](guides/onboarding.md). Runnable A2A demos live in-repo under [`examples/`](../examples/) (`make demo` / `demo-triad` / `demo-brief`).
 
 ## What it does (jobs → status)
 

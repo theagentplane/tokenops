@@ -4,6 +4,9 @@ This walkthrough mirrors how TokenOps was wired into the **Planner → Researche
 bench under [`examples/triad/`](../../examples/triad/). Code screenshots below were generated with
 `python scripts/render_field_guide_snippets.py` → [`docs/guides/assets/`](assets/).
 
+New to TokenOps? Start with the [onboarding guide](onboarding.md) (prereqs, bare-min
+integrate, FAQ, current limits), then return here for the triad deep dive.
+
 Related docs: [control-plane status](../control-plane-status.md),
 [control-plane-deploy.md](../control-plane-deploy.md),
 [run-attribution.md](../run-attribution.md).
