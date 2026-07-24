@@ -34,7 +34,7 @@ Chronicle records decision boundaries; TokenOps observes them for cost/governanc
 | **Or embedded Store** *(single-process / tests)* | Omit `TOKENOPS_URL` or set `TOKENOPS_EMBEDDED=1`. |
 | **LLM API keys** | Only for real model calls — not required for TokenOps itself or offline tests. |
 | **FastAPI** | Only if you use `instrument_app`. Non-FastAPI: pass kwargs / `RequestContext` to `tokenops_run`. |
-| **Chronicle `@boundary`** | Only if tools should be governed; LLM-only stacks can stop at `wrap_complete`. |
+| **Chronicle `@boundary`** | Tools *and* LLM: `kind="llm"` runs pre_call via `on_enter`; tools stay observe-only. LLM-only stacks can use bare `@boundary(..., kind="llm")` under `tokenops_run` instead of `wrap_complete`. |
 
 You do **not** need A2A, `create_a2a_app`, LangChain, or the Admin UI for governance to work.
 
