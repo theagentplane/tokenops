@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from tokenops.control.http import post_run, post_run_sync
+from tokenops.control.http_store import HttpStore
 from tokenops.control.models import (
     GovernanceMode,
     RunAlreadyRegisteredError,
@@ -58,23 +59,27 @@ class ControlPlaneClient:
             raise ValueError("exactly one of url or store is required")
         self._url = url.rstrip("/") if url else None
         self._store = store
-        self._hybrid_store: Store | None = None
+        self._hybrid_store: Any = None
         self._timeout = timeout
 
     @classmethod
     def from_env(cls, *, timeout: float = 30.0) -> ControlPlaneClient:
         """Build a client from ``TOKENOPS_URL`` / ``TOKENOPS_EMBEDDED`` / ``TOKENOPS_DB``.
 
-        * ``TOKENOPS_URL`` set and ``TOKENOPS_EMBEDDED`` not ``1`` → HTTP to the plane.
-        * otherwise → embedded :class:`Store` at ``TOKENOPS_DB`` (default ``tokenops.db``).
-
-        Also installs the Chronicle crossing hook (idempotent; design notes §17).
+        * ``TOKENOPS_URL`` or ``CONTROL_PLANE_URL`` set and ``TOKENOPS_EMBEDDED`` not ``1``
+          → HTTP to the plane (no local SQLite).
+        * otherwise → embedded :class:`Store` at ``TOKENOPS_DB``.
         """
         from tokenops.control.crossing import install_crossing_hook
 
         install_crossing_hook()
         embedded = os.environ.get("TOKENOPS_EMBEDDED", "").strip() == "1"
-        url = (os.environ.get("TOKENOPS_URL") or "").strip()
+        url = (
+            os.environ.get("CONTROL_PLANE_URL")
+            or os.environ.get("TOKENOPS_URL")
+            or os.environ.get("TOKENOPS_CONTROL_PLANE_URL")
+            or ""
+        ).strip()
         if url and not embedded:
             return cls(url=url, timeout=timeout)
         db = os.environ.get("TOKENOPS_DB", "tokenops.db")
@@ -98,19 +103,18 @@ class ControlPlaneClient:
         return self._store
 
     def require_store(self) -> Store:
-        """Backing Store for ledger / config / dashboard rows (escape hatch).
+        """Backing store for ledger / config / dashboard rows.
 
-        Embedded mode returns the in-process Store. Remote registration mode
-        lazily opens shared ``TOKENOPS_DB`` for ledger and config until those
-        plane APIs are HTTP (§4 / later waves).
+        Embedded mode returns the in-process SQLite Store. Remote mode returns
+        :class:`HttpStore` — never a local DB file.
         """
         if self._store is not None:
             return self._store
         if self._hybrid_store is None:
-            db = os.environ.get("TOKENOPS_DB", "tokenops.db")
-            logger.debug("tokenops.client hybrid_store path=%s", db)
-            self._hybrid_store = Store(db)
-        return self._hybrid_store
+            assert self._url is not None
+            key = os.environ.get("CONTROL_PLANE_API_KEY") or os.environ.get("TOKENOPS_API_KEY")
+            self._hybrid_store = HttpStore(self._url, api_key=key, timeout=self._timeout)
+        return cast(Store, self._hybrid_store)
 
     def register_run(
         self,
