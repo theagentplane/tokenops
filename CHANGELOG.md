@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-14
+
+### Added
+
+- **HTTP store** when `CONTROL_PLANE_URL` or `TOKENOPS_URL` is set: runs, governance,
+  ledger, and run-records go to the AgentPlane control plane over HTTP (`HttpStore`).
+  No local SQLite in that mode. `CONTROL_PLANE_API_KEY` / `TOKENOPS_API_KEY` are sent
+  as Bearer on those requests.
+
 ## [0.1.3] - 2026-07-24
 
 ### Fixed
