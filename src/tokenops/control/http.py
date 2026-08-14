@@ -6,6 +6,7 @@ wrap handlers here so Halt/Throttled map to HTTP responses.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
@@ -107,6 +108,15 @@ def _raise_for_response(response: httpx.Response) -> None:
         ) from exc
 
 
+def _plane_auth_headers() -> dict[str, str]:
+    key = (
+        os.environ.get("CONTROL_PLANE_API_KEY") or os.environ.get("TOKENOPS_API_KEY") or ""
+    ).strip()
+    if not key:
+        return {}
+    return {"Authorization": f"Bearer {key}"}
+
+
 async def post_run(
     url: str,
     payload: dict[str, Any],
@@ -116,7 +126,7 @@ async def post_run(
     """POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
     base = url.rstrip("/")
     async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f"{base}/v1/runs", json=payload)
+        response = await client.post(f"{base}/v1/runs", json=payload, headers=_plane_auth_headers())
         _raise_for_response(response)
         return response.json()
 
@@ -130,6 +140,6 @@ def post_run_sync(
     """Sync POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
     base = url.rstrip("/")
     with httpx.Client(timeout=timeout) as client:
-        response = client.post(f"{base}/v1/runs", json=payload)
+        response = client.post(f"{base}/v1/runs", json=payload, headers=_plane_auth_headers())
         _raise_for_response(response)
         return response.json()
