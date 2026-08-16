@@ -52,8 +52,12 @@ class NativeResearchAgent:
         task: str,
         corpus_profile: CorpusProfile,
         on_step: StepCallback | None = None,
+        complete_fn=None,
     ) -> list[Finding]:
         cfg = self._config
+        # Injected so a governed wrapper (control.wrap_complete) can run pre_call and apply
+        # MUTATE/REJECT before dispatch. Defaults to the vanilla provider entry point.
+        do_complete = complete_fn or complete
         search_fn = make_search_tool(corpus_profile, on_step)
         context: list[dict] = []
         findings: list[Finding] = []
@@ -66,7 +70,7 @@ class NativeResearchAgent:
                     "content": prompts.decision_prompt(task, context, cfg.max_steps, step),
                 },
             ]
-            response = complete(cfg.provider, cfg.model, messages)
+            response = do_complete(cfg.provider, cfg.model, messages)
             if on_step:
                 on_step(
                     StepEvent(

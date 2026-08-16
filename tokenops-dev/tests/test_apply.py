@@ -108,3 +108,20 @@ def test_pre_call_halt_blocks_dispatch():
     with pytest.raises(Halt):
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": "x" * 5000}])
     assert calls == []  # never dispatched
+
+
+def test_concurrency_cap_throttles_through_wrap():
+    from tokenops.control.policies import concurrency_cap
+    ledger = Ledger(price=toy_price)
+    controls = ApplyControls()
+    gov = Governor(ledger, controls)
+    gov.register(*concurrency_cap.build(max_concurrent=1, mode="reject"))
+    attr = make_attr()
+    ledger.open_run("run-1")
+    ledger.admit("run:run-1")  # one call already in flight for this segment
+
+    dispatch, calls = _record_dispatch()
+    governed = wrap_complete(gov, controls, attr, provider="openai", model="gpt-4o-mini", dispatch=dispatch)
+    with pytest.raises(Throttled):
+        governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
+    assert calls == []  # rejected before dispatch (no tokens spent)
