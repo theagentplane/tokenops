@@ -6,12 +6,13 @@ We help teams wire TokenOps into agent pipelines — registration, boundary inst
 
 | Channel | Use for |
 |---|---|
-| **[GitHub Issues](https://github.com/theagentplane/tokenops/issues)** | Onboarding questions, documentation feedback, general inquiries |
+| **[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions)** | Onboarding questions, integration help, ideas, and show-and-tell |
+| **[GitHub Issues](https://github.com/theagentplane/tokenops/issues)** | Bug reports and ready-to-implement feature work |
 | **[tishachawla5@gmail.com](mailto:tishachawla5@gmail.com)** | Direct email — onboarding and partnerships |
 | **[susheemkoul97@gmail.com](mailto:susheemkoul97@gmail.com)** | Direct email — onboarding and partnerships |
 | **[Agent Plane on GitHub](https://github.com/theagentplane)** | Organization profile and related projects |
 
-We respond to onboarding inquiries through GitHub Issues or email. Include a short description of your agent architecture, priority failure modes, and whether you need help with instrumentation, governance config, or both.
+We respond to onboarding inquiries through GitHub Discussions or email. Include a short description of your agent architecture, priority failure modes, and whether you need help with instrumentation, governance config, or both.
 
 ## What onboarding typically covers
 

@@ -11,6 +11,7 @@ Cap spend and steer behavior across a whole agent workflow â€” not per request â
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 [![Stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=flat&color=yellow)](https://github.com/theagentplane/tokenops/stargazers)
+[![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
 
 <br>
 
@@ -237,7 +238,7 @@ TokenOps is early (0.x). Near-term:
 - Remote observe / decide (fatter plane) for multi-host stacks.
 - Documentation site.
 
-Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md). Ideas welcome via GitHub issues.
+Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md). Ideas welcome in [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
 
 ## Documentation
 
@@ -252,7 +253,8 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 
 ## Contributing
 
-Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md),
+Questions, ideas, and show-and-tell belong in [Discussions](https://github.com/theagentplane/tokenops/discussions).
+Bugs and pull requests belong in Issues. See [CONTRIBUTING.md](CONTRIBUTING.md),
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
 
 ```bash

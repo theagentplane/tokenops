@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: TokenOps Discussions
+    url: https://github.com/theagentplane/tokenops/discussions
+    about: Questions, ideas, and show-and-tell. Use Q&A for integration help.
+  - name: Security
+    url: https://github.com/theagentplane/tokenops/blob/main/SECURITY.md
+    about: Report vulnerabilities privately. Do not file public issues.

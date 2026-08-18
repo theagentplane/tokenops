@@ -1,0 +1,56 @@
+title: "[Help] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask for help integrating TokenOps (`tokenops_run`, `wrap_complete`, `TOKENOPS_URL`, policies, the control plane).
+
+        - **Bugs** with expected vs actual behavior → [GitHub Issues](https://github.com/theagentplane/tokenops/issues)
+        - **Security** → [SECURITY.md](https://github.com/theagentplane/tokenops/blob/main/SECURITY.md) (do not post here)
+        - Search [existing discussions](https://github.com/theagentplane/tokenops/discussions) first
+  - type: dropdown
+    id: setup
+    attributes:
+      label: How are you running TokenOps?
+      description: Multi-process stacks should use TOKENOPS_URL; tests and single-process apps can use an embedded Store.
+      options:
+        - Remote control plane (TOKENOPS_URL)
+        - Embedded Store (TOKENOPS_EMBEDDED=1 or no URL)
+        - Not sure
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: stack
+    attributes:
+      label: Agent stack
+      options:
+        - Native / wrap_complete only
+        - Chronicle @boundary + crossing hook
+        - A2A (two-agent / triad)
+        - LangChain
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TokenOps version
+      description: PyPI version (`pip show agent-tokenops`) or git SHA.
+      placeholder: "e.g. 0.x.x or main @ abc1234"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+      description: Include a short description of the agent architecture and where governance should fire (LLM call, tool, or A2A hop).
+      placeholder: I register a run from the entry agent, then the summarizer should share the same run_id and budget…
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Config, logs, or repro
+      description: Optional. Redact API keys. Useful bits include TOKENOPS_URL / TOKENOPS_DB, the policy that should fire, and halt or ledger output.
+      render: shell

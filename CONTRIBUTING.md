@@ -68,8 +68,19 @@ governance wraps, ledger, and the control-plane server.
 3. Run `make lint` and `make test` before opening the PR.
 4. Update `CHANGELOG.md` for user-visible changes (see `RELEASING.md`).
 
-## Issues
+## Discussions vs issues
+
+Use **[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions)** for conversation:
+
+| Category | Use for |
+|----------|---------|
+| Q&A | Integration help (`tokenops_run`, `wrap_complete`, `TOKENOPS_URL`, policies) |
+| Ideas | Feature sketches and RFCs |
+| Show and tell | Integrations, benches, production setups |
+| General | Everything else |
+
+Use **Issues** for work that needs a patch:
 
 - Bug reports: expected vs actual behavior, minimal repro, versions.
-- Features: problem statement first; link related docs if helpful.
-- Security: see [SECURITY.md](SECURITY.md) — do not file public issues for vulns.
+- Concrete, ready-to-implement features (problem statement first; link related docs).
+- Security: see [SECURITY.md](SECURITY.md) — do not file public issues or discussions for vulns.

@@ -1,0 +1,41 @@
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a TokenOps change. Start with the problem, not the API.
+
+        Ready-to-implement work with a clear patch shape can go to [Issues](https://github.com/theagentplane/tokenops/issues) instead.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where would this live?
+      options:
+        - SDK (tokenops_run, wrap_complete, crossing hook)
+        - Control plane / ledger
+        - Policies / actuators
+        - Admin or Dashboard UI
+        - Docs / onboarding
+        - Examples / benches
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What fails, costs too much, or is hard to operate today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: A sketch is enough. Call out run-scoped vs request-scoped behavior if it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Existing policies, env vars, or workarounds you already tried.

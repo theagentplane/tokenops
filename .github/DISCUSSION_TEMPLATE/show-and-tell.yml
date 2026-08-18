@@ -1,0 +1,37 @@
+title: "[Show] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a TokenOps integration, bench, or production setup. Screenshots, GIFs, and repo links welcome.
+  - type: textarea
+    id: built
+    attributes:
+      label: What did you build?
+      description: What does the run look like (agents, tools, budget / policies)?
+    validations:
+      required: true
+  - type: dropdown
+    id: stack
+    attributes:
+      label: Stack
+      multiple: true
+      options:
+        - Native Python agents
+        - Chronicle
+        - A2A
+        - LangChain
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Optional repo, demo, or write-up.
+      placeholder: https://
+  - type: textarea
+    id: notes
+    attributes:
+      label: What surprised you?
+      description: Optional. Halt behavior, ledger attribution, policy tuning, or plane ops.
