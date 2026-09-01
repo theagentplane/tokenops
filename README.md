@@ -3,7 +3,9 @@
 # TokenOps
 
 **Run-aware token governance for multi-agent systems.**<br>
-Cap spend and steer behavior across a whole agent workflow — not per request — with a shared ledger and in-path enforcement.
+Cap spend and steer behavior across a whole agent workflow, not per request, with a shared ledger and in-path enforcement.
+
+<sub>Built by <b>Susheem Koul</b> and <b>Tisha Chawla</b></sub>
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
@@ -12,6 +14,11 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 [![Stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=flat&color=yellow)](https://github.com/theagentplane/tokenops/stargazers)
 [![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
+[![Slack](https://img.shields.io/badge/Slack-join%20the%20community-4A154B?style=flat&logo=slack&logoColor=white)](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)
+
+[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured%20by-Microsoft%20Developer-0078D4?style=flat&logo=microsoft&logoColor=white)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Command Line, a Microsoft publication](https://img.shields.io/badge/Command%20Line-Microsoft-5E5E5E?style=flat&logo=microsoft&logoColor=white)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Talk: AI Engineer World's Fair](https://img.shields.io/badge/Talk-AI%20Engineer%20World%27s%20Fair-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
 
@@ -25,16 +32,16 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 
 <br>
 
-TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes — so a research → summarize → review pipeline stays inside a single budget even across processes.
+TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes, so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Onboarding](docs/guides/onboarding.md) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
 
 ## Why TokenOps
 
 - **Govern the run, not the request.** One `run_id` spans every model, tool, and A2A hop in a workflow.
 - **Shared ledger across processes.** Spend, inflight, and halt live in SQLite so multi-agent stacks cannot each burn the full cap locally.
 - **In-path enforcement.** `wrap_complete` runs detect → decide → apply *before* the next LLM call; Chronicle `@boundary` + a crossing hook ingest tool spend.
-- **Steer or stop.** Actuators: `HALT` · `MUTATE` · `INJECT` · reject/queue — not just post-hoc analytics.
+- **Steer or stop.** Actuators: `HALT` · `MUTATE` · `INJECT` · reject/queue, not just post-hoc analytics.
 - **Batteries included.** Control plane (`:7700`), Admin + Dashboard UI, ten seeded policies, and runnable A2A benches (two-agent, triad, LangChain brief).
 
 ## Architecture
@@ -134,9 +141,9 @@ make control-plane               # :7700
 make ui                          # Admin + Dashboard :8501
 ```
 
-New here? [Onboarding guide](docs/guides/onboarding.md) (prereqs, bare-min integrate, FAQ, current limits).
-
-Full integration checklist: [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md) · triad deep dive: [`docs/guides/field-guide-add-tokenops.md`](docs/guides/field-guide-add-tokenops.md).
+New here? Start with the [onboarding guide](docs/guides/onboarding.md), then the
+[integration checklist](.cursor/skills/integrate-tokenops/SKILL.md) or the
+[triad field guide](docs/guides/field-guide-add-tokenops.md).
 
 ## Demos
 
@@ -148,12 +155,6 @@ Each bench is a multi-agent stack with a shared run ledger. Start the plane, age
 | Triad | Planner → Researcher → Writer | `make demo-triad` |
 | Brief | Scout → Analyst → Editor (LangChain) | `make demo-brief` |
 | Bench UI | Chat + Simulator only | `make bench-ui` |
-
-```bash
-make demo              # plane + research/summarize + Admin UI
-make demo-triad        # plane + planner/researcher/writer
-make demo-brief        # plane + scout/analyst/editor
-```
 
 Docker:
 
@@ -168,7 +169,7 @@ See [`examples/README.md`](examples/README.md) and [`docs/control-plane-deploy.m
 
 ## How TokenOps compares
 
-TokenOps is not a gateway or a tracing dashboard. It governs the **run** — a full agent workflow — and sits alongside the tools you already use for routing and observability.
+TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
 
 | | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
 |---|:---:|:---:|:---:|
@@ -178,7 +179,7 @@ TokenOps is not a gateway or a tracing dashboard. It governs the **run** — a f
 | Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
 | Shared ledger across agent processes | Yes | N/A | N/A |
 
-What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you. Fail-closed integrity (refuse on missing registration) is optional and upcoming.
+What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
 
 Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
 
@@ -234,16 +235,16 @@ tests/                     # unit + e2e
 TokenOps is early (0.x). Near-term:
 
 - User/tag segment-scoped budgets (machinery exists; seed is run-only today).
-- Optional fail-closed mode on missing registration or exceeded budget.
+- Optional fail-closed integrity: refuse on missing registration or exceeded budget.
 - Remote observe / decide (fatter plane) for multi-host stacks.
 - Documentation site.
 
-Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md). Ideas welcome in [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
+Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md).
 
 ## Documentation
 
-- [Onboarding](docs/guides/onboarding.md) — prereqs, bare-min integrate, FAQ, current limits
-- [Field guide](docs/guides/field-guide-add-tokenops.md) — triad deep dive + screenshots
+- [Onboarding](docs/guides/onboarding.md): prereqs, bare-min integrate, FAQ, current limits
+- [Field guide](docs/guides/field-guide-add-tokenops.md): triad deep dive + screenshots
 - [Control plane status](docs/control-plane-status.md)
 - [Architecture](docs/architecture.md)
 - [Run attribution](docs/run-attribution.md)
@@ -251,11 +252,27 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 - [Examples](examples/README.md)
 - [Product: comparison](docs/product/comparison.md) · [shared ledger](docs/product/shared-ledger.md)
 
+## Talks & press
+
+- **Featured by Microsoft Developer**: “Who spent all the tokens?” on
+  [LinkedIn](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b) and [X](https://x.com/msdev/status/2093425027500978292).
+- **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)**: *Command Line*, a Microsoft publication. Why per-request caps miss agent workflows, and how a run-scoped ledger plus in-path enforcement stops the bill mid-run.
+- **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)**: talk at the **AI Engineer World's Fair**, San Francisco. Live walkthrough of a governed multi-agent run hitting its budget cap.
+
+## Community
+
+**[Join The Agent Plane on Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)**
+for real-time questions, integration help, and demos of what you have governed.
+
+For longer-form questions, ideas, and show-and-tell, use
+[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
+
 ## Contributing
 
-Questions, ideas, and show-and-tell belong in [Discussions](https://github.com/theagentplane/tokenops/discussions).
-Bugs and pull requests belong in Issues. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
+Bugs belong in Issues. Open an issue before a pull request so the approach can
+be agreed there first; typos and small docs fixes can go straight to a PR. See
+[CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
+and [SECURITY.md](SECURITY.md).
 
 ```bash
 make install
@@ -275,6 +292,6 @@ If TokenOps saves you a runaway agent bill, please [⭐ star the repo](https://g
 
 <div align="center">
 
-Built by Susheem Koul and Tisha Chawla
+[Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) · [Discussions](https://github.com/theagentplane/tokenops/discussions) · [PyPI](https://pypi.org/project/agent-tokenops/)
 
 </div>
