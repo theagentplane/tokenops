@@ -34,7 +34,7 @@ Cap spend and steer behavior across a whole agent workflow, not per request, wit
 
 TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes, so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Onboarding](docs/guides/onboarding.md) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
 
 ## Why TokenOps
 
@@ -141,9 +141,9 @@ make control-plane               # :7700
 make ui                          # Admin + Dashboard :8501
 ```
 
-New here? [Onboarding guide](docs/guides/onboarding.md) (prereqs, bare-min integrate, FAQ, current limits).
-
-Full integration checklist: [`.cursor/skills/integrate-tokenops/SKILL.md`](.cursor/skills/integrate-tokenops/SKILL.md) · triad deep dive: [`docs/guides/field-guide-add-tokenops.md`](docs/guides/field-guide-add-tokenops.md).
+New here? Start with the [onboarding guide](docs/guides/onboarding.md), then the
+[integration checklist](.cursor/skills/integrate-tokenops/SKILL.md) or the
+[triad field guide](docs/guides/field-guide-add-tokenops.md).
 
 ## Demos
 
@@ -155,12 +155,6 @@ Each bench is a multi-agent stack with a shared run ledger. Start the plane, age
 | Triad | Planner → Researcher → Writer | `make demo-triad` |
 | Brief | Scout → Analyst → Editor (LangChain) | `make demo-brief` |
 | Bench UI | Chat + Simulator only | `make bench-ui` |
-
-```bash
-make demo              # plane + research/summarize + Admin UI
-make demo-triad        # plane + planner/researcher/writer
-make demo-brief        # plane + scout/analyst/editor
-```
 
 Docker:
 
@@ -185,7 +179,7 @@ TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full
 | Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
 | Shared ledger across agent processes | Yes | N/A | N/A |
 
-What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you. Fail-closed integrity (refuse on missing registration) is optional and upcoming.
+What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
 
 Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
 
@@ -241,11 +235,11 @@ tests/                     # unit + e2e
 TokenOps is early (0.x). Near-term:
 
 - User/tag segment-scoped budgets (machinery exists; seed is run-only today).
-- Optional fail-closed mode on missing registration or exceeded budget.
+- Optional fail-closed integrity: refuse on missing registration or exceeded budget.
 - Remote observe / decide (fatter plane) for multi-host stacks.
 - Documentation site.
 
-Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md). Ideas welcome in [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
+Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md).
 
 ## Documentation
 
