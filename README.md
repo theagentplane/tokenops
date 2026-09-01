@@ -5,6 +5,8 @@
 **Run-aware token governance for multi-agent systems.**<br>
 Cap spend and steer behavior across a whole agent workflow — not per request — with a shared ledger and in-path enforcement.
 
+<sub>Built by <b>Susheem Koul</b> and <b>Tisha Chawla</b></sub>
+
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/theagentplane/tokenops)
@@ -12,6 +14,10 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 [![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
 [![Stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=flat&color=yellow)](https://github.com/theagentplane/tokenops/stargazers)
 [![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
+[![Slack](https://img.shields.io/badge/Slack-join%20the%20community-4A154B?style=flat&logo=slack&logoColor=white)](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)
+
+[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured%20by-Microsoft%20Developer-0078D4?style=flat&logo=microsoft&logoColor=white)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Talk: AI Engineer World's Fair](https://img.shields.io/badge/Talk-AI%20Engineer%20World%27s%20Fair-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
 
@@ -27,7 +33,7 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 
 TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes — so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Onboarding](docs/guides/onboarding.md) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Onboarding](docs/guides/onboarding.md) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Make targets](#make-targets) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
 
 ## Why TokenOps
 
@@ -251,9 +257,21 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 - [Examples](examples/README.md)
 - [Product: comparison](docs/product/comparison.md) · [shared ledger](docs/product/shared-ledger.md)
 
+## Talks & press
+
+- **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)** — *Command Line*, a Microsoft publication. Why per-request caps miss agent workflows, and how a run-scoped ledger plus in-path enforcement stops the bill mid-run.
+- **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)** — talk at the **AI Engineer World's Fair**, San Francisco. Live walkthrough of a governed multi-agent run hitting its budget cap.
+
+## Community
+
+Join the Slack workspace — **[The Agent Plane on Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)** — for real-time questions,
+integration help, and demos of what you have governed.
+
+For longer-form questions, ideas, and show-and-tell, use
+[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
+
 ## Contributing
 
-Questions, ideas, and show-and-tell belong in [Discussions](https://github.com/theagentplane/tokenops/discussions).
 Bugs and pull requests belong in Issues. See [CONTRIBUTING.md](CONTRIBUTING.md),
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
 
@@ -275,6 +293,6 @@ If TokenOps saves you a runaway agent bill, please [⭐ star the repo](https://g
 
 <div align="center">
 
-Built by Susheem Koul and Tisha Chawla
+[Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) · [Discussions](https://github.com/theagentplane/tokenops/discussions) · [PyPI](https://pypi.org/project/agent-tokenops/)
 
 </div>
