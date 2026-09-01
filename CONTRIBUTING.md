@@ -19,7 +19,7 @@ cp .env.example .env  # optional API keys for live demos
 Install [Git LFS](https://git-lfs.com) if you need local copies of demo videos /
 the product deck (tracked as LFS pointers).
 
-Optional local hooks (same checks as CI — ruff + mypy):
+Optional local hooks (same checks as CI: ruff + mypy):
 
 ```bash
 pre-commit install
@@ -63,10 +63,20 @@ governance wraps, ledger, and the control-plane server.
 
 ## Pull requests
 
-1. Prefer a focused PR (one concern per change).
-2. Add or update tests when behavior changes.
-3. Run `make lint` and `make test` before opening the PR.
-4. Update `CHANGELOG.md` for user-visible changes (see `RELEASING.md`).
+**Open an issue first.** For anything beyond a typo or a small docs fix, file an
+issue describing the problem or the feature, and wait for a maintainer to agree
+on the approach before you write the patch. It keeps you from spending a weekend
+on a change we cannot merge, and it gives the PR something to close.
+
+1. Open an issue and get agreement on the approach.
+2. Branch, then keep the PR focused (one concern per change).
+3. Add or update tests when behavior changes.
+4. Run `make lint` and `make test` before opening the PR.
+5. Update `CHANGELOG.md` for user-visible changes (see `RELEASING.md`).
+6. Link the issue in the PR description (`Fixes #123`).
+
+Typos, broken links, and formatting fixes can skip step 1 and go straight to a
+pull request.
 
 ## Discussions vs issues
 
@@ -83,4 +93,5 @@ Use **Issues** for work that needs a patch:
 
 - Bug reports: expected vs actual behavior, minimal repro, versions.
 - Concrete, ready-to-implement features (problem statement first; link related docs).
-- Security: see [SECURITY.md](SECURITY.md) — do not file public issues or discussions for vulns.
+- The issue comes before the pull request, so the approach can be agreed there.
+- Security: see [SECURITY.md](SECURITY.md); do not file public issues or discussions for vulns.

@@ -275,8 +275,10 @@ For longer-form questions, ideas, and show-and-tell, use
 
 ## Contributing
 
-Bugs and pull requests belong in Issues. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
+Bugs belong in Issues. Open an issue before a pull request so the approach can
+be agreed there first; typos and small docs fixes can go straight to a PR. See
+[CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
+and [SECURITY.md](SECURITY.md).
 
 ```bash
 make install
