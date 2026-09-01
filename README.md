@@ -5,7 +5,7 @@
 **Run-aware token governance for multi-agent systems.**<br>
 Cap spend and steer behavior across a whole agent workflow, not per request, with a shared ledger and in-path enforcement.
 
-**Built by Susheem Koul and Tisha Chawla**
+**Built by [Susheem Koul](https://www.linkedin.com/in/susheemkoul/) and [Tisha Chawla](https://www.linkedin.com/in/tisha-chawla/)**
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
