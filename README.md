@@ -5,8 +5,6 @@
 **Run-aware token governance for multi-agent systems.**<br>
 Cap spend and steer behavior across a whole agent workflow, not per request, with a shared ledger and in-path enforcement.
 
-Built by <b>Susheem Koul</b> and <b>Tisha Chawla</b>
-
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/theagentplane/tokenops)
@@ -21,6 +19,8 @@ Built by <b>Susheem Koul</b> and <b>Tisha Chawla</b>
 [![Talk: AI Engineer World's Fair](https://img.shields.io/badge/Talk-AI%20Engineer%20World%27s%20Fair-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
+
+Built by <b>Susheem Koul</b> and <b>Tisha Chawla</b>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
 <img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="720" />
