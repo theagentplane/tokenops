@@ -16,7 +16,8 @@ Cap spend and steer behavior across a whole agent workflow — not per request �
 [![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
 [![Slack](https://img.shields.io/badge/Slack-join%20the%20community-4A154B?style=flat&logo=slack&logoColor=white)](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)
 
-[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured%20by-Microsoft%20Developer-0078D4?style=flat&logo=microsoft&logoColor=white)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured%20by-Microsoft%20Developer-0078D4?style=flat&logo=microsoft&logoColor=white)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Command Line — a Microsoft publication](https://img.shields.io/badge/Command%20Line-Microsoft-5E5E5E?style=flat&logo=microsoft&logoColor=white)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
 [![Talk: AI Engineer World's Fair](https://img.shields.io/badge/Talk-AI%20Engineer%20World%27s%20Fair-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
@@ -259,6 +260,8 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 
 ## Talks & press
 
+- **Featured by Microsoft Developer** — “Who spent all the tokens?” on
+  [LinkedIn](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b) and [X](https://x.com/msdev/status/2093425027500978292).
 - **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)** — *Command Line*, a Microsoft publication. Why per-request caps miss agent workflows, and how a run-scoped ledger plus in-path enforcement stops the bill mid-run.
 - **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)** — talk at the **AI Engineer World's Fair**, San Francisco. Live walkthrough of a governed multi-agent run hitting its budget cap.
 
