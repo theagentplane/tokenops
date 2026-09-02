@@ -267,6 +267,9 @@ for real-time questions, integration help, and demos of what you have governed.
 For longer-form questions, ideas, and show-and-tell, use
 [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
 
+**Office hours:** if you are wiring TokenOps into a real stack and want to talk it
+through, [book a slot](https://calendly.com/theagentplane/theagentplane).
+
 ## Contributing
 
 Bugs belong in Issues. Open an issue before a pull request so the approach can
