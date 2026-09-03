@@ -1,0 +1,35 @@
+<svg width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1000" height="420" fill="#fafaf8"/>
+  <rect x="0" y="0" width="1000" height="420" fill="none" stroke="#eceae3" stroke-width="2"/>
+
+  <!-- kicker -->
+  <text x="64" y="80" font-size="14" font-weight="700" letter-spacing="3" fill="#9a978c">OPEN SOURCE · MIT LICENSED</text>
+
+  <!-- wordmark -->
+  <text x="64" y="120" font-size="22" font-weight="800" fill="#151512">TokenOps</text>
+
+  <!-- headline -->
+  <text x="64" y="195" font-size="46" font-weight="800" fill="#1c1b17">One budget for</text>
+  <text x="64" y="250" font-size="46" font-weight="800" fill="#1c1b17">the whole run.</text>
+  <text x="64" y="305" font-size="46" font-weight="800" fill="#a9791c">Enforced before</text>
+  <text x="64" y="360" font-size="46" font-weight="800" fill="#a9791c">each call goes out.</text>
+
+  <!-- right side: mini bar comparison -->
+  <g transform="translate(630,110)">
+    <rect x="0" y="0" width="310" height="250" rx="16" fill="#ffffff" stroke="#eceae3" stroke-width="1.5"/>
+
+    <text x="26" y="36" font-size="12" font-weight="700" letter-spacing="1.5" fill="#9a978c">SAME WORKFLOW, TWO OUTCOMES</text>
+
+    <text x="26" y="66" font-size="14" fill="#6b6858">without TokenOps</text>
+    <rect x="26" y="76" width="180" height="22" rx="6" fill="#c98f2b"/>
+    <text x="216" y="93" font-size="26" font-weight="800" fill="#1c1b17">$100</text>
+
+    <text x="26" y="128" font-size="14" fill="#6b6858">with TokenOps</text>
+    <rect x="26" y="138" width="180" height="22" rx="6" fill="#f2ede0"/>
+    <rect x="26" y="138" width="63" height="22" rx="6" fill="#1c1b17"/>
+    <text x="216" y="155" font-size="26" font-weight="800" fill="#1c1b17">$35</text>
+
+    <text x="26" y="200" font-size="22" font-weight="800" fill="#a9791c">$65 not spent</text>
+    <text x="26" y="226" font-size="13" fill="#9a978c">65% less, same task</text>
+  </g>
+</svg>
