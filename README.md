@@ -2,7 +2,8 @@
 
 # TokenOps
 
-**Cuts wasted agent spend by checking the run's budget before every call.**
+**Cuts wasted agent spend by up to 65%, checking the run's budget before every call.**<br>
+<sub>Toward token governance as a first-class discipline, not an afterthought.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
 [![Downloads](https://img.shields.io/pepy/dt/agent-tokenops)](https://pepy.tech/project/agent-tokenops)
@@ -11,21 +12,21 @@
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 [![GitHub Discussions](https://img.shields.io/badge/Discussions-24292f?logo=github&logoColor=white)](https://github.com/theagentplane/tokenops/discussions)
 
-[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured-Microsoft%20Developer-lightgrey)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
-[![Featured by Command Line](https://img.shields.io/badge/Featured-Command%20Line-lightgrey)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
-[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/Featured-AI%20Engineer%20World's%20Fair-lightgrey)](https://www.youtube.com/watch?v=GJX19pNhmSw)
+[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured-Microsoft%20Developer-5E5E5E)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Featured by Command Line](https://img.shields.io/badge/Featured-Command%20Line-5E5E5E)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/Featured-AI%20Engineer%20World's%20Fair-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <sub>Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a></b> and <b><a href="https://www.linkedin.com/in/tisha-chawla/">Tisha Chawla</a></b></sub>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
-<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="720" />
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="600" />
 </a>
 
 <sub><i>Governed Research → Summarize run: the budget cap halts spend mid-run, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
 
 <br>
 
-[Core features](#-core-features) · [Quickstart](#-quickstart) · [Quickdeploy](#-quickdeploy) · [How it compares](#how-tokenops-compares) · [See it work](#see-it-work) · [Policies](docs/policies/) · [Support](#support) · [Contributing](#-open-to-contribution)
+[Core features](#-core-features) · [Quickstart](#-quickstart) · [Quickdeploy](#-quickdeploy) · [How it compares](#-how-tokenops-compares) · [Policies](docs/policies/) · [Support](#-support) · [Contributing](#-open-to-contribution)
 
 </div>
 
@@ -49,8 +50,7 @@ add your own.
 
 ## 🚀 Quickstart
 
-Requires Python 3.10+. Want to see it run first, before touching your own code?
-Jump to [See it work](#see-it-work).
+Requires Python 3.10+.
 
 ### 1. Put it in your agent
 
@@ -177,39 +177,21 @@ PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
 
 </details>
 
-## How TokenOps compares
+## 🆚 How TokenOps compares
 
 TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
 
 | | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
 |---|:---:|:---:|:---:|
 | Primary focus | Run (stateful) | Request | Trace (observe) |
-| Multi-agent workflow as one unit | Yes | No | Manual stitch |
-| Budget enforcement in-path | Yes (run-aware) | Yes (key/team) | No (analytics) |
-| Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
-| Shared ledger across agent processes | Yes | N/A | N/A |
+| Multi-agent workflow as one unit | ✅ | ❌ | 🟡 manual stitch |
+| Budget enforcement in-path | ✅ run-aware | ✅ key/team | ❌ analytics only |
+| Steer next call (mutate / inject) | ✅ | 🟡 routing/fallbacks | ❌ |
+| Shared ledger across agent processes | ✅ | — | — |
 
 What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
 
 Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
-
-## See it work
-
-No install, no API keys, no server:
-
-```bash
-pip install agent-tokenops
-python -m tokenops.demo
-```
-
-```
-An agent makes 40 model calls. Budget for the whole run: $2.00.
-
-  without TokenOps   40 calls run, spend $5.80
-  with TokenOps      halted at call 12, spend $2.03
-
-  $3.77 not spent. The run stopped itself.
-```
 
 ## Reference
 
@@ -328,16 +310,16 @@ tests/                     # unit + e2e
 - **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)**: *Command Line*, a Microsoft publication.
 - **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)**: talk at the **AI Engineer World's Fair**, San Francisco.
 
-## Support
+## 🛟 Support
 
 | Need | Where |
 |---|---|
-| Report a bug | [Open an issue](https://github.com/theagentplane/tokenops/issues) with expected vs actual behavior and a minimal repro |
-| Report a security issue | [SECURITY.md](SECURITY.md), not a public issue |
-| Real-time questions, integration help | [Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) |
-| Longer-form questions, ideas, show-and-tell | [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions) |
-| Talk through a real integration | [Book office hours](https://calendly.com/theagentplane/theagentplane) |
-| Talks, writing, videos | [theagentplane.github.io/media](https://theagentplane.github.io/media.html) |
+| Bug | [Open an issue](https://github.com/theagentplane/tokenops/issues) |
+| Security issue | [SECURITY.md](SECURITY.md) |
+| Real-time help | [Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) |
+| Longer-form discussion | [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions) |
+| Talk it through | [Office hours](https://calendly.com/theagentplane/theagentplane) |
+| Talks & writing | [theagentplane.github.io/media](https://theagentplane.github.io/media.html) |
 
 ## Contributors
 
@@ -346,8 +328,6 @@ Thanks to everyone who has contributed.
 [![Contributors](https://contrib.rocks/image?repo=theagentplane/tokenops)](https://github.com/theagentplane/tokenops/graphs/contributors)
 
 ---
-
-If TokenOps saves you a runaway agent bill, please [⭐ star the repo](https://github.com/theagentplane/tokenops) so more people can find it.
 
 <div align="center">
 
