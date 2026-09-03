@@ -2,8 +2,8 @@
 
 # TokenOps
 
-**One budget for a whole agent workflow, enforced before each call.**<br>
-Your agent stops when the run is out of money, instead of after the bill arrives.
+**Cuts wasted agent spend before it happens, not after the bill arrives.**<br>
+One budget for the whole run, checked before every call.
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
