@@ -13,7 +13,7 @@ Your agent stops when the run is out of money, instead of after the bill arrives
 [![GitHub stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=social)](https://github.com/theagentplane/tokenops/stargazers)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 
-<b><font color="#6a737d">Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></font></b>
+<b><span style="color:#6a737d">Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></span></b>
 
 <br>
 
