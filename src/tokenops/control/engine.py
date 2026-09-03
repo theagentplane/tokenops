@@ -107,6 +107,17 @@ class ApplyControls:
       * MUTATE  → ``call`` overrides (model swap, output cap) + any prompt directive carried
       * INJECT  → ``carry`` messages appended as final user turns on the next dispatch
       * RETRY   → ``retry`` flag (the wrap may re-issue; streaming CANCEL is out of scope here)
+
+    One ``observe`` pass can hand several policies' actions to the same call, so this
+    connector merges rather than overwrites. Two rules keep that merge safe:
+
+    **Caps only tighten.** ``max_output_tokens`` takes the ``min`` of what any policy asked
+    for. Without this, a looser cap applied later silently undoes a tighter one, and the
+    order is severity rank then detector registration, which no user controls.
+
+    **Directives are bounded.** ``carry`` dedups and stops at ``max_carry``. ``cost_guard``
+    fires *because* spend is high, so an unbounded pile of steer messages would add prompt
+    tokens at exactly the wrong moment.
     """
 
     carry: list[str] = field(default_factory=list)
@@ -114,12 +125,15 @@ class ApplyControls:
     call: _ResolvedCall = field(default_factory=_ResolvedCall)
     retry: bool = False
     tool_result_override: str | None = None  # deep INJECT: substitute the last tool result
+    max_carry: int = 3  # steer messages carried onto one dispatch; the rest are dropped
+    dropped_carry: int = 0  # how many were dropped, for the dashboard
 
     def begin_call(self) -> None:
         """Reset per-call mutation state before a pre_call pass (``carry`` persists across
         calls until consumed by the next dispatch)."""
         self.call = _ResolvedCall()
         self.retry = False
+        self.dropped_carry = 0
 
     def take_tool_result(self) -> str | None:
         """Consume a pending tool-result substitution (the agent calls this after a tool
@@ -141,19 +155,38 @@ class ApplyControls:
             if action.downgrade_to:
                 self.call.model_override = action.downgrade_to
             if action.max_output_tokens is not None:
-                self.call.max_output_tokens = action.max_output_tokens
+                self._tighten_output_cap(action.max_output_tokens)
             if action.compact:  # deep prompt compaction (rewrite messages in the wrap)
                 self.call.compact = True
             if action.inject_message:  # compaction directive / steer
-                self.carry.append(action.inject_message)
+                self._carry(action.inject_message)
         elif kind is ActionKind.INJECT:
             if action.replace_tool_result and action.inject_message:  # deep tool-result swap
                 self.tool_result_override = action.inject_message
             elif action.inject_message:
-                self.carry.append(action.inject_message)
+                self._carry(action.inject_message)
         elif kind is ActionKind.RETRY:
             self.retry = True
         # CANCEL is stream-only; a synchronous wrap has nothing to tear down.
+
+    def _tighten_output_cap(self, requested: int) -> None:
+        """Take the tightest cap any policy asked for on this call.
+
+        Never widen: a policy asking for a bigger cap than one already set is asking to
+        undo another policy's restriction, and the winner would otherwise be decided by
+        detector registration order.
+        """
+        current = self.call.max_output_tokens
+        self.call.max_output_tokens = requested if current is None else min(current, requested)
+
+    def _carry(self, message: str) -> None:
+        """Queue a steer message, deduped and bounded by ``max_carry``."""
+        if message in self.carry:
+            return
+        if len(self.carry) >= self.max_carry:
+            self.dropped_carry += 1
+            return
+        self.carry.append(message)
 
 
 @dataclass
