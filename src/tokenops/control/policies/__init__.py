@@ -3,7 +3,10 @@
 Every module exposes a ``build(...) -> tuple[Detector, Policy]`` factory so the config
 layer can instantiate templates declaratively and register them with the Governor.
 
-Governance docs (the action each policy takes) live in ``tokenops-lld/policies/``.
+Governance docs (the action each policy takes) live in ``docs/policies/``.
+
+Note: ``trajectory_hint`` requires a ``Store`` and is configured via
+``src/tokenops/control/config.py`` rather than exported here.
 """
 
 from tokenops.control.policies import (
