@@ -44,10 +44,9 @@
 ## ✨ Core features
 
 An AI agent's workflow can run up cost fast: dozens of small, individually
-cheap steps that quietly add up to a surprisingly large bill. Most safeguards
-only watch one step at a time and miss this. TokenOps sets a single budget
-for the whole workflow and enforces it before every step, so spending never
-gets away from you.
+cheap steps that quietly add up to a surprisingly large bill. TokenOps sets
+a single budget for the whole workflow and enforces it before every step,
+so spending never gets away from you.
 
 <img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="850" />
 
