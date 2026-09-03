@@ -2,7 +2,7 @@
 
 # TokenOps
 
-**Cuts wasted agent spend by up to 65%, checking the run's budget before every call.**<br>
+**Cuts wasted agent spend by up to `65%`, checking the run's budget before every call.**<br>
 <sub>Toward token governance as a first-class discipline, not an afterthought.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
@@ -328,6 +328,8 @@ Thanks to everyone who has contributed.
 [![Contributors](https://contrib.rocks/image?repo=theagentplane/tokenops)](https://github.com/theagentplane/tokenops/graphs/contributors)
 
 ---
+
+Saved you tokens? [⭐ Star the repo](https://github.com/theagentplane/tokenops).
 
 <div align="center">
 
