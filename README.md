@@ -13,7 +13,7 @@ Your agent stops when the run is out of money, instead of after the bill arrives
 [![GitHub stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=social)](https://github.com/theagentplane/tokenops/stargazers)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 
-**Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a>**
+<b><font color="#6a737d">Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></font></b>
 
 <br>
 
@@ -27,25 +27,29 @@ Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a><
 
 <br><br>
 
-[Quickstart](#-quickstart) · [Core features](#-core-features) · [Quickdeploy](#quickdeploy) · [How it compares](#how-tokenops-compares) · [Policies](docs/policies/) · [Upcoming features](#upcoming-features) · [Support](#support) · [Contributing](#contributing)
+[Core features](#-core-features) · [Quickstart](#-quickstart) · [See it work](#see-it-work) · [Quickdeploy](#quickdeploy) · [How it compares](#how-tokenops-compares) · [Policies](docs/policies/) · [Upcoming features](#upcoming-features) · [Support](#support) · [Contributing](#contributing)
 
 </div>
 
 <br>
 
-TokenOps is MIT-licensed and built in the open. If something is missing, broken, or
-just wrong, [open an issue](https://github.com/theagentplane/tokenops/issues) or send
-a PR. Issues tagged
-[`good first issue`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-are scoped for exactly that. See [Contributing](#contributing) for the workflow.
+## ✨ Core features
 
-<br>
+An agent workflow can call a model twenty times. Each call passes its own limit,
+but the workflow still costs ten times what was expected, because nothing was
+counting it as one thing. TokenOps gives the whole workflow one budget, checked
+before each call instead of reported after.
+
+<img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
+
+Ten policies ship configured in [`docs/policies/`](docs/policies/); add your own
+with the same `(Detector, Policy)` shape.
 
 ## 🚀 Quickstart
 
-Three steps: wire TokenOps into your own agent, run a demo to see what it does
-with nothing to configure, then look up anything more specific you need.
-Requires Python 3.10+.
+Wire TokenOps into your own agent, then look up anything more specific you need.
+Requires Python 3.10+. Want to see it work first, with nothing installed but the
+package? Jump to [See it work](#see-it-work).
 
 ### 1. Put it in your agent
 
@@ -106,7 +110,59 @@ even from another process.
 
 </details>
 
-### 2. See it work
+### 2. When you need more
+
+| You want to | Go to |
+|---|---|
+| Change the budget | [Set the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) |
+| One budget across several agent processes | [Shared plane](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) |
+| FastAPI or A2A services | [Instrumented app](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) |
+| Something other than stopping | [The ten policies](docs/policies/) |
+| Cost per agent in a dashboard | [Run it locally](#run-it-locally) |
+| A worked end-to-end example | [Field guide](docs/guides/field-guide-add-tokenops.md) |
+| Everything else | [Onboarding guide](docs/guides/onboarding.md) |
+
+## How TokenOps compares
+
+TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
+
+| | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
+|---|:---:|:---:|:---:|
+| Primary focus | Run (stateful) | Request | Trace (observe) |
+| Multi-agent workflow as one unit | Yes | No | Manual stitch |
+| Budget enforcement in-path | Yes (run-aware) | Yes (key/team) | No (analytics) |
+| Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
+| Shared ledger across agent processes | Yes | N/A | N/A |
+
+What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
+
+Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
+
+## Quickdeploy
+
+> [!TIP]
+> The **control plane** is the small service (`python -m tokenops.server`) that
+> stores each run's budget and ledger in one shared SQLite file, so several agent
+> processes can check the same running total. A single-process agent does not
+> need it running at all; TokenOps just opens a local ledger file for itself.
+> Stand up the control plane once you want a budget shared across processes,
+> or the dashboard.
+
+One Docker command brings up the control plane and the Admin/Dashboard together,
+no local Python setup:
+
+```bash
+git clone https://github.com/theagentplane/tokenops && cd tokenops
+docker compose --profile ui up --build
+```
+
+Plane health check: `localhost:7700/health` · Dashboard: `localhost:8501`.
+
+Plane only, no UI: `docker compose up --build`. Service breakdown, env vars, and
+running the example agents over Docker:
+[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
+
+## See it work
 
 Want to see the mechanism before touching your own code? This needs no install
 beyond the package, no API keys, no server, no Docker:
@@ -131,84 +187,11 @@ An agent makes 40 model calls. Budget for the whole run: $2.00.
 No single call in that run was expensive. It was the 40 of them together that
 crossed the cap, $2.03 against $5.80, about 65% less, which is exactly what a
 per-request limit cannot see because it only ever looks at one call at a time.
-That is the whole idea: a team ships an agent expecting it to cost roughly what
-it costs in testing, and TokenOps is what keeps a bad day from turning into a
-bad bill.
-
-### 3. When you need more
-
-| You want to | Go to |
-|---|---|
-| Change the budget | [Set the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) |
-| One budget across several agent processes | [Shared plane](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) |
-| FastAPI or A2A services | [Instrumented app](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) |
-| Something other than stopping | [The ten policies](docs/policies/) |
-| Cost per agent in a dashboard | [Run it locally](#run-it-locally) |
-| A worked end-to-end example | [Field guide](docs/guides/field-guide-add-tokenops.md) |
-| Everything else | [Onboarding guide](docs/guides/onboarding.md) |
-
-
-## ✨ Core features
-
-**The problem.** An agent workflow can call a model twenty times. Each call is
-cheap and passes whatever per-request limit is set. The workflow still costs ten
-times what was expected, and nothing stopped it, because nothing was counting
-the workflow as one thing. TokenOps gives the whole workflow one budget and one
-running total, and checks that total *before* each call rather than reporting
-on it afterwards.
-
-<img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
-
-Ten policies ship configured, in [`docs/policies/`](docs/policies/); add your own
-with the same `(Detector, Policy)` shape. For a team shipping an agent, this is
-what keeps a run's cost close to what it cost in testing instead of a bill that
-shows up after. For whoever wires it in, it is one wrapped call and one
-exception to catch.
-
-## How TokenOps compares
-
-TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
-
-| | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
-|---|:---:|:---:|:---:|
-| Primary focus | Run (stateful) | Request | Trace (observe) |
-| Multi-agent workflow as one unit | Yes | No | Manual stitch |
-| Budget enforcement in-path | Yes (run-aware) | Yes (key/team) | No (analytics) |
-| Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
-| Shared ledger across agent processes | Yes | N/A | N/A |
-
-What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
-
-Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
-
-## Quickdeploy
-
-> [!TIP]
-> The **control plane** is the small service (`python -m tokenops.server`) that
-> stores each run's budget and ledger in one shared SQLite file, so several agent
-> processes can check the same running total. A single-process agent, the demo
-> in Quickstart included, does not need it running at all; TokenOps just opens
-> a local ledger file for itself. Stand up the control plane once you want a
-> budget shared across processes, or the dashboard.
-
-One Docker command brings up the control plane and the Admin/Dashboard together,
-no local Python setup:
-
-```bash
-git clone https://github.com/theagentplane/tokenops && cd tokenops
-docker compose --profile ui up --build
-```
-
-Plane health check: `localhost:7700/health` · Dashboard: `localhost:8501`.
-
-Plane only, no UI: `docker compose up --build`. Service breakdown, env vars, and
-running the example agents over Docker:
-[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
 
 ## Run it locally
 
 For the same result without Docker, or to run the multi-agent benches. The
-no-server demo in Quickstart needs none of this.
+demo above needs none of this.
 
 ```bash
 git clone https://github.com/theagentplane/tokenops && cd tokenops
