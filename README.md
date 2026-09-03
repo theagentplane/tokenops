@@ -330,22 +330,14 @@ tests/                     # unit + e2e
 
 ## Support
 
-Found a bug? [Open an issue](https://github.com/theagentplane/tokenops/issues)
-with expected vs actual behavior and a minimal repro. For a security issue, see
-[SECURITY.md](SECURITY.md) instead of filing a public issue.
-
-**[Join The Agent Plane on Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)**
-for real-time questions, integration help, and demos of what you have governed.
-
-For longer-form questions, ideas, and show-and-tell, use
-[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions).
-
-**Office hours:** if you are wiring TokenOps into a real stack and want to talk it
-through, [book a slot](https://calendly.com/theagentplane/theagentplane).
-
-**Writing, talks and videos** from the people building this, on agent
-observability, replay testing, and token infrastructure:
-**[theagentplane.github.io/media](https://theagentplane.github.io/media.html)**.
+| Need | Where |
+|---|---|
+| Report a bug | [Open an issue](https://github.com/theagentplane/tokenops/issues) with expected vs actual behavior and a minimal repro |
+| Report a security issue | [SECURITY.md](SECURITY.md), not a public issue |
+| Real-time questions, integration help | [Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) |
+| Longer-form questions, ideas, show-and-tell | [GitHub Discussions](https://github.com/theagentplane/tokenops/discussions) |
+| Talk through a real integration | [Book office hours](https://calendly.com/theagentplane/theagentplane) |
+| Talks, writing, videos | [theagentplane.github.io/media](https://theagentplane.github.io/media.html) |
 
 ## Contributors
 
