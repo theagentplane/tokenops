@@ -25,7 +25,7 @@
 
 <br>
 
-[Core features](#-core-features) · [Quickstart](#-quickstart) · [Quickdeploy](#-quickdeploy) · [How it compares](#how-tokenops-compares) · [See it work](#see-it-work) · [Policies](docs/policies/) · [Support](#support) · [Contributing](#contributing)
+[Core features](#-core-features) · [Quickstart](#-quickstart) · [Quickdeploy](#-quickdeploy) · [How it compares](#how-tokenops-compares) · [See it work](#see-it-work) · [Policies](docs/policies/) · [Support](#support) · [Contributing](#-open-to-contribution)
 
 </div>
 
@@ -38,11 +38,11 @@
 
 ## ✨ Core features
 
-A per-request limit only looks at one call at a time, so a lot of cheap calls
-can quietly add up to far more than you expected. TokenOps tracks the whole
-run against one budget, and checks it before every call, not after.
+Cheap calls add up fast, and a per-request limit never sees it coming, since
+it only ever checks one call at a time. TokenOps watches the whole run
+instead: one budget, checked before every call, not after.
 
-<img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
+<img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="850" />
 
 Ten policies ship configured in [`docs/policies/`](docs/policies/), and you can
 add your own.
@@ -71,8 +71,6 @@ Anywhere else (Cursor, Copilot, ...), paste this:
 
 <details>
 <summary><b>Manual</b>, about ten lines</summary>
-
-<br>
 
 Wrap your model call once, then hand the wrapped version to your agent.
 
@@ -134,8 +132,6 @@ Plane: `localhost:7700/health` · Dashboard: `localhost:8501`. Plane only:
 <details>
 <summary><b>Without Docker</b> (make)</summary>
 
-<br>
-
 ```bash
 git clone https://github.com/theagentplane/tokenops && cd tokenops
 make install
@@ -148,8 +144,6 @@ Then open `localhost:8501` to see spend and governance per agent.
 
 <details>
 <summary><b>Multi-agent benches</b>: watch one budget span several agents</summary>
-
-<br>
 
 Each is a real multi-agent stack sharing one run ledger. One target starts the
 plane, the agents, and the Admin UI.
@@ -168,8 +162,6 @@ plane, the agents, and the Admin UI.
 
 <details>
 <summary><b>Pointing several processes at one plane</b></summary>
-
-<br>
 
 ```bash
 export TOKENOPS_URL=http://localhost:7700
@@ -203,14 +195,12 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 
 ## See it work
 
-No install beyond the package, no API keys, no server:
+No install, no API keys, no server:
 
 ```bash
 pip install agent-tokenops
 python -m tokenops.demo
 ```
-
-Same 40-call agent loop, governed and not:
 
 ```
 An agent makes 40 model calls. Budget for the whole run: $2.00.
@@ -220,9 +210,6 @@ An agent makes 40 model calls. Budget for the whole run: $2.00.
 
   $3.77 not spent. The run stopped itself.
 ```
-
-$2.03 vs $5.80, about 65% less. No single call was expensive; the 40 together
-crossed the cap, which a per-request limit can't see.
 
 ## Reference
 
@@ -359,28 +346,6 @@ through, [book a slot](https://calendly.com/theagentplane/theagentplane).
 **Writing, talks and videos** from the people building this, on agent
 observability, replay testing, and token infrastructure:
 **[theagentplane.github.io/media](https://theagentplane.github.io/media.html)**.
-
-## Contributing
-
-Good first contributions are labelled
-[`good first issue`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-and [`help wanted`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
-Two areas take contributions without touching the core:
-
-- **A new policy** (a detector plus a decision) under `src/tokenops/control/policies/`.
-  Ten existing ones are working references, one doc each in [`docs/policies/`](docs/policies/).
-- **A new adapter** so another SDK can be governed, under `src/tokenops/adapters/`.
-
-Open an issue before a pull request so the approach can be agreed there first;
-typos and small docs fixes can go straight to a PR. See
-[CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
-and [SECURITY.md](SECURITY.md).
-
-```bash
-make install
-make lint
-make test
-```
 
 ## Contributors
 
