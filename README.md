@@ -2,8 +2,7 @@
 
 # TokenOps
 
-**Cuts wasted agent spend before it happens, not after the bill arrives.**<br>
-One budget for the whole run, checked before every call.
+**Cuts wasted agent spend by checking the run's budget before every call.**
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
@@ -13,9 +12,9 @@ One budget for the whole run, checked before every call.
 [![GitHub stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=social)](https://github.com/theagentplane/tokenops/stargazers)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 
-[![Featured by Microsoft Developer](https://img.shields.io/badge/press-Microsoft%20Developer-6a737d)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
-[![Featured by Command Line](https://img.shields.io/badge/press-Command%20Line-6a737d)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
-[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/press-AI%20Engineer%20World's%20Fair-6a737d)](https://www.youtube.com/watch?v=GJX19pNhmSw)
+[![Featured by Microsoft Developer](https://img.shields.io/badge/press-Microsoft%20Developer-lightgrey)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Featured by Command Line](https://img.shields.io/badge/press-Command%20Line-lightgrey)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/press-AI%20Engineer%20World's%20Fair-lightgrey)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
 
