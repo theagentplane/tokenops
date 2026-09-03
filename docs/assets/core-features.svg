@@ -1,19 +1,25 @@
 <svg width="1200" height="560" viewBox="0 0 1200 560" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
-  <rect x="0" y="0" width="1200" height="560" rx="20" fill="#f6f6f4"/>
-  <rect x="20" y="20" width="1160" height="520" rx="14" fill="none" stroke="#d8d8d3" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <defs>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#151512" flood-opacity="0.07"/>
+    </filter>
+  </defs>
 
-  <text x="52" y="66" font-size="12" font-weight="700" letter-spacing="2" fill="#8a8a82">CORE FEATURES</text>
+  <rect x="0" y="0" width="1200" height="560" rx="20" fill="#fafaf8"/>
+  <rect x="20" y="20" width="1160" height="520" rx="16" fill="#ffffff" stroke="#eceae3" stroke-width="1" filter="url(#cardShadow)"/>
 
-  <text x="52" y="106" font-size="30" font-weight="800" fill="#151512">One budget for a whole agent workflow,</text>
-  <text x="52" y="140" font-size="30" font-weight="800" fill="#151512">
-    <tspan fill="#151512">enforced </tspan><tspan fill="#a9791c">before each call</tspan><tspan fill="#151512">.</tspan>
+  <text x="52" y="66" font-size="12" font-weight="700" letter-spacing="2" fill="#9a978c">CORE FEATURES</text>
+
+  <text x="52" y="106" font-size="30" font-weight="800" fill="#1c1b17">One budget for a whole agent workflow,</text>
+  <text x="52" y="140" font-size="30" font-weight="800" fill="#1c1b17">
+    <tspan fill="#1c1b17">enforced </tspan><tspan fill="#a9791c">before each call</tspan><tspan fill="#1c1b17">.</tspan>
   </text>
 
-  <text x="1148" y="70" font-size="13" fill="#6b6b63" text-anchor="end">Governs the run, not the request: one ledger,</text>
-  <text x="1148" y="90" font-size="13" fill="#6b6b63" text-anchor="end">checked before every call, shared across every agent.</text>
+  <text x="1148" y="70" font-size="13" fill="#83806f" text-anchor="end">Governs the run, not the request: one ledger,</text>
+  <text x="1148" y="90" font-size="13" fill="#83806f" text-anchor="end">checked before every call, shared across every agent.</text>
 
   <!-- grid -->
-  <g stroke="#e2e2dd" stroke-width="1">
+  <g stroke="#f0eee6" stroke-width="1">
     <line x1="52" y1="176" x2="1148" y2="176"/>
     <line x1="52" y1="356" x2="1148" y2="356"/>
     <line x1="52" y1="536" x2="1148" y2="536"/>
@@ -21,81 +27,80 @@
     <line x1="784" y1="176" x2="784" y2="536"/>
   </g>
 
-  <!-- card template macro via repeated groups -->
   <!-- Card 1 -->
   <g transform="translate(52,196)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <path d="M8 15 L13 20 L22 9" stroke="#f6d34a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">BEFORE THE CALL</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Enforced pre-call</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Checks the running total before</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">each call, not after. It refuses</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">the call that would break budget.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <path d="M9 16 L14 21 L23 10" stroke="#a9791c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">BEFORE THE CALL</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Enforced pre-call</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">Checks the running total before</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">each call, not after. It refuses</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">the call that would break budget.</text>
   </g>
 
   <!-- Card 2 -->
   <g transform="translate(420,196)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <circle cx="15" cy="15" r="8" fill="none" stroke="#f6d34a" stroke-width="2.4"/>
-    <line x1="15" y1="15" x2="15" y2="9" stroke="#f6d34a" stroke-width="2.2" stroke-linecap="round"/>
-    <line x1="15" y1="15" x2="19" y2="17" stroke="#f6d34a" stroke-width="2.2" stroke-linecap="round"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">WHOLE RUN</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Run-scoped budget</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">One cap for the whole workflow,</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">not per request, so cheap calls</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">cannot quietly add up.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <circle cx="16" cy="16" r="8.5" fill="none" stroke="#a9791c" stroke-width="2.4"/>
+    <line x1="16" y1="16" x2="16" y2="9.5" stroke="#a9791c" stroke-width="2.2" stroke-linecap="round"/>
+    <line x1="16" y1="16" x2="20.5" y2="18" stroke="#a9791c" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">WHOLE RUN</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Run-scoped budget</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">One cap for the whole workflow,</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">not per request, so cheap calls</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">cannot quietly add up.</text>
   </g>
 
   <!-- Card 3 -->
   <g transform="translate(788,196)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <circle cx="8" cy="10" r="3.4" fill="#f6d34a"/>
-    <circle cx="22" cy="10" r="3.4" fill="#f6d34a"/>
-    <circle cx="15" cy="22" r="3.4" fill="#f6d34a"/>
-    <path d="M8 10 L15 22 M22 10 L15 22" stroke="#f6d34a" stroke-width="1.6"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">MULTI-AGENT</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Shared across processes</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Research, summarize and review</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">can be three services and still</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">draw from one ledger.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <circle cx="9" cy="11" r="3.2" fill="none" stroke="#a9791c" stroke-width="2"/>
+    <circle cx="23" cy="11" r="3.2" fill="none" stroke="#a9791c" stroke-width="2"/>
+    <circle cx="16" cy="23" r="3.2" fill="none" stroke="#a9791c" stroke-width="2"/>
+    <path d="M11.5 12.5 L14 20 M20.5 12.5 L18 20" stroke="#a9791c" stroke-width="1.6"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">MULTI-AGENT</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Shared across processes</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">Research, summarize and review</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">can be three services and still</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">draw from one ledger.</text>
   </g>
 
   <!-- Card 4 -->
   <g transform="translate(52,376)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <path d="M7 22 L15 8 L23 22" stroke="#f6d34a" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">POLICY</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Steers, not just stops</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Shrinks the next prompt, swaps</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">to a cheaper model, or flags a</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">loop. Stopping is the last resort.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <path d="M8 24 L16 9 L24 24" stroke="#a9791c" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">POLICY</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Steers, not just stops</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">Shrinks the next prompt, swaps</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">to a cheaper model, or flags a</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">loop. Stopping is the last resort.</text>
   </g>
 
   <!-- Card 5 -->
   <g transform="translate(420,376)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <rect x="7" y="7" width="16" height="16" rx="2" fill="none" stroke="#f6d34a" stroke-width="2.2"/>
-    <line x1="10" y1="13" x2="20" y2="13" stroke="#f6d34a" stroke-width="1.6"/>
-    <line x1="10" y1="17" x2="17" y2="17" stroke="#f6d34a" stroke-width="1.6"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">SPEND</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Nothing hides in a tool call</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Search results and file reads</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">that land in the next prompt are</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">real spend, and get counted.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <rect x="8" y="8" width="16" height="16" rx="2.5" fill="none" stroke="#a9791c" stroke-width="2.1"/>
+    <line x1="11" y1="14" x2="21" y2="14" stroke="#a9791c" stroke-width="1.6"/>
+    <line x1="11" y1="18" x2="18" y2="18" stroke="#a9791c" stroke-width="1.6"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">SPEND</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Nothing hides in a tool call</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">Search results and file reads</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">that land in the next prompt are</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">real spend, and get counted.</text>
   </g>
 
   <!-- Card 6 -->
   <g transform="translate(788,376)">
-    <rect x="0" y="0" width="30" height="30" rx="7" fill="#151512"/>
-    <circle cx="15" cy="15" r="3" fill="#f6d34a"/>
-    <circle cx="7" cy="8" r="2.2" fill="#f6d34a"/>
-    <circle cx="23" cy="8" r="2.2" fill="#f6d34a"/>
-    <circle cx="7" cy="22" r="2.2" fill="#f6d34a"/>
-    <circle cx="23" cy="22" r="2.2" fill="#f6d34a"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">BATTERIES INCLUDED</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Governance, out of the box</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Ten documented policies covering</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">the common ways a run goes</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">wrong. Add your own alongside.</text>
+    <rect x="0" y="0" width="32" height="32" rx="9" fill="#f7edd4"/>
+    <circle cx="16" cy="16" r="2.6" fill="#a9791c"/>
+    <circle cx="9" cy="9" r="2" fill="#a9791c"/>
+    <circle cx="23" cy="9" r="2" fill="#a9791c"/>
+    <circle cx="9" cy="23" r="2" fill="#a9791c"/>
+    <circle cx="23" cy="23" r="2" fill="#a9791c"/>
+    <text x="0" y="58" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#a39f92">BATTERIES INCLUDED</text>
+    <text x="0" y="82" font-size="17" font-weight="700" fill="#1c1b17">Governance, out of the box</text>
+    <text x="0" y="106" font-size="12.5" fill="#6b6858">Ten documented policies covering</text>
+    <text x="0" y="124" font-size="12.5" fill="#6b6858">the common ways a run goes</text>
+    <text x="0" y="142" font-size="12.5" fill="#6b6858">wrong. Add your own alongside.</text>
   </g>
 </svg>
