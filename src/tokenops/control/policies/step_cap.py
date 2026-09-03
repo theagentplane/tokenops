@@ -40,7 +40,7 @@ class StepCapDetector(Detector):
                 detector=self.name,
                 severity=Severity.TRIP,
                 run_id=attr.run_id,
-                reason=f"step cap reached: {step.step} ≥ {self.max_steps}",
+                reason=f"step cap reached: {step.step} >= {self.max_steps}",
                 evidence={"steps": step.step, "max_steps": self.max_steps},
             )
         return None

@@ -78,7 +78,7 @@ class PreCallWorstCaseDetector(Detector):
                 detector=self.name,
                 severity=Severity.TRIP,
                 run_id=request.attr.run_id,
-                reason=f"worst-case {projected} ≥ remaining budget {left} (micros)",
+                reason=f"worst-case {projected} >= remaining budget {left} (micros)",
                 evidence={"projected": projected, "left": left, "capped_out": capped_out},
             )
         if request.max_output_tokens is None:

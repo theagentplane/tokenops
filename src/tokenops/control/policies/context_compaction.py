@@ -77,7 +77,7 @@ class ContextCompactionPolicy(Policy):
             return Action(
                 kind=ActionKind.ALLOW,
                 run_id=signal.run_id,
-                reason=f"{signal.reason} (no assembly hook — telemetry only)",
+                reason=f"{signal.reason} (no assembly hook: telemetry only)",
             )
         return Action(
             kind=ActionKind.MUTATE,
