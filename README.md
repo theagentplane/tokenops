@@ -7,10 +7,12 @@ Your agent stops when the run is out of money, instead of after the bill arrives
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
+[![Downloads](https://img.shields.io/pepy/dt/agent-tokenops)](https://pepy.tech/project/agent-tokenops)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/agent-tokenops/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 
-<sub>Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></sub>
+**Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a>**
 
 <br>
 
@@ -22,20 +24,38 @@ Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a><
 
 <sub><i>Governed Research → Summarize run: the budget cap halts spend mid-run, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
 
+<br><br>
+
+[Quickstart](#quickstart) · [Core features](#core-features) · [Quickdeploy](#quickdeploy) · [How it compares](#how-tokenops-compares) · [Policies](docs/policies/) · [Upcoming features](#upcoming-features) · [Support](#support) · [Contributing](#contributing)
+
 </div>
 
 <br>
 
-## Start here
+TokenOps is MIT-licensed and built in the open. If something is missing, broken, or
+just wrong, [open an issue](https://github.com/theagentplane/tokenops/issues) or send
+a PR. Issues tagged
+[`good first issue`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+are scoped for exactly that. See [Contributing](#contributing) for the workflow.
+
+<br>
+
+## Quickstart
+
+Three steps: run a working demo with nothing to configure, then wire TokenOps into
+your own agent, then look up anything more specific you need. Requires Python 3.10+.
 
 ### 1. See it work
+
+No install beyond the package, no API keys, no server, no Docker:
 
 ```bash
 pip install agent-tokenops
 python -m tokenops.demo
 ```
 
-No API keys, no server, no Docker. It runs the same agent loop twice:
+This runs the same 40-call agent loop twice, once ungoverned and once with
+TokenOps watching the run:
 
 ```
 An agent makes 40 model calls. Budget for the whole run: $2.00.
@@ -46,15 +66,19 @@ An agent makes 40 model calls. Budget for the whole run: $2.00.
   $3.77 not spent. The run stopped itself.
 ```
 
-No single call was expensive. Together they crossed the cap, which is what a
-per-request limit cannot see.
+No single call in that run was expensive. It was the 40 of them together that
+crossed the cap, $2.03 against $5.80, about 65% less, which is exactly what a
+per-request limit cannot see because it only ever looks at one call at a time.
+That is the whole idea: a team ships an agent expecting it to cost roughly what
+it costs in testing, and TokenOps is what keeps a bad day from turning into a
+bad bill.
 
 ### 2. Put it in your agent
 
 **The fastest way is to let your coding assistant do it.** TokenOps ships an
-integration skill: a written procedure your assistant reads and follows. It reads
-your agent, picks the right setup, wires the enforcement point, and tells you what
-to check.
+integration skill: a written procedure your assistant reads and follows so you
+do not have to. It reads your agent's code, picks the right setup for it, wires
+in the one enforcement point, and tells you what to check afterward.
 
 In **Claude Code**, from a clone:
 
@@ -121,31 +145,36 @@ even from another process.
 | Everything else | [Onboarding guide](docs/guides/onboarding.md) |
 
 
-## Why TokenOps
+## Core features
 
-**The problem.** Your agent workflow calls a model twenty times. Each call is
-cheap and each one passes whatever per-request limit you set. The workflow still
-costs ten times what you expected, and nothing stopped it, because nothing was
-counting the workflow as one thing.
+**The problem.** An agent workflow can call a model twenty times. Each call is
+cheap and passes whatever per-request limit is set. The workflow still costs ten
+times what was expected, and nothing stopped it, because nothing was counting
+the workflow as one thing.
 
-**What TokenOps does.** It gives the whole workflow one budget and one running
-total, and it checks that total *before* each call rather than reporting on it
-afterwards. Cross the budget and the run stops.
+TokenOps gives the whole workflow one budget and one running total, and checks
+that total *before* each call rather than reporting on it afterwards.
 
-A few things follow from that:
-
-- **It works across processes.** Research, summarize and review can be three
-  separate services and still share one budget. Without that, each one gets the
-  full cap and you pay three times over.
-- **Stopping is not the only option.** A policy can also shrink the next prompt,
-  swap to a cheaper model, or tell the agent it is going in circles. Stopping is
-  the last resort, not the only tool.
+- **Run-scoped budget.** One cap for the whole workflow, not per request, so a
+  string of individually-cheap calls cannot quietly add up to an expensive one.
+- **Enforced before the call.** The total is checked pre-call, not reported after
+  the fact. This refuses the call that would break the budget, it does not just
+  tell you it happened.
+- **Shared across processes.** Research, summarize and review can be three
+  separate services and still draw from one budget, so a multi-agent stack does
+  not get the full cap three times over.
+- **Steers, not just stops.** A policy can shrink the next prompt, swap to a
+  cheaper model, or flag an agent going in circles, before it halts the run.
+  Stopping is the last resort, not the only tool.
 - **Tool calls count too.** Not just model calls. Search results and file reads
-  end up in the next prompt, and that is real spend.
-- **It is not a dashboard.** Analytics tell you what you already spent. This
-  refuses the call that would break the budget.
+  that land in the next prompt are real spend.
+- **Ten policies included**, each documented and swappable, in
+  [`docs/policies/`](docs/policies/). Add your own with the same `(Detector,
+  Policy)` shape.
 
-Ten policies ship configured. You can [add your own](docs/policies/).
+For a team shipping an agent, this is what keeps a run's cost close to what it
+cost in testing instead of a bill that shows up after. For whoever wires it in,
+it is one wrapped call and one exception to catch.
 
 ## How TokenOps compares
 
@@ -163,10 +192,34 @@ What this does **not** do: replace your LLM gateway, replace Chronicle-style rec
 
 Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
 
+## Quickdeploy
+
+> [!TIP]
+> The **control plane** is the small service (`python -m tokenops.server`) that
+> stores each run's budget and ledger in one shared SQLite file, so several agent
+> processes can check the same running total. A single-process agent, Step 1 of
+> the Quickstart, does not need it running at all; TokenOps just opens a local
+> ledger file for itself. Stand up the control plane once you want a budget
+> shared across processes, or the dashboard.
+
+One Docker command brings up the control plane and the Admin/Dashboard together,
+no local Python setup:
+
+```bash
+git clone https://github.com/theagentplane/tokenops && cd tokenops
+docker compose --profile ui up --build
+```
+
+Plane health check: `localhost:7700/health` · Dashboard: `localhost:8501`.
+
+Plane only, no UI: `docker compose up --build`. Service breakdown, env vars, and
+running the example agents over Docker:
+[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
+
 ## Run it locally
 
-Only needed if you want the dashboard, the multi-agent benches, or a budget shared
-across processes. Step 1 needs none of this.
+For the same result without Docker, or to run the multi-agent benches. Step 1 of
+the Quickstart needs none of this.
 
 ```bash
 git clone https://github.com/theagentplane/tokenops && cd tokenops
@@ -193,9 +246,8 @@ plane, the agents, and the Admin UI.
 
 `cp .env.example .env` first if you want them to call real models.
 
-Docker instead of make: `docker compose up --build`. See
-[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md) for the UI and
-two-agent profiles, and [`examples/README.md`](examples/README.md) for the benches.
+For Docker instead of make, see [Quickdeploy](#quickdeploy) above and
+[`examples/README.md`](examples/README.md) for the bench profiles.
 
 </details>
 
@@ -328,7 +380,7 @@ tests/                     # unit + e2e
 
 </details>
 
-## Roadmap
+## Upcoming features
 
 TokenOps is early (0.x). Near-term:
 
@@ -346,7 +398,11 @@ Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-
 - **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)**: *Command Line*, a Microsoft publication. Why per-request caps miss agent workflows, and how a run-scoped ledger plus in-path enforcement stops the bill mid-run.
 - **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)**: talk at the **AI Engineer World's Fair**, San Francisco. Live walkthrough of a governed multi-agent run hitting its budget cap.
 
-## Community
+## Support
+
+Found a bug? [Open an issue](https://github.com/theagentplane/tokenops/issues)
+with expected vs actual behavior and a minimal repro. For a security issue, see
+[SECURITY.md](SECURITY.md) instead of filing a public issue.
 
 **[Join The Agent Plane on Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)**
 for real-time questions, integration help, and demos of what you have governed.
@@ -372,8 +428,8 @@ Two areas take contributions without touching the core:
   Ten existing ones are working references, one doc each in [`docs/policies/`](docs/policies/).
 - **A new adapter** so another SDK can be governed, under `src/tokenops/adapters/`.
 
-Bugs belong in Issues. Open an issue before a pull request so the approach can
-be agreed there first; typos and small docs fixes can go straight to a PR. See
+Open an issue before a pull request so the approach can be agreed there first;
+typos and small docs fixes can go straight to a PR. See
 [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
 and [SECURITY.md](SECURITY.md).
 
@@ -395,6 +451,6 @@ If TokenOps saves you a runaway agent bill, please [⭐ star the repo](https://g
 
 <div align="center">
 
-[Slack](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg) · [Discussions](https://github.com/theagentplane/tokenops/discussions) · [PyPI](https://pypi.org/project/agent-tokenops/)
+[Back to top](#tokenops)
 
 </div>
