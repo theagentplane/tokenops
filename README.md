@@ -19,7 +19,7 @@
 <sub>Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a></b> and <b><a href="https://www.linkedin.com/in/tisha-chawla/">Tisha Chawla</a></b></sub>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
-<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="600" />
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="500" />
 </a>
 
 <sub><i>Governed Research → Summarize run: the budget cap halts spend mid-run, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
@@ -54,9 +54,9 @@ Requires Python 3.10+.
 
 ### 1. Put it in your agent
 
-**Skill (recommended).** Your coding assistant reads
-[`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires the one
-enforcement point into your agent, and tells you what to check.
+![recommended](https://img.shields.io/badge/skill-recommended-2ea44f) Your coding
+assistant reads [`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires
+the one enforcement point into your agent, and tells you what to check.
 
 In **Claude Code**, from a clone:
 
@@ -184,10 +184,10 @@ TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full
 | | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
 |---|:---:|:---:|:---:|
 | Primary focus | Run | Request | Trace |
-| Multi-agent workflow as one unit | ✅ | ❌ | 🟡 |
-| Budget enforcement in-path | ✅ | ✅ | ❌ |
-| Steer next call (mutate / inject) | ✅ | 🟡 | ❌ |
-| Shared ledger across processes | ✅ | — | — |
+| Multi-agent workflow as one unit | Yes | No | Partial |
+| Budget enforcement in-path | Yes | Yes | No |
+| Steer next call (mutate / inject) | Yes | Partial | No |
+| Shared ledger across processes | Yes | — | — |
 
 What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
 
