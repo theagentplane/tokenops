@@ -90,7 +90,7 @@ class ToolFixPolicy(Policy):
             return Action(
                 kind=ActionKind.HALT,
                 run_id=signal.run_id,
-                reason=f"tool_fix: {signal.evidence['count']} identical bad calls — halting",
+                reason=f"tool_fix: {signal.evidence['count']} identical bad calls, halting",
             )
         ev = signal.evidence
         hint = f" did_you_mean={ev['did_you_mean']}" if ev.get("did_you_mean") else ""

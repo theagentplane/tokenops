@@ -108,7 +108,7 @@ class ProgressGuardPolicy(Policy):
             return Action(
                 kind=ActionKind.HALT,
                 run_id=signal.run_id,
-                reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress — halting",
+                reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress, halting",
             )
         return Action(
             kind=ActionKind.INJECT,

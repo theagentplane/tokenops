@@ -52,7 +52,7 @@ class ConcurrencyCapDetector(Detector):
                 detector=self.name,
                 severity=Severity.TRIP,
                 run_id=request.attr.run_id,
-                reason=f"inflight {n} ≥ max_concurrent {self.max_concurrent} on {sk}",
+                reason=f"inflight {n} >= max_concurrent {self.max_concurrent} on {sk}",
                 evidence={"inflight": n, "max": self.max_concurrent, "segment": sk},
             )
         return None

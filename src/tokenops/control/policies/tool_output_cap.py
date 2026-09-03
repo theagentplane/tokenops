@@ -58,7 +58,7 @@ class ToolOutputCapDetector(Detector):
                 detector=self.name,
                 severity=Severity.WARN,
                 run_id=attr.run_id,
-                reason=f"tool '{step.boundary_id}' output ≈{est} tokens ≥ cap {self.cap_tokens}",
+                reason=f"tool '{step.boundary_id}' output ~{est} tokens >= cap {self.cap_tokens}",
                 evidence={
                     "est_tokens": est,
                     "cap": self.cap_tokens,

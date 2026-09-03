@@ -56,7 +56,7 @@ class OutputRunawayDetector(Detector):
                 detector=self.name,
                 severity=Severity.WARN,
                 run_id=attr.run_id,
-                reason=f"degenerate output: ngram×{rep}, domination {dom:.0%}",
+                reason=f"degenerate output: ngram x{rep}, domination {dom:.0%}",
                 evidence={"ngram_repeat": rep, "domination": dom},
             )
         return None

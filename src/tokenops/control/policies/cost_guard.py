@@ -75,7 +75,7 @@ class CostGuardDetector(Detector):
                 detector=self.name,
                 severity=Severity.WARN,
                 run_id=attr.run_id,
-                reason=f"spend at {ratio:.0%} of budget (vel {vel:.0f}/step) — minimizing",
+                reason=f"spend at {ratio:.0%} of budget (vel {vel:.0f}/step), minimizing",
                 evidence={"ratio": ratio, "velocity": vel},
             )
         return None
