@@ -117,9 +117,7 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
         seg_runs[sv] = seg_runs.get(sv, 0) + 1
 
     st.subheader(f"Cost by {group_by}")
-    chart_df = pd.DataFrame(
-        [{group_by: s, "cost_usd": _usd(m)} for s, m in seg_cost.items()]
-    )
+    chart_df = pd.DataFrame([{group_by: s, "cost_usd": _usd(m)} for s, m in seg_cost.items()])
     chart = (
         alt.Chart(chart_df)
         .mark_bar(color=GOLD, cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
@@ -128,7 +126,9 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
             y=alt.Y("cost_usd:Q", title="Cost (USD)"),
             tooltip=[group_by, "cost_usd"],
         )
-        .configure_axis(labelColor=MUTED, titleColor=MUTED, domainColor="#E7E4DB", gridColor="#F0EEE7")
+        .configure_axis(
+            labelColor=MUTED, titleColor=MUTED, domainColor="#E7E4DB", gridColor="#F0EEE7"
+        )
         .configure_view(strokeWidth=0)
         .properties(height=260)
     )
