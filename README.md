@@ -44,9 +44,9 @@
 
 ## ✨ Core features
 
-A per-request limit only looks at one call at a time, so a string of cheap
-calls can quietly add up to far more than you expected. TokenOps tracks the
-whole run against one budget, and checks it before every call, not after.
+A per-request limit only looks at one call at a time, so a lot of cheap calls
+can quietly add up to far more than you expected. TokenOps tracks the whole
+run against one budget, and checks it before every call, not after.
 
 <img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
 
@@ -55,16 +55,14 @@ add your own.
 
 ## 🚀 Quickstart
 
-Wire TokenOps into your own agent, then look up anything more specific you need.
-Requires Python 3.10+. Want to see it work first, with nothing installed but the
-package? Jump to [See it work](#see-it-work).
+Requires Python 3.10+. Want to see it run first, before touching your own code?
+Jump to [See it work](#see-it-work).
 
 ### 1. Put it in your agent
 
-**The fastest way is to let your coding assistant do it.** TokenOps ships an
-integration skill: a written procedure your assistant reads and follows so you
-do not have to. It reads your agent's code, picks the right setup for it, wires
-in the one enforcement point, and tells you what to check afterward.
+**Skill (recommended).** Your coding assistant reads
+[`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires the one
+enforcement point into your agent, and tells you what to check.
 
 In **Claude Code**, from a clone:
 
@@ -72,18 +70,13 @@ In **Claude Code**, from a clone:
 /integrate-tokenops
 ```
 
-In **Cursor, Copilot, or anywhere else**, paste this:
+Anywhere else (Cursor, Copilot, ...), paste this:
 
 > Integrate TokenOps into this agent, following
 > https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
 
-The skill handles three setups: one process, several processes sharing one budget,
-or FastAPI and A2A services. It is
-[`.claude/skills/integrate-tokenops/SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md),
-plain markdown, readable on its own if you would rather follow it yourself.
-
 <details>
-<summary><b>Or wire it yourself</b>, about ten lines</summary>
+<summary><b>Manual</b>, about ten lines</summary>
 
 <br>
 
@@ -109,12 +102,9 @@ with tokenops_run(client=client, service="my-agent", intent="research",
         print(f"run stopped: {stopped}")
 ```
 
-**The only change to your agent is that one line.** If your agent hard-codes its
-model client, make the completion function injectable. Nothing else moves.
-
-`wrap_complete` checks the budget before each call and records the cost after.
-When the run runs out, it raises `Halt`, and later calls on that run are refused,
-even from another process.
+Pass `governed` to your agent instead of `complete`; nothing else changes.
+`wrap_complete` checks the budget before each call and raises `Halt` when the
+run is out, even from another process.
 
 </details>
 
