@@ -7,7 +7,7 @@
 	db-clear db-reseed db-reset \
 	dist check-dist \
 	lint format test \
-	quickstart sync-skills
+	demo-quick sync-skills
 
 PYTHON ?= python3
 export PYTHONPATH := .$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -31,8 +31,9 @@ test:
 	$(PYTHON) -m pytest -q
 
 # Smallest end-to-end run: no API keys, no server, no Docker.
-quickstart:
-	$(PYTHON) examples/quickstart.py
+# Ships inside the package, so `pip install agent-tokenops` is enough to run it.
+demo-quick:
+	$(PYTHON) -m tokenops.demo
 
 # Regenerate the editor-specific copies of .claude/skills/integrate-tokenops.
 sync-skills:

@@ -27,7 +27,7 @@ because the project looks big. Most integrations start and stay at Tier 1.
 
 Install: `pip install agent-tokenops` (Python 3.10+).
 
-Runnable reference: `examples/quickstart.py` (Tier 1),
+Runnable reference: `python -m tokenops.demo` (Tier 1, ships in the package),
 `examples/triad/` and `examples/agents/` (Tier 3).
 
 ---
@@ -129,11 +129,11 @@ governance:
 ### Verify
 
 ```bash
-python examples/quickstart.py
+python -m tokenops.demo
 ```
 
-Expect spend to climb per call and the run to halt with
-`budget 'run_llm_cap' exhausted`.
+It runs the same loop ungoverned and governed, and prints both totals. Expect the
+governed run to halt with `budget 'run_llm_cap' exhausted`.
 
 ---
 
