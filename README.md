@@ -2,20 +2,15 @@
 
 # TokenOps
 
-**Run-aware token governance for multi-agent systems.**<br>
-Cap spend and steer behavior across a whole agent workflow, not per request, with a shared ledger and in-path enforcement.
+**One budget for a whole agent workflow, enforced before each call.**<br>
+Your agent stops when the run is out of money, instead of after the bill arrives.
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/agent-tokenops/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/agent-tokenops/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
-[![Writing & talks](https://img.shields.io/badge/Writing%20%26%20talks-The%20Agent%20Plane-7B61FF?style=flat)](https://theagentplane.github.io/media.html)
-[![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
-[![Slack](https://img.shields.io/badge/Slack-join%20the%20community-4A154B?style=flat&logo=slack&logoColor=white)](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)
 
-[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured%20by-Microsoft%20Developer-0078D4?style=flat&logo=microsoft&logoColor=white)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
-[![Command Line, a Microsoft publication](https://img.shields.io/badge/Command%20Line-Microsoft-5E5E5E?style=flat&logo=microsoft&logoColor=white)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
-[![Talk: AI Engineer World's Fair](https://img.shields.io/badge/Talk-AI%20Engineer%20World%27s%20Fair-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
+<sub>Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></sub>
 
 <br>
 
@@ -56,7 +51,33 @@ per-request limit cannot see.
 
 ### 2. Put it in your agent
 
-Ten lines. Wrap your model call once, then pass the wrapped version to your agent.
+**The fastest way is to let your coding assistant do it.** TokenOps ships an
+integration skill: a written procedure your assistant reads and follows. It reads
+your agent, picks the right setup, wires the enforcement point, and tells you what
+to check.
+
+In **Claude Code**, from a clone:
+
+```
+/integrate-tokenops
+```
+
+In **Cursor, Copilot, or anywhere else**, paste this:
+
+> Integrate TokenOps into this agent, following
+> https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
+
+The skill handles three setups: one process, several processes sharing one budget,
+or FastAPI and A2A services. It is
+[`.claude/skills/integrate-tokenops/SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md),
+plain markdown, readable on its own if you would rather follow it yourself.
+
+<details>
+<summary><b>Or wire it yourself</b>, about ten lines</summary>
+
+<br>
+
+Wrap your model call once, then hand the wrapped version to your agent.
 
 ```python
 from tokenops import ControlPlaneClient, tokenops_run
@@ -78,17 +99,14 @@ with tokenops_run(client=client, service="my-agent", intent="research",
         print(f"run stopped: {stopped}")
 ```
 
-**The only change to your agent is that last line.** If your agent hard-codes its
-model client, make the completion function injectable. Everything else stays as it is.
+**The only change to your agent is that one line.** If your agent hard-codes its
+model client, make the completion function injectable. Nothing else moves.
 
-`wrap_complete` checks the budget *before* each call and records the cost after.
-When the run is out of budget it raises `Halt`, and later calls on the same run are
-refused, even from another process.
+`wrap_complete` checks the budget before each call and records the cost after.
+When the run runs out, it raises `Halt`, and later calls on that run are refused,
+even from another process.
 
-Would rather not hand-wire it? Point Claude Code, Cursor, or Copilot at your agent:
-
-> Integrate TokenOps into this agent using
-> https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
+</details>
 
 ### 3. When you need more
 
@@ -97,10 +115,11 @@ Would rather not hand-wire it? Point Claude Code, Cursor, or Copilot at your age
 | Change the budget from $2.00 | [Set the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) |
 | One budget across several agent processes | [Shared plane](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) |
 | FastAPI or A2A services | [Instrumented app](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) |
+| Something other than stopping | [The ten policies](docs/policies/) |
 | Cost per agent in a dashboard | [Run it locally](#run-it-locally) |
-| Something else to happen instead of stopping | [Policies](docs/policies/) |
+| A worked end-to-end example | [Field guide](docs/guides/field-guide-add-tokenops.md) |
+| Everything else | [Onboarding guide](docs/guides/onboarding.md) |
 
----
 
 ## Why TokenOps
 
@@ -128,7 +147,83 @@ A few things follow from that:
 
 Ten policies ship configured. You can [add your own](docs/policies/).
 
-## Architecture
+## How TokenOps compares
+
+TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
+
+| | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
+|---|:---:|:---:|:---:|
+| Primary focus | Run (stateful) | Request | Trace (observe) |
+| Multi-agent workflow as one unit | Yes | No | Manual stitch |
+| Budget enforcement in-path | Yes (run-aware) | Yes (key/team) | No (analytics) |
+| Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
+| Shared ledger across agent processes | Yes | N/A | N/A |
+
+What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
+
+Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
+
+## Run it locally
+
+Only needed if you want the dashboard, the multi-agent benches, or a budget shared
+across processes. Step 1 needs none of this.
+
+```bash
+git clone https://github.com/theagentplane/tokenops && cd tokenops
+make install
+make run          # control plane :7700 + Admin/Dashboard :8501
+```
+
+Then open `localhost:8501` to see spend and governance per agent.
+
+<details>
+<summary><b>Multi-agent benches</b>: watch one budget span several agents</summary>
+
+<br>
+
+Each is a real multi-agent stack sharing one run ledger. One target starts the
+plane, the agents, and the Admin UI.
+
+| Bench | Agents | Run |
+|---|---|---|
+| Two-agent | Research to Summarize | `make demo` |
+| Triad | Planner to Researcher to Writer | `make demo-triad` |
+| Brief | Scout to Analyst to Editor (LangChain) | `make demo-brief` |
+| Bench UI | Chat + Simulator only | `make bench-ui` |
+
+`cp .env.example .env` first if you want them to call real models.
+
+Docker instead of make: `docker compose up --build`. See
+[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md) for the UI and
+two-agent profiles, and [`examples/README.md`](examples/README.md) for the benches.
+
+</details>
+
+<details>
+<summary><b>Pointing several processes at one plane</b></summary>
+
+<br>
+
+```bash
+export TOKENOPS_URL=http://localhost:7700
+export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
+```
+
+> `TOKENOPS_EMBEDDED=1` overrides `TOKENOPS_URL`. Leave it unset here, or each
+> process silently falls back to its own local ledger and gets the full budget.
+
+PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
+`pip install "agent-tokenops[examples]"` for the LangChain benches,
+`".[dev,examples]"` from source. Releases: [`RELEASING.md`](RELEASING.md).
+
+</details>
+
+## Reference
+
+Things you will want eventually, not now.
+
+<details>
+<summary><b>Architecture: how the plane and the SDK split the work</b></summary>
 
 TokenOps is two layers that share one artifact, the **run**: a control plane that registers runs and stores budgets/policies, and an in-process SDK that enforces at every boundary crossing.
 
@@ -158,85 +253,10 @@ flowchart LR
 
 Chronicle records decision boundaries; TokenOps attaches as the cost/governance observer on live crossings. See [Chronicle](https://github.com/theagentplane/chronicle) for record-and-replay.
 
-## Run it locally
-
-The plane, the Admin/Dashboard UI, and the seeded policies, from a clone:
-
-```bash
-make install                     # editable install with dev + examples extras
-cp .env.example .env             # optional: API keys for the demos below
-make run                         # control plane :7700 + Admin/Dashboard :8501
-```
-
-Point agent processes at that plane so they share one budget:
-
-```bash
-export TOKENOPS_URL=http://localhost:7700
-export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
-```
-
-> `TOKENOPS_EMBEDDED=1` overrides `TOKENOPS_URL`. Leave it unset here, or each
-> process silently falls back to its own local ledger and gets the full budget.
-
-PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
-`pip install "agent-tokenops[examples]"` for the LangChain benches,
-`".[dev,examples]"` from source. Releases: [`RELEASING.md`](RELEASING.md).
-
-### Multi-agent benches
-
-Each is a real multi-agent stack sharing one run ledger, so you can watch a
-single budget span several agents. One target starts the plane, the agents and
-the Admin UI.
-
-| Bench | Agents | Run |
-|---|---|---|
-| Two-agent | Research to Summarize | `make demo` |
-| Triad | Planner to Researcher to Writer | `make demo-triad` |
-| Brief | Scout to Analyst to Editor (LangChain) | `make demo-brief` |
-| Bench UI | Chat + Simulator only | `make bench-ui` |
-
-Docker instead of make: `docker compose up --build`, and see
-[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md) for the UI and
-two-agent profiles. More on the benches: [`examples/README.md`](examples/README.md).
-
-## How TokenOps compares
-
-TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
-
-| | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
-|---|:---:|:---:|:---:|
-| Primary focus | Run (stateful) | Request | Trace (observe) |
-| Multi-agent workflow as one unit | Yes | No | Manual stitch |
-| Budget enforcement in-path | Yes (run-aware) | Yes (key/team) | No (analytics) |
-| Steer next call (mutate / inject) | Yes | Routing / fallbacks | No |
-| Shared ledger across agent processes | Yes | N/A | N/A |
-
-What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
-
-Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
-
-## Make targets
-
-<details>
-<summary>Command reference</summary>
-
-| Target | Role |
-|--------|------|
-| `make install` | Editable install with dev + examples extras |
-| `make dist` / `check-dist` | Build sdist+wheel / `twine check` |
-| `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
-| `make ui` | Admin + Dashboard on `:8501` |
-| `make run` | Plane + Admin/Dashboard |
-| `make demo-quick` | `python -m tokenops.demo`: no API keys, no server |
-| `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
-| `make bench-ui` | Chat + Simulator |
-| `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
-| `make stop` | Kill listeners on `:7700` / `:8501` |
-| `make sync-skills` | Regenerate the editor copies of the integration skill |
-
 </details>
 
-## Environment variables
+<details>
+<summary><b>Environment variables</b></summary>
 
 | Variable | Purpose |
 |---|---|
@@ -256,7 +276,29 @@ Production / multi-process: set `TOKENOPS_URL`; agents must **not** mount `/v1/r
 > budget. Check with
 > `print("embedded" if client.embedded else client.url)`.
 
-## Project structure
+</details>
+
+<details>
+<summary><b>Make targets</b></summary>
+
+| Target | Role |
+|--------|------|
+| `make install` | Editable install with dev + examples extras |
+| `make dist` / `check-dist` | Build sdist+wheel / `twine check` |
+| `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
+| `make ui` | Admin + Dashboard on `:8501` |
+| `make run` | Plane + Admin/Dashboard |
+| `make demo-quick` | `python -m tokenops.demo`: no API keys, no server |
+| `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
+| `make bench-ui` | Chat + Simulator |
+| `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
+| `make stop` | Kill listeners on `:7700` / `:8501` |
+| `make sync-skills` | Regenerate the editor copies of the integration skill |
+
+</details>
+
+<details>
+<summary><b>Project structure</b></summary>
 
 Only `src/tokenops/` is the installable package. Demos and benches stay under `examples/`.
 
@@ -273,6 +315,19 @@ docs/                      # architecture, policies, guides, product
 tests/                     # unit + e2e
 ```
 
+</details>
+
+<details>
+<summary><b>More documentation</b></summary>
+
+- [Onboarding](docs/guides/onboarding.md): prereqs, minimum integration, FAQ, current limits
+- [Field guide](docs/guides/field-guide-add-tokenops.md): a triad walked through, with screenshots
+- [Policies](docs/policies/): one page per policy
+- [Run attribution](docs/run-attribution.md) - [control plane deploy](docs/control-plane-deploy.md) - [status](docs/control-plane-status.md)
+- [Examples](examples/README.md) - [comparison](docs/product/comparison.md) - [shared ledger](docs/product/shared-ledger.md)
+
+</details>
+
 ## Roadmap
 
 TokenOps is early (0.x). Near-term:
@@ -283,17 +338,6 @@ TokenOps is early (0.x). Near-term:
 - Documentation site.
 
 Status of each control-plane job: [`docs/control-plane-status.md`](docs/control-plane-status.md).
-
-## Documentation
-
-- [Onboarding](docs/guides/onboarding.md): prereqs, bare-min integrate, FAQ, current limits
-- [Field guide](docs/guides/field-guide-add-tokenops.md): triad deep dive + screenshots
-- [Control plane status](docs/control-plane-status.md)
-- [Architecture](docs/architecture.md)
-- [Run attribution](docs/run-attribution.md)
-- [Control plane deploy](docs/control-plane-deploy.md)
-- [Examples](examples/README.md)
-- [Product: comparison](docs/product/comparison.md) · [shared ledger](docs/product/shared-ledger.md)
 
 ## Talks & press
 
