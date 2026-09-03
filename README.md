@@ -31,62 +31,34 @@ Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a><
 
 <br>
 
-## Start hacking
+## Start here
+
+### 1. See it work
 
 ```bash
 pip install agent-tokenops
+python -m tokenops.demo
 ```
 
-Two ways in. Both end at the same place: a run that halts itself when it runs out of budget.
-
-<table>
-<tr>
-<th width="50%">Let an assistant wire it up</th>
-<th width="50%">Do it by hand</th>
-</tr>
-<tr>
-<td valign="top">
-
-Point Claude Code, Cursor, or Copilot at your agent and say:
-
-> Integrate TokenOps into this agent using
-> https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
-
-The skill picks the right tier for your setup, wires the enforcement point, and
-tells you what to verify. Working inside a clone? It is already at
-[`.claude/skills/integrate-tokenops/`](.claude/skills/integrate-tokenops/SKILL.md),
-so `/integrate-tokenops` just works.
-
-</td>
-<td valign="top">
-
-Run the whole idea in one file. No API keys, no server, no Docker:
-
-```bash
-python examples/quickstart.py
-```
+No API keys, no server, no Docker. It runs the same agent loop twice:
 
 ```
-call  1: ok       spend $0.4350
-call  2: ok       spend $0.5800
-...
-call 11: ok       spend $1.8850
-call 12: HALTED   spend $2.0300
+An agent makes 40 model calls. Budget for the whole run: $2.00.
 
-budget 'run_llm_cap' exhausted
+  without TokenOps   40 calls run, spend $5.80
+  with TokenOps      halted at call 12, spend $2.03
+
+  $3.77 not spent. The run stopped itself.
 ```
 
-</td>
-</tr>
-</table>
+No single call was expensive. Together they crossed the cap, which is what a
+per-request limit cannot see.
 
-The whole integration is ten lines. The stub model below is the only thing you
-swap for a real one:
+### 2. Put it in your agent
+
+Ten lines. Wrap your model call once, then pass the wrapped version to your agent.
 
 ```python
-import os
-os.environ.setdefault("TOKENOPS_EMBEDDED", "1")   # in-process ledger, no server
-
 from tokenops import ControlPlaneClient, tokenops_run
 from tokenops.control import Halt, wrap_complete
 from tokenops.providers import complete
@@ -95,39 +67,66 @@ client = ControlPlaneClient.from_env()
 
 with tokenops_run(client=client, service="my-agent", intent="research",
                   provider="openai", model="gpt-4o") as bound:
-    governed = wrap_complete(                      # <- the enforcement point
+    governed = wrap_complete(
         bound.governor, bound.controls, bound.attr,
         provider="openai", model="gpt-4o",
         dispatch=complete, service="my-agent",
     )
     try:
-        agent.run(..., complete_fn=governed)       # <- the only invasive change
-    except Halt as halt:
-        print(f"run stopped: {halt}")
+        agent.run(..., complete_fn=governed)   # <-- pass `governed`, not `complete`
+    except Halt as stopped:
+        print(f"run stopped: {stopped}")
 ```
 
-`wrap_complete` runs detect → decide → apply **before** each model call and
-updates the ledger after it. When a policy trips it raises `Halt` and flags the
-run, so later calls on the same `run_id` are refused, even from another process.
+**The only change to your agent is that last line.** If your agent hard-codes its
+model client, make the completion function injectable. Everything else stays as it is.
 
-**Next:** [share one budget across processes](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) ·
-[change the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) ·
-[FastAPI / A2A](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) ·
-[onboarding guide](docs/guides/onboarding.md)
+`wrap_complete` checks the budget *before* each call and records the cost after.
+When the run is out of budget it raises `Halt`, and later calls on the same run are
+refused, even from another process.
+
+Would rather not hand-wire it? Point Claude Code, Cursor, or Copilot at your agent:
+
+> Integrate TokenOps into this agent using
+> https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
+
+### 3. When you need more
+
+| You want to | Go to |
+|---|---|
+| Change the budget from $2.00 | [Set the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) |
+| One budget across several agent processes | [Shared plane](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) |
+| FastAPI or A2A services | [Instrumented app](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) |
+| Cost per agent in a dashboard | [Run it locally](#run-it-locally) |
+| Something else to happen instead of stopping | [Policies](docs/policies/) |
 
 ---
 
-TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes, so a research → summarize → review pipeline stays inside a single budget even across processes.
-
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
-
 ## Why TokenOps
 
-- **Govern the run, not the request.** One `run_id` spans every model, tool, and A2A hop in a workflow.
-- **Shared ledger across processes.** Spend, inflight, and halt live in SQLite so multi-agent stacks cannot each burn the full cap locally.
-- **In-path enforcement.** `wrap_complete` runs detect → decide → apply *before* the next LLM call; Chronicle `@boundary` + a crossing hook ingest tool spend.
-- **Steer or stop.** Actuators: `HALT` · `MUTATE` · `INJECT` · reject/queue, not just post-hoc analytics.
-- **Batteries included.** Control plane (`:7700`), Admin + Dashboard UI, ten seeded policies, and runnable A2A benches (two-agent, triad, LangChain brief).
+**The problem.** Your agent workflow calls a model twenty times. Each call is
+cheap and each one passes whatever per-request limit you set. The workflow still
+costs ten times what you expected, and nothing stopped it, because nothing was
+counting the workflow as one thing.
+
+**What TokenOps does.** It gives the whole workflow one budget and one running
+total, and it checks that total *before* each call rather than reporting on it
+afterwards. Cross the budget and the run stops.
+
+A few things follow from that:
+
+- **It works across processes.** Research, summarize and review can be three
+  separate services and still share one budget. Without that, each one gets the
+  full cap and you pay three times over.
+- **Stopping is not the only option.** A policy can also shrink the next prompt,
+  swap to a cheaper model, or tell the agent it is going in circles. Stopping is
+  the last resort, not the only tool.
+- **Tool calls count too.** Not just model calls. Search results and file reads
+  end up in the next prompt, and that is real spend.
+- **It is not a dashboard.** Analytics tell you what you already spent. This
+  refuses the call that would break the budget.
+
+Ten policies ship configured. You can [add your own](docs/policies/).
 
 ## Architecture
 
@@ -228,7 +227,7 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 | `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
 | `make ui` | Admin + Dashboard on `:8501` |
 | `make run` | Plane + Admin/Dashboard |
-| `make quickstart` | The one-file example: no API keys, no server |
+| `make demo-quick` | `python -m tokenops.demo`: no API keys, no server |
 | `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
 | `make bench-ui` | Chat + Simulator |
 | `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
