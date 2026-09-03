@@ -183,11 +183,11 @@ TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full
 
 | | TokenOps | LiteLLM / Portkey / AI Gateway | Langfuse |
 |---|:---:|:---:|:---:|
-| Primary focus | Run (stateful) | Request | Trace (observe) |
-| Multi-agent workflow as one unit | ✅ | ❌ | 🟡 manual stitch |
-| Budget enforcement in-path | ✅ run-aware | ✅ key/team | ❌ analytics only |
-| Steer next call (mutate / inject) | ✅ | 🟡 routing/fallbacks | ❌ |
-| Shared ledger across agent processes | ✅ | — | — |
+| Primary focus | Run | Request | Trace |
+| Multi-agent workflow as one unit | ✅ | ❌ | 🟡 |
+| Budget enforcement in-path | ✅ | ✅ | ❌ |
+| Steer next call (mutate / inject) | ✅ | 🟡 | ❌ |
+| Shared ledger across processes | ✅ | — | — |
 
 What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
 
