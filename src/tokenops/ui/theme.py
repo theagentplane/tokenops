@@ -1,14 +1,16 @@
-"""Shared Streamlit styling — black + gold TokenOps look."""
+"""Shared Streamlit styling — light, minimalist TokenOps look."""
 
 from __future__ import annotations
 
 import streamlit as st
 
-GOLD = "#C9A227"
-GOLD_DIM = "#8A7020"
-INK = "#0A0A0A"
-PANEL = "#121212"
-MUTED = "#9A9588"
+GOLD = "#A9762C"
+GOLD_DIM = "#E3D3AE"
+INK = "#1C1B17"
+BG = "#FAFAF7"
+PANEL = "#FFFFFF"
+BORDER = "#E7E4DB"
+MUTED = "#716E63"
 
 
 def inject_theme() -> None:
@@ -16,25 +18,28 @@ def inject_theme() -> None:
         f"""
         <style>
         .stApp {{
-            background: linear-gradient(180deg, {INK} 0%, #0E0E0E 100%);
+            background: {BG};
         }}
         [data-testid="stSidebar"] {{
             background-color: {PANEL};
-            border-right: 1px solid #1F1F1F;
+            border-right: 1px solid {BORDER};
         }}
         [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
-            color: {GOLD};
+            color: {INK};
+        }}
+        [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] li {{
+            color: {INK};
         }}
         .tokenops-header {{
             padding: 0.25rem 0 1.25rem 0;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid {BORDER};
             margin-bottom: 1.25rem;
         }}
         .tokenops-title {{
             font-size: 1.75rem;
             font-weight: 700;
-            letter-spacing: 0.04em;
-            color: {GOLD};
+            letter-spacing: 0.02em;
+            color: {INK};
             margin: 0;
         }}
         .tokenops-sub {{
@@ -52,22 +57,23 @@ def inject_theme() -> None:
             text-transform: uppercase;
         }}
         .status-on {{
-            background: rgba(201, 162, 39, 0.15);
+            background: #F5EBD3;
             color: {GOLD};
             border: 1px solid {GOLD_DIM};
         }}
         .status-off {{
-            background: rgba(180, 60, 60, 0.12);
-            color: #E07070;
-            border: 1px solid #5A2020;
+            background: #FBEAEA;
+            color: #B23B3B;
+            border: 1px solid #EFC6C6;
         }}
         div[data-testid="stChatMessage"] {{
             background-color: {PANEL};
-            border: 1px solid #1E1E1E;
+            border: 1px solid {BORDER};
             border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(28, 27, 23, 0.04);
         }}
         .stChatInput textarea {{
-            border-color: {GOLD_DIM} !important;
+            border-color: {BORDER} !important;
         }}
         .stChatInput textarea:focus {{
             border-color: {GOLD} !important;
@@ -75,39 +81,41 @@ def inject_theme() -> None:
         }}
         [data-testid="stMetric"] {{
             background: {PANEL};
-            border: 1px solid #1E1E1E;
+            border: 1px solid {BORDER};
             border-radius: 10px;
             padding: 0.65rem 0.85rem;
+            box-shadow: 0 1px 2px rgba(28, 27, 23, 0.04);
         }}
         [data-testid="stMetricLabel"] {{
             color: {MUTED} !important;
         }}
         [data-testid="stMetricValue"] {{
-            color: {GOLD} !important;
+            color: {INK} !important;
         }}
         .stTabs [data-baseweb="tab-list"] {{
             gap: 0.35rem;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid {BORDER};
         }}
         .stTabs [data-baseweb="tab"] {{
-            background: {PANEL};
+            background: transparent;
             border-radius: 8px 8px 0 0;
             color: {MUTED};
             border: 1px solid transparent;
         }}
         .stTabs [aria-selected="true"] {{
             color: {GOLD} !important;
-            border-color: {GOLD_DIM} !important;
-            background: #181818 !important;
+            border-color: {BORDER} !important;
+            background: {PANEL} !important;
         }}
         [data-testid="stDataFrame"] {{
-            border: 1px solid #1E1E1E;
+            border: 1px solid {BORDER};
             border-radius: 8px;
         }}
         .stExpander {{
-            border: 1px solid #1E1E1E !important;
+            border: 1px solid {BORDER} !important;
             border-radius: 8px !important;
             background: {PANEL} !important;
+            box-shadow: 0 1px 2px rgba(28, 27, 23, 0.04);
         }}
         </style>
         """,
