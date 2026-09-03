@@ -10,9 +10,9 @@
 
   <!-- headline -->
   <text x="64" y="195" font-size="46" font-weight="800" fill="#1c1b17">One budget for</text>
-  <text x="64" y="250" font-size="46" font-weight="800" fill="#1c1b17">the whole run.</text>
+  <text x="64" y="250" font-size="46" font-weight="800" fill="#1c1b17">one whole agent run.</text>
   <text x="64" y="305" font-size="46" font-weight="800" fill="#a9791c">Enforced before</text>
-  <text x="64" y="360" font-size="46" font-weight="800" fill="#a9791c">each call goes out.</text>
+  <text x="64" y="360" font-size="46" font-weight="800" fill="#a9791c">every model call.</text>
 
   <!-- right side: mini bar comparison -->
   <g transform="translate(630,110)">
