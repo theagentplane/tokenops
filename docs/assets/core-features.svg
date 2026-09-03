@@ -78,10 +78,10 @@
     <line x1="10" y1="13" x2="20" y2="13" stroke="#f6d34a" stroke-width="1.6"/>
     <line x1="10" y1="17" x2="17" y2="17" stroke="#f6d34a" stroke-width="1.6"/>
     <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">SPEND</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Tool calls count too</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Not just model calls. Search</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">results and file reads that land</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">in the next prompt are real spend.</text>
+    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Nothing hides in a tool call</text>
+    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Search results and file reads</text>
+    <text x="0" y="122" font-size="12.5" fill="#5c5c54">that land in the next prompt are</text>
+    <text x="0" y="140" font-size="12.5" fill="#5c5c54">real spend, and get counted.</text>
   </g>
 
   <!-- Card 6 -->
@@ -92,10 +92,10 @@
     <circle cx="23" cy="8" r="2.2" fill="#f6d34a"/>
     <circle cx="7" cy="22" r="2.2" fill="#f6d34a"/>
     <circle cx="23" cy="22" r="2.2" fill="#f6d34a"/>
-    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">EXTENSIBLE</text>
-    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Ten policies included</text>
-    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Each documented and swappable.</text>
-    <text x="0" y="122" font-size="12.5" fill="#5c5c54">Add your own with the same</text>
-    <text x="0" y="140" font-size="12.5" fill="#5c5c54">(Detector, Policy) shape.</text>
+    <text x="0" y="56" font-size="10.5" font-weight="700" letter-spacing="1.5" fill="#9a9a90">BATTERIES INCLUDED</text>
+    <text x="0" y="80" font-size="17" font-weight="700" fill="#151512">Governance, out of the box</text>
+    <text x="0" y="104" font-size="12.5" fill="#5c5c54">Ten documented policies covering</text>
+    <text x="0" y="122" font-size="12.5" fill="#5c5c54">the common ways a run goes</text>
+    <text x="0" y="140" font-size="12.5" fill="#5c5c54">wrong. Add your own alongside.</text>
   </g>
 </svg>
