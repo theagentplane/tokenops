@@ -11,9 +11,9 @@
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 [![GitHub Discussions](https://img.shields.io/badge/Discussions-24292f?logo=github&logoColor=white)](https://github.com/theagentplane/tokenops/discussions)
 
-[![Featured by Microsoft Developer](https://img.shields.io/badge/press-Microsoft%20Developer-lightgrey)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
-[![Featured by Command Line](https://img.shields.io/badge/press-Command%20Line-lightgrey)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
-[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/press-AI%20Engineer%20World's%20Fair-lightgrey)](https://www.youtube.com/watch?v=GJX19pNhmSw)
+[![Featured by Microsoft Developer](https://img.shields.io/badge/Featured-Microsoft%20Developer-lightgrey)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Featured by Command Line](https://img.shields.io/badge/Featured-Command%20Line-lightgrey)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/Featured-AI%20Engineer%20World's%20Fair-lightgrey)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
 
