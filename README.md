@@ -119,7 +119,7 @@ run, so later calls on the same `run_id` are refused, even from another process.
 
 TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes, so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
 
 ## Why TokenOps
 
@@ -183,27 +183,22 @@ PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
 `pip install "agent-tokenops[examples]"` for the LangChain benches,
 `".[dev,examples]"` from source. Releases: [`RELEASING.md`](RELEASING.md).
 
-## Demos
+### Multi-agent benches
 
-Each bench is a multi-agent stack with a shared run ledger. Start the plane, agents, and Admin UI with one make target.
+Each is a real multi-agent stack sharing one run ledger, so you can watch a
+single budget span several agents. One target starts the plane, the agents and
+the Admin UI.
 
-| Demo | Agents | Run |
+| Bench | Agents | Run |
 |---|---|---|
-| Two-agent | Research → Summarize | `make demo` |
-| Triad | Planner → Researcher → Writer | `make demo-triad` |
-| Brief | Scout → Analyst → Editor (LangChain) | `make demo-brief` |
+| Two-agent | Research to Summarize | `make demo` |
+| Triad | Planner to Researcher to Writer | `make demo-triad` |
+| Brief | Scout to Analyst to Editor (LangChain) | `make demo-brief` |
 | Bench UI | Chat + Simulator only | `make bench-ui` |
 
-Docker:
-
-```bash
-docker compose up --build
-# optional UI: docker compose --profile ui up --build
-# two-agent stack:
-docker compose -f docker-compose.examples.yml up --build
-```
-
-See [`examples/README.md`](examples/README.md) and [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
+Docker instead of make: `docker compose up --build`, and see
+[`docs/control-plane-deploy.md`](docs/control-plane-deploy.md) for the UI and
+two-agent profiles. More on the benches: [`examples/README.md`](examples/README.md).
 
 ## How TokenOps compares
 
@@ -233,10 +228,12 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 | `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
 | `make ui` | Admin + Dashboard on `:8501` |
 | `make run` | Plane + Admin/Dashboard |
+| `make quickstart` | The one-file example: no API keys, no server |
 | `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
 | `make bench-ui` | Chat + Simulator |
 | `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
 | `make stop` | Kill listeners on `:7700` / `:8501` |
+| `make sync-skills` | Regenerate the editor copies of the integration skill |
 
 </details>
 
