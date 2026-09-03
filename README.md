@@ -33,6 +33,15 @@
 
 <br>
 
+> ### 🙌 Open to contribution
+>
+> Token spend deserves the same first-class attention as compute or latency, and
+> we are growing the community working on that. Policies, actuators, and the
+> shared ledger are all open to extension. See
+> **[CONTRIBUTING.md](CONTRIBUTING.md)** to get started.
+
+<br>
+
 ## ✨ Core features
 
 An agent workflow can call a model twenty times. Each call passes its own limit,
