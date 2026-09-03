@@ -44,9 +44,9 @@
 
 ## ✨ Core features
 
-Per-call limits miss the workflow as a whole, so a chain of individually-cheap
-calls can quietly cost far more than expected. TokenOps gives the whole run one
-budget, checked before every call instead of reported after the fact.
+A per-request limit only looks at one call at a time, so a string of cheap
+calls can quietly add up to far more than you expected. TokenOps tracks the
+whole run against one budget, and checks it before every call, not after.
 
 <img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
 
