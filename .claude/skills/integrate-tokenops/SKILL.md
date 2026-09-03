@@ -10,8 +10,6 @@ description: >-
   LangGraph agent, and FastAPI / A2A multi-agent stacks.
 ---
 
-<!-- Generated from .claude/skills/integrate-tokenops/SKILL.md by `make sync-skills`. Edit that file, not this one. -->
-
 # Integrate TokenOps
 
 Wire a spend cap and in-path enforcement into an agent stack.

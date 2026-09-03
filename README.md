@@ -7,11 +7,9 @@ Cap spend and steer behavior across a whole agent workflow, not per request, wit
 
 [![CI](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml/badge.svg)](https://github.com/theagentplane/tokenops/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/agent-tokenops?color=blue)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/theagentplane/tokenops)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/agent-tokenops/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
-[![Status](https://img.shields.io/badge/status-0.x%20%7C%20draft-7B61FF?style=flat-square)](https://semver.org/)
-[![Stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=flat&color=yellow)](https://github.com/theagentplane/tokenops/stargazers)
+[![Writing & talks](https://img.shields.io/badge/Writing%20%26%20talks-The%20Agent%20Plane-7B61FF?style=flat)](https://theagentplane.github.io/media.html)
 [![Discussions](https://img.shields.io/badge/GitHub-Discussions-7B61FF?style=flat)](https://github.com/theagentplane/tokenops/discussions)
 [![Slack](https://img.shields.io/badge/Slack-join%20the%20community-4A154B?style=flat&logo=slack&logoColor=white)](https://join.slack.com/t/theagentplane/shared_invite/zt-47lqx2xtc-0idr1cuLNJ_JDTgqxDiUsg)
 
@@ -33,9 +31,95 @@ Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a><
 
 <br>
 
+## Start hacking
+
+```bash
+pip install agent-tokenops
+```
+
+Two ways in. Both end at the same place: a run that halts itself when it runs out of budget.
+
+<table>
+<tr>
+<th width="50%">Let an assistant wire it up</th>
+<th width="50%">Do it by hand</th>
+</tr>
+<tr>
+<td valign="top">
+
+Point Claude Code, Cursor, or Copilot at your agent and say:
+
+> Integrate TokenOps into this agent using
+> https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md
+
+The skill picks the right tier for your setup, wires the enforcement point, and
+tells you what to verify. Working inside a clone? It is already at
+[`.claude/skills/integrate-tokenops/`](.claude/skills/integrate-tokenops/SKILL.md),
+so `/integrate-tokenops` just works.
+
+</td>
+<td valign="top">
+
+Run the whole idea in one file. No API keys, no server, no Docker:
+
+```bash
+python examples/quickstart.py
+```
+
+```
+call  1: ok       spend $0.4350
+call  2: ok       spend $0.5800
+...
+call 11: ok       spend $1.8850
+call 12: HALTED   spend $2.0300
+
+budget 'run_llm_cap' exhausted
+```
+
+</td>
+</tr>
+</table>
+
+The whole integration is ten lines. The stub model below is the only thing you
+swap for a real one:
+
+```python
+import os
+os.environ.setdefault("TOKENOPS_EMBEDDED", "1")   # in-process ledger, no server
+
+from tokenops import ControlPlaneClient, tokenops_run
+from tokenops.control import Halt, wrap_complete
+from tokenops.providers import complete
+
+client = ControlPlaneClient.from_env()
+
+with tokenops_run(client=client, service="my-agent", intent="research",
+                  provider="openai", model="gpt-4o") as bound:
+    governed = wrap_complete(                      # <- the enforcement point
+        bound.governor, bound.controls, bound.attr,
+        provider="openai", model="gpt-4o",
+        dispatch=complete, service="my-agent",
+    )
+    try:
+        agent.run(..., complete_fn=governed)       # <- the only invasive change
+    except Halt as halt:
+        print(f"run stopped: {halt}")
+```
+
+`wrap_complete` runs detect → decide → apply **before** each model call and
+updates the ledger after it. When a policy trips it raises `Halt` and flags the
+run, so later calls on the same `run_id` are refused, even from another process.
+
+**Next:** [share one budget across processes](.claude/skills/integrate-tokenops/SKILL.md#tier-2--several-processes-one-budget) ·
+[change the budget](.claude/skills/integrate-tokenops/SKILL.md#set-the-budget) ·
+[FastAPI / A2A](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) ·
+[onboarding guide](docs/guides/onboarding.md)
+
+---
+
 TokenOps is a **control plane + SDK** for agent stacks. Entry agents register a run; every LLM and tool crossing shares one `run_id` and one ledger. Policies can halt, mutate, or inject before the next call executes, so a research → summarize → review pipeline stays inside a single budget even across processes.
 
-**[Why](#why-tokenops) · [Architecture](#architecture) · [Install](#install) · [Quick start](#quick-start) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
+**[Why](#why-tokenops) · [Architecture](#architecture) · [Run it locally](#run-it-locally) · [Demos](#demos) · [Comparison](#how-tokenops-compares) · [Roadmap](#roadmap) · [Talks & press](#talks--press) · [Community](#community)**
 
 ## Why TokenOps
 
@@ -75,76 +159,29 @@ flowchart LR
 
 Chronicle records decision boundaries; TokenOps attaches as the cost/governance observer on live crossings. See [Chronicle](https://github.com/theagentplane/chronicle) for record-and-replay.
 
-## Install
+## Run it locally
+
+The plane, the Admin/Dashboard UI, and the seeded policies, from a clone:
 
 ```bash
-pip install agent-tokenops
-
-# With example / bench extras (LangChain, ddgs):
-pip install "agent-tokenops[examples]"
-
-# From source (development):
-pip install -e ".[dev,examples]"
+make install                     # editable install with dev + examples extras
+cp .env.example .env             # optional: API keys for the demos below
+make run                         # control plane :7700 + Admin/Dashboard :8501
 ```
 
-**Prerequisites:** Python 3.10+; `agent-tokenops`; either a running control plane
-(`TOKENOPS_URL` + shared `TOKENOPS_DB`) or `TOKENOPS_EMBEDDED=1` for single-process /
-tests. LLM API keys only for real model calls. FastAPI only if you use
-`instrument_app`.
-
-PyPI name is `agent-tokenops`; import is still `tokenops` (same pattern as Chronicle).
-See [`RELEASING.md`](RELEASING.md) for releases.
-
-## Quick start
-
-```bash
-make install
-cp .env.example .env   # optional API keys for demos / your agents
-
-make db-reset          # optional: clean SQLite + seed governance from default.yaml
-make run               # control plane :7700 + Admin/Dashboard :8501
-```
-
-Wire governance into an agent: `instrument_app` once, then `tokenops_run` per request.
-The UI sends **task only**; intent / mode come from agent config on `instrument_app`.
-
-```python
-from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import wrap_complete, with_governance_errors
-from tokenops.providers import complete
-
-client = ControlPlaneClient.from_env()  # TOKENOPS_URL or embedded Store
-
-async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
-    with tokenops_run(client=client) as bound:
-        governed = wrap_complete(
-            bound.governor, bound.controls, bound.attr,
-            provider=provider, model=model,
-            dispatch=complete, service="planner",
-        )
-        run_agent(..., complete_fn=governed)
-
-app = create_a2a_app(..., handler=with_governance_errors(handler))
-instrument_app(app, service="planner", intent="triad_plan",
-               provider=provider, model=model)
-```
-
-**Non-FastAPI:** TokenOps does not yet ship middleware for other frameworks. Use
-`bind_request_context(RequestContext(headers=..., payload=..., service=...))` then
-`with tokenops_run():`, or pass those kwargs explicitly to `tokenops_run`.
-
-Point agents at the plane and share one DB:
+Point agent processes at that plane so they share one budget:
 
 ```bash
 export TOKENOPS_URL=http://localhost:7700
-export TOKENOPS_DB=tokenops.db   # plane + all agents
-make control-plane               # :7700
-make ui                          # Admin + Dashboard :8501
+export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
 ```
 
-New here? Start with the [onboarding guide](docs/guides/onboarding.md), then the
-[integration checklist](.cursor/skills/integrate-tokenops/SKILL.md) or the
-[triad field guide](docs/guides/field-guide-add-tokenops.md).
+> `TOKENOPS_EMBEDDED=1` overrides `TOKENOPS_URL`. Leave it unset here, or each
+> process silently falls back to its own local ledger and gets the full budget.
+
+PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
+`pip install "agent-tokenops[examples]"` for the LangChain benches,
+`".[dev,examples]"` from source. Releases: [`RELEASING.md`](RELEASING.md).
 
 ## Demos
 
@@ -212,7 +249,16 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 | `TOKENOPS_DB` | SQLite path shared by plane + agents |
 | `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`) |
 
+`TOKENOPS_URL` also accepts the aliases `CONTROL_PLANE_URL` and
+`TOKENOPS_CONTROL_PLANE_URL`.
+
 Production / multi-process: set `TOKENOPS_URL`; agents must **not** mount `/v1/runs`. Tests: `TOKENOPS_EMBEDDED=1` (or omit URL).
+
+> **Precedence.** `ControlPlaneClient.from_env` takes the HTTP path only when a
+> URL is set **and** `TOKENOPS_EMBEDDED` is not `1`. Setting both falls back to a
+> local SQLite file with no warning, and every process then gets its own full
+> budget. Check with
+> `print("embedded" if client.embedded else client.url)`.
 
 ## Project structure
 
@@ -271,7 +317,20 @@ For longer-form questions, ideas, and show-and-tell, use
 **Office hours:** if you are wiring TokenOps into a real stack and want to talk it
 through, [book a slot](https://calendly.com/theagentplane/theagentplane).
 
+**Writing, talks and videos** from the people building this, on agent
+observability, replay testing, and token infrastructure:
+**[theagentplane.github.io/media](https://theagentplane.github.io/media.html)**.
+
 ## Contributing
+
+Good first contributions are labelled
+[`good first issue`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+and [`help wanted`](https://github.com/theagentplane/tokenops/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
+Two areas take contributions without touching the core:
+
+- **A new policy** (a detector plus a decision) under `src/tokenops/control/policies/`.
+  Ten existing ones are working references, one doc each in [`docs/policies/`](docs/policies/).
+- **A new adapter** so another SDK can be governed, under `src/tokenops/adapters/`.
 
 Bugs belong in Issues. Open an issue before a pull request so the approach can
 be agreed there first; typos and small docs fixes can go straight to a PR. See

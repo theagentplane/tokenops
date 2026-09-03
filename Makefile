@@ -6,7 +6,8 @@
 	stop-demo stop-triad stop-brief \
 	db-clear db-reseed db-reset \
 	dist check-dist \
-	lint format test
+	lint format test \
+	quickstart sync-skills
 
 PYTHON ?= python3
 export PYTHONPATH := .$(if $(PYTHONPATH),:$(PYTHONPATH),)
@@ -19,6 +20,7 @@ install:
 lint:
 	$(PYTHON) -m ruff check src tests examples
 	$(PYTHON) -m ruff format --check src tests examples
+	$(PYTHON) scripts/sync-skills.py --check
 	$(PYTHON) -m mypy --python-version $$( $(PYTHON) -c 'import sys; print("%d.%d" % sys.version_info[:2])' )
 
 format:
@@ -27,6 +29,14 @@ format:
 
 test:
 	$(PYTHON) -m pytest -q
+
+# Smallest end-to-end run: no API keys, no server, no Docker.
+quickstart:
+	$(PYTHON) examples/quickstart.py
+
+# Regenerate the editor-specific copies of .claude/skills/integrate-tokenops.
+sync-skills:
+	$(PYTHON) scripts/sync-skills.py
 
 # Build sdist + wheel under dist/ (see RELEASING.md).
 dist:
