@@ -8,7 +8,8 @@
 [![Downloads](https://img.shields.io/pepy/dt/agent-tokenops)](https://pepy.tech/project/agent-tokenops)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 [![GitHub stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=social)](https://github.com/theagentplane/tokenops/stargazers)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
+[![GitHub Discussions](https://img.shields.io/github/discussions/theagentplane/tokenops)](https://github.com/theagentplane/tokenops/discussions)
 
 [![Featured by Microsoft Developer](https://img.shields.io/badge/press-Microsoft%20Developer-lightgrey)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
 [![Featured by Command Line](https://img.shields.io/badge/press-Command%20Line-lightgrey)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
@@ -16,7 +17,7 @@
 
 <br>
 
-Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a></b> and <b><a href="https://www.linkedin.com/in/tisha-chawla/">Tisha Chawla</a></b>
+<sub>Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a></b> and <b><a href="https://www.linkedin.com/in/tisha-chawla/">Tisha Chawla</a></b></sub>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
 <img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="720" />
