@@ -21,7 +21,7 @@
 <table><tr><td>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
-<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="500" />
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: a governed Research to Summarize run halts when worst-case cost exceeds the remaining run budget, then the Dashboard shows spend and governance per agent" width="560" />
 </a>
 
 </td></tr></table>
@@ -58,9 +58,10 @@ Requires Python 3.10+.
 
 ### 1. Put it in your agent
 
-![recommended](https://img.shields.io/badge/skill-recommended-2ea44f) Your coding
-assistant reads [`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires
-the one enforcement point into your agent, and tells you what to check.
+> [!TIP]
+> **Recommended.** Your coding assistant reads
+> [`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires the one
+> enforcement point into your agent, and tells you what to check.
 
 In **Claude Code**, from a clone:
 
