@@ -44,15 +44,14 @@
 
 ## ✨ Core features
 
-An agent workflow can call a model twenty times. Each call passes its own limit,
-but the workflow still costs ten times what was expected, because nothing was
-counting it as one thing. TokenOps gives the whole workflow one budget, checked
-before each call instead of reported after.
+Per-call limits miss the workflow as a whole, so a chain of individually-cheap
+calls can quietly cost far more than expected. TokenOps gives the whole run one
+budget, checked before every call instead of reported after the fact.
 
 <img src="docs/assets/core-features.svg" alt="TokenOps core features: enforced pre-call, run-scoped budget, shared across processes, steers not just stops, tool calls count too, ten policies included" width="100%" />
 
-Ten policies ship configured in [`docs/policies/`](docs/policies/); add your own
-with the same `(Detector, Policy)` shape.
+Ten policies ship configured in [`docs/policies/`](docs/policies/), and you can
+add your own.
 
 ## 🚀 Quickstart
 
