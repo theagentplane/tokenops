@@ -58,9 +58,10 @@ Requires Python 3.10+.
 
 ### 1. Put it in your agent
 
-![recommended](https://img.shields.io/badge/skill-recommended-2ea44f) Your coding
-assistant reads [`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires
-the one enforcement point into your agent, and tells you what to check.
+> [!TIP]
+> **Recommended.** Your coding assistant reads
+> [`SKILL.md`](.claude/skills/integrate-tokenops/SKILL.md), wires the one
+> enforcement point into your agent, and tells you what to check.
 
 In **Claude Code**, from a clone:
 
