@@ -13,7 +13,9 @@ One budget for the whole run, checked before every call.
 [![GitHub stars](https://img.shields.io/github/stars/theagentplane/tokenops?style=social)](https://github.com/theagentplane/tokenops/stargazers)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-The%20Agent%20Plane-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/company/the-agent-plane/)
 
-<b><span style="color:#6a737d">Featured by <a href="https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b">Microsoft Developer</a> · <a href="https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/">Command Line</a> · <a href="https://www.youtube.com/watch?v=GJX19pNhmSw">AI Engineer World's Fair</a></span></b>
+[![Featured by Microsoft Developer](https://img.shields.io/badge/press-Microsoft%20Developer-6a737d)](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b)
+[![Featured by Command Line](https://img.shields.io/badge/press-Command%20Line-6a737d)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
+[![Featured by AI Engineer World's Fair](https://img.shields.io/badge/press-AI%20Engineer%20World's%20Fair-6a737d)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
 <br>
 
