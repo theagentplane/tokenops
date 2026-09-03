@@ -177,7 +177,7 @@ PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
 
 </details>
 
-## ⚖️ How TokenOps compares
+## 🆚 How TokenOps compares
 
 TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full agent workflow, and sits alongside the tools you already use for routing and observability.
 
