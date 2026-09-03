@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
 from tokenops.ui.run_detail import render_run_detail
 from tokenops.ui.store_client import get_store
-from tokenops.ui.theme import page_shell
+from tokenops.ui.theme import GOLD, MUTED, page_shell
 
 page_shell(subtitle="Run history, costs, and governance trace (read-only)")
 store = get_store()
@@ -116,7 +117,22 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
         seg_runs[sv] = seg_runs.get(sv, 0) + 1
 
     st.subheader(f"Cost by {group_by}")
-    st.bar_chart(pd.DataFrame({"cost_usd": {s: _usd(m) for s, m in seg_cost.items()}}))
+    chart_df = pd.DataFrame(
+        [{group_by: s, "cost_usd": _usd(m)} for s, m in seg_cost.items()]
+    )
+    chart = (
+        alt.Chart(chart_df)
+        .mark_bar(color=GOLD, cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X(f"{group_by}:N", title=None, sort="-y"),
+            y=alt.Y("cost_usd:Q", title="Cost (USD)"),
+            tooltip=[group_by, "cost_usd"],
+        )
+        .configure_axis(labelColor=MUTED, titleColor=MUTED, domainColor="#E7E4DB", gridColor="#F0EEE7")
+        .configure_view(strokeWidth=0)
+        .properties(height=260)
+    )
+    st.altair_chart(chart, use_container_width=True)
     st.dataframe(
         pd.DataFrame(
             [
