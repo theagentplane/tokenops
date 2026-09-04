@@ -69,9 +69,9 @@ async def post_task(
         return response.json()
 
 
-async def fetch_agent_card(url: str) -> dict[str, Any]:
+async def fetch_agent_card(url: str, *, timeout: float = 2.0) -> dict[str, Any]:
     base = url.rstrip("/")
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.get(f"{base}/.well-known/agent-card.json")
         response.raise_for_status()
         return response.json()
@@ -114,9 +114,9 @@ def post_task_sync(
         return response.json()
 
 
-def fetch_agent_card_sync(url: str) -> dict[str, Any]:
+def fetch_agent_card_sync(url: str, *, timeout: float = 2.0) -> dict[str, Any]:
     base = url.rstrip("/")
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=timeout) as client:
         response = client.get(f"{base}/.well-known/agent-card.json")
         response.raise_for_status()
         return response.json()
