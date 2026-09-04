@@ -11,7 +11,7 @@
   <!-- headline -->
   <text x="64" y="195" font-size="46" font-weight="800" fill="#1c1b17">One budget for</text>
   <text x="64" y="250" font-size="46" font-weight="800" fill="#1c1b17">one whole agent run.</text>
-  <text x="64" y="305" font-size="46" font-weight="800" fill="#a9791c">Checked before</text>
+  <text x="64" y="305" font-size="46" font-weight="800" fill="#a9791c">Governed before</text>
   <text x="64" y="360" font-size="46" font-weight="800" fill="#a9791c">every model call.</text>
 
   <!-- right side: mini bar comparison -->

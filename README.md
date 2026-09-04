@@ -2,7 +2,7 @@
 
 # TokenOps
 
-**Cuts wasted agent spend by up to `65%`, checking what the run has already spent before every call.**<br>
+**Cuts wasted agent spend by up to `65%`, governing what the run has already spent before every call.**<br>
 <sub>Toward token governance as a first-class discipline, not an afterthought.</sub>
 
 [![PyPI](https://img.shields.io/pypi/v/agent-tokenops.svg)](https://pypi.org/project/agent-tokenops/)
