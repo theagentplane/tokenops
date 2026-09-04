@@ -121,7 +121,7 @@ run is out, even from another process.
 <table><tr><td>
 
 <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
-<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: the same task run twice - ungoverned, it completes over budget; governed, TokenOps halts it within the cap - then the Dashboard shows spend and governance per agent" width="560" />
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: the same task run twice - ungoverned, it completes over budget; governed, TokenOps halts it within the cap - then the Dashboard shows spend and governance per agent" width="760" />
 </a>
 
 </td></tr></table>
