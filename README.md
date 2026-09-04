@@ -20,13 +20,11 @@
 
 <table><tr><td>
 
-<a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
-<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: the same task run twice - ungoverned, it completes over budget; governed, TokenOps halts it within the cap - then the Dashboard shows spend and governance per agent" width="560" />
-</a>
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/docs/assets/devto-cover.png" alt="TokenOps: one budget for one whole agent run, enforced before every model call" width="720" />
 
 </td></tr></table>
 
-<sub><i>Same task, run twice: ungoverned it completes over budget, governed it halts within the cap, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
+<sub><i>See it stop a run mid-budget in the <a href="#-quickstart">Quickstart</a> below.</i></sub>
 
 <br>
 
@@ -117,6 +115,18 @@ run is out, even from another process.
 | Cost per agent in a dashboard | [Quickdeploy](#-quickdeploy) |
 | A worked end-to-end example | [Field guide](docs/guides/field-guide-add-tokenops.md) |
 | Everything else | [Onboarding guide](docs/guides/onboarding.md) |
+
+### 3. See it in action
+
+<table><tr><td>
+
+<a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">
+<img src="https://raw.githubusercontent.com/theagentplane/tokenops/main/examples/demo-assets/videos/02_governance_on_budget_cap.gif" alt="TokenOps demo: the same task run twice - ungoverned, it completes over budget; governed, TokenOps halts it within the cap - then the Dashboard shows spend and governance per agent" width="560" />
+</a>
+
+</td></tr></table>
+
+<sub><i>Same task, run twice: ungoverned it completes over budget, governed it halts within the cap, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
 
 ## 🐳 Quickdeploy
 
