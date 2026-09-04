@@ -124,17 +124,17 @@ async def delegate_summarize(
     )
 
 
-def check_health_sync(url: str) -> bool:
+def check_health_sync(url: str, *, timeout: float = 2.0) -> bool:
     try:
-        fetch_agent_card_sync(url)
+        fetch_agent_card_sync(url, timeout=timeout)
         return True
     except Exception:
         return False
 
 
-async def check_health(url: str) -> bool:
+async def check_health(url: str, *, timeout: float = 2.0) -> bool:
     try:
-        await fetch_agent_card(url)
+        await fetch_agent_card(url, timeout=timeout)
         return True
     except Exception:
         return False

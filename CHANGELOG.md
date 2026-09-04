@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Add configurable short timeout (default 2.0s) for agent card fetch and health checks (#86)
+
 ## [0.2.0] - 2026-08-14
 
 ### Added
