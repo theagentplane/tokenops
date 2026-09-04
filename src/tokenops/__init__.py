@@ -4,7 +4,7 @@ from tokenops.env import load_env
 
 load_env()
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 
 def init() -> None:
