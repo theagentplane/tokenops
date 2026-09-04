@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Add configurable short timeout (default 2.0s) for agent card fetch and health checks (#86)
+- Pin `streamlit` to `>=1.38,<2` instead of an unbounded lower-bound-only range (#84)
 
 ## [0.2.0] - 2026-08-14
 
