@@ -48,6 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
+  "pytest-asyncio>=0.24",
   "build>=1.2",
   "twine>=6.0",
   "ruff>=0.8",
@@ -71,6 +72,7 @@ Changelog = "https://github.com/theagentplane/tokenops/blob/main/CHANGELOG.md"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
+asyncio_mode = "strict"
 markers = [
   "e2e: example / bench end-to-end tests (not run in default CI)",
   "live: requires API keys or vendored frameworks",
