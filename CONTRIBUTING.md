@@ -72,7 +72,9 @@ on a change we cannot merge, and it gives the PR something to close.
 2. Branch, then keep the PR focused (one concern per change).
 3. Add or update tests when behavior changes.
 4. Run `make lint` and `make test` before opening the PR.
-5. Update `CHANGELOG.md` for user-visible changes (see `RELEASING.md`).
+5. Update `CHANGELOG.md` for user-visible changes (see `RELEASING.md`). If you're
+   an external contributor, credit yourself in the entry, e.g.
+   `(#123, thanks @yourhandle)` — maintainers will do this for you if you forget.
 6. Link the issue in the PR description (`Fixes #123`).
 
 Typos, broken links, and formatting fixes can skip step 1 and go straight to a
