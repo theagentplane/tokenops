@@ -53,7 +53,10 @@ add your own.
 
 ## 🚀 Quickstart
 
-Requires Python 3.10+.
+Requires Python 3.10+ and a running control plane — TokenOps has no ledger of its
+own, so every agent (even a single process) governs against one. Zero-setup taste:
+`python -m tokenops.demo` launches a throwaway plane for you automatically. For your
+own agent, start one first (see [Quickdeploy](#-quickdeploy) below), then:
 
 ### 1. Put it in your agent
 
@@ -76,14 +79,16 @@ Anywhere else (Cursor, Copilot, ...), paste this:
 <details>
 <summary><b>Manual</b>, about ten lines</summary>
 
-Wrap your model call once, then hand the wrapped version to your agent.
+Wrap your model call once, then hand the wrapped version to your agent. Needs
+`CONTROL_PLANE_URL` (or `TOKENOPS_URL`) pointing at a running control plane —
+see [Quickdeploy](#-quickdeploy).
 
 ```python
 from tokenops import ControlPlaneClient, tokenops_run
 from tokenops.control import Halt, wrap_complete
 from tokenops.providers import complete
 
-client = ControlPlaneClient.from_env()
+client = ControlPlaneClient.from_env()  # raises if CONTROL_PLANE_URL isn't set
 
 with tokenops_run(client=client, service="my-agent", intent="research",
                   provider="openai", model="gpt-4o") as bound:
@@ -131,9 +136,9 @@ run is out, even from another process.
 ## 🐳 Quickdeploy
 
 > [!TIP]
-> The control plane (`python -m tokenops.server`) shares one budget across
-> processes and powers the dashboard. A single-process agent doesn't need it
-> running at all.
+> Every agent needs a control plane running — TokenOps has no ledger of its own.
+> A single-process agent still needs one, just not the multi-process sharing this
+> section is about. `python -m tokenops.server` powers the dashboard too.
 
 One command, plane + dashboard:
 
