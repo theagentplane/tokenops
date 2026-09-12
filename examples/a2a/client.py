@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from examples.a2a import messages
 from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage, summarize_request
 from examples.a2a.server import fetch_agent_card, fetch_agent_card_sync, post_task, post_task_sync
@@ -53,11 +51,6 @@ def submit_task_sync_with_meta(
     Research registers the run when ``X-TokenOps-Run-Id`` is absent — clients should
     not call ``/v1/runs`` themselves for the default Chat / bench flow.
     """
-    if (
-        not (os.environ.get("TOKENOPS_URL") or "").strip()
-        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
-    ):
-        os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = messages.task_request(
         task=task, bench={"corpus_profile": corpus_profile}, intent=intent
     )
@@ -86,11 +79,6 @@ async def submit_task(
     intent: str = "",
     user_dims: dict[str, str] | None = None,
 ) -> RunResult:
-    if (
-        not (os.environ.get("TOKENOPS_URL") or "").strip()
-        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
-    ):
-        os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = messages.task_request(
         task=task, bench={"corpus_profile": corpus_profile}, intent=intent
     )

@@ -23,15 +23,24 @@ from tokenops.control.models import (
 
 
 class HttpStore:
-    def __init__(self, base_url: str, *, api_key: str | None = None, timeout: float = 30.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        api_key: str | None = None,
+        timeout: float = 30.0,
+        client: httpx.Client | None = None,
+    ) -> None:
         self.path = base_url.rstrip("/")
+        self._owns_client = client is None
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        self._client = httpx.Client(base_url=self.path, timeout=timeout, headers=headers)
+        self._client = client or httpx.Client(base_url=self.path, timeout=timeout, headers=headers)
 
     def close(self) -> None:
-        self._client.close()
+        if self._owns_client:
+            self._client.close()
 
     def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         response = self._client.request(method, path, **kwargs)

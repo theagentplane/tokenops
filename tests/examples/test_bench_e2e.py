@@ -1,12 +1,19 @@
-"""End-to-end on the real A2A research bench (FastAPI TestClient).
+"""End-to-end on the real A2A research bench (FastAPI TestClient) against a real,
+in-process control plane (real TCP port — tokenops#118: tokenops has no ledger of
+its own, so this is the only kind of "real" left to test against).
 
-Drives the full live path — entry registers run on task → per-run governor → actuators →
-RunRecord — for four policies. Only the model call and the search tool are faked (no API
-key, no network); the server, governor, ledger, store, and agent loop are all real.
+Drives the full live path — entry registers run on task → per-run governor (reading
+policies the *plane* was configured with over its own HTTP API) → actuators →
+RunRecord (persisted on the plane) — for four policies. Only the model call and the
+search tool are faked (no API key, no network to a real LLM); the server, control
+plane, governor, ledger, and agent loop are all real.
 """
 
 from __future__ import annotations
 
+import dataclasses
+
+import httpx
 import pytest
 
 pytestmark = pytest.mark.e2e
@@ -16,8 +23,8 @@ from examples.agents.research.tools import core as search_core
 from examples.agents.research.tools.core import SearchResult
 from fastapi.testclient import TestClient
 
+from tokenops.control.http_store import HttpStore
 from tokenops.control.models import BudgetSpec, PolicyInstance
-from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
 
 
@@ -37,17 +44,21 @@ def _run(client, *, intent="demo", user_dims=None):
     return resp.json()
 
 
-def _client(monkeypatch, tmp_path, policies, budgets=(), model=None):
-    db = str(tmp_path / "bench.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
-    s = Store(db)
+def _seed(plane_url: str, *, policies=(), budgets=()) -> None:
+    """Configure the plane exactly the way a real deployment would — over its own
+    HTTP API, not by touching whatever storage happens to sit behind it."""
     for b in budgets:
-        s.upsert_budget(b)
+        httpx.put(
+            f"{plane_url}/v1/budgets", json=dataclasses.asdict(b), timeout=10
+        ).raise_for_status()
     for pi in policies:
-        s.upsert_policy_instance(pi)
-    s.close()
+        httpx.put(
+            f"{plane_url}/v1/policies", json=dataclasses.asdict(pi), timeout=10
+        ).raise_for_status()
+
+
+def _client(live_plane_url, monkeypatch, policies, budgets=(), model=None):
+    _seed(live_plane_url, policies=policies, budgets=budgets)
     monkeypatch.setattr(search_core, "search", _search)
     from examples.agents.research.native import server as srv
 
@@ -69,11 +80,11 @@ def _always_search(provider, model, messages, max_output_tokens=None, **kw):
     )
 
 
-# 1) step_cap → HALT
-def test_step_cap_halts(monkeypatch, tmp_path):
+# 1) step_cap, pulled from the control plane's own /v1/policies → HALT
+def test_step_cap_halts(live_plane_url, monkeypatch):
     srv, client = _client(
+        live_plane_url,
         monkeypatch,
-        tmp_path,
         [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
         model=_always_search,
     )
@@ -82,11 +93,11 @@ def test_step_cap_halts(monkeypatch, tmp_path):
     assert body["cost_micros"] > 0
 
 
-# 2) cost_budget → HALT
-def test_cost_budget_halts(monkeypatch, tmp_path):
+# 2) cost_budget, budget + policy both configured on the plane → HALT
+def test_cost_budget_halts(live_plane_url, monkeypatch):
     srv, client = _client(
+        live_plane_url,
         monkeypatch,
-        tmp_path,
         [PolicyInstance(id="p", template="cost_budget", budget_id="cap", agent="research")],
         budgets=[
             BudgetSpec(id="cap", limit_micros=250, dimension="run")
@@ -98,7 +109,7 @@ def test_cost_budget_halts(monkeypatch, tmp_path):
 
 
 # 3) output_runaway via streaming → CANCEL + RETRY → run completes
-def test_cancel_retry_streaming(monkeypatch, tmp_path):
+def test_cancel_retry_streaming(live_plane_url, monkeypatch):
     monkeypatch.setenv("TOKENOPS_STREAM", "1")
     calls = {"n": 0}
 
@@ -120,8 +131,8 @@ def test_cancel_retry_streaming(monkeypatch, tmp_path):
             yield '{"action": "finish"}'
 
     srv, client = _client(
+        live_plane_url,
         monkeypatch,
-        tmp_path,
         [
             PolicyInstance(
                 id="p",
@@ -139,7 +150,7 @@ def test_cancel_retry_streaming(monkeypatch, tmp_path):
 
 
 # 4) tool_output_cap deep swap → the oversized result is replaced by the descriptor
-def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
+def test_tool_output_cap_substitutes_result(live_plane_url, monkeypatch):
     big = "x" * 60_000
 
     def search_then_finish(provider, model, messages, max_output_tokens=None, **kw):
@@ -153,8 +164,8 @@ def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
         )
 
     srv, client = _client(
+        live_plane_url,
         monkeypatch,
-        tmp_path,
         [
             PolicyInstance(
                 id="p", template="tool_output_cap", params={"cap_tokens": 1000}, agent="research"
@@ -182,22 +193,17 @@ def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
 #    backbone, and the attribution-hardening boundary — an untrusted request body
 #    must not be able to inject arbitrary segmentation tags; see
 #    attribution._PAYLOAD_USER_DIM_ALLOWLIST, commit 28337d1 "Harden ...").
-def test_run_dims_only_allowlisted_payload_keys_persist(monkeypatch, tmp_path):
-    import os
-
-    from tokenops.control.store import Store
-
+def test_run_dims_only_allowlisted_payload_keys_persist(live_plane_url, monkeypatch):
     srv, client = _client(
+        live_plane_url,
         monkeypatch,
-        tmp_path,
         [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="research")],
         model=_always_search,
     )
     body = _run(client, user_dims={"user_id": "alice", "team": "growth"})
     run_id = body["run_id"]
-    s = Store(os.environ["TOKENOPS_DB"], auto_seed=False)
-    rec = s.get_run(run_id)
+    hs = HttpStore(live_plane_url)
+    rec = hs.get_run(run_id)
     assert rec.dims.get("user_id") == "alice"  # allow-listed payload key persists
     assert "team" not in rec.dims  # arbitrary payload tag must not leak into segmentation
-    assert "team" not in s.run_tag_keys()
-    s.close()
+    hs.close()

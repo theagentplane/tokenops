@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 
 from tokenops.control.engine import AgentControls, ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import Budget, Ledger, PriceFn
+from tokenops.control.ledger_backend import LedgerBackend
 from tokenops.control.models import GovernanceMode
 from tokenops.control.policies import (
     concurrency_cap,
@@ -132,17 +133,21 @@ def build_governor(
     controls: AgentControls | None = None,
     *,
     store: Store | None = None,
+    backend: LedgerBackend | None = None,
     enforce: bool = True,
 ) -> Governor:
     """Build a fully-registered Governor (and its Ledger, on ``governor.ledger``) from a
     declarative governance config. ``config`` is the ``governance:`` block (or a mapping
     that contains ``budgets`` / ``policies``).
 
-    Pass ``store`` to share spend, inflight, and halt state across A2A agent processes."""
+    Pass exactly one of ``store`` (local Store — tests only) or ``backend`` (a
+    :class:`~tokenops.control.ledger_backend.LedgerBackend` — the control plane, direct
+    or fake) to share spend, inflight, and halt state across A2A agent processes.
+    Neither means a fully in-memory, single-process Ledger."""
     gov_cfg = config.get("governance", config)
     budgets = parse_budgets(gov_cfg.get("budgets"))
 
-    ledger = Ledger(budgets=list(budgets.values()), price=price, store=store)
+    ledger = Ledger(budgets=list(budgets.values()), price=price, store=store, backend=backend)
     governor = Governor(ledger, controls, enforce=enforce)
     ctx = _Ctx(budgets=budgets, price=price)
 
@@ -181,11 +186,14 @@ def build_governance_stack(
     price: PriceFn,
     *,
     store: Store | None = None,
+    backend: LedgerBackend | None = None,
     mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[Governor, ApplyControls | PreviewControls]:
     """Wire a Governor + OUT connector for enforce or preview mode."""
     enforce = mode is not GovernanceMode.PREVIEW
     controls: ApplyControls | PreviewControls
     controls = ApplyControls() if enforce else PreviewControls()
-    governor = build_governor(config, price, controls, store=store, enforce=enforce)
+    governor = build_governor(
+        config, price, controls, store=store, backend=backend, enforce=enforce
+    )
     return governor, controls

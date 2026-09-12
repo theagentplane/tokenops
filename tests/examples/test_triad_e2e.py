@@ -1,13 +1,18 @@
-"""End-to-end triad bench (Planner → Researcher → Writer) with mocked LLMs.
+"""End-to-end triad bench (Planner → Researcher → Writer) with mocked LLMs, against a
+real, in-process control plane (real TCP port — tokenops#118: tokenops has no ledger
+of its own, so a live plane is the only thing left to test "real" against).
 
-Drives the real FastAPI handlers, shared Store/ledger, wrap_complete, crossing
-hook, and A2A delegates. Only ``complete`` and the search tool are faked.
+Drives the real FastAPI handlers, shared ledger (via the plane's precheck/events:batch),
+wrap_complete, crossing hook, and A2A delegates. Only ``complete`` and the search tool
+are faked.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
+import httpx
 import pytest
 
 pytestmark = pytest.mark.e2e
@@ -20,8 +25,8 @@ from fastapi.testclient import TestClient
 
 from tokenops.control.client import ControlPlaneClient
 from tokenops.control.context import RUN_ID_HEADER
+from tokenops.control.http_store import HttpStore
 from tokenops.control.models import BudgetSpec, PolicyInstance
-from tokenops.control.store import Store
 from tokenops.providers.types import ModelResponse
 
 
@@ -71,22 +76,18 @@ def _write_answer(provider, model, messages, max_output_tokens=None, **kw):
     )
 
 
-def _seed(tmp_path, monkeypatch, policies, budgets=()):
-    db = str(tmp_path / "triad.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.setenv("TOKENOPS_CONFIG", "examples/config/triad.yaml")
+def _seed(live_plane_url, monkeypatch, policies, budgets=()):
     monkeypatch.setenv("SEARCH_BACKEND", "corpus")
-    # Avoid YAML seed so test policies are the only ones present.
-    s = Store(db, auto_seed=False)
+    # A fresh plane per test already has no policies — nothing to avoid seeding.
     for b in budgets:
-        s.upsert_budget(b)
+        httpx.put(
+            f"{live_plane_url}/v1/budgets", json=dataclasses.asdict(b), timeout=10
+        ).raise_for_status()
     for pi in policies:
-        s.upsert_policy_instance(pi)
-    s.close()
+        httpx.put(
+            f"{live_plane_url}/v1/policies", json=dataclasses.asdict(pi), timeout=10
+        ).raise_for_status()
     monkeypatch.setattr(search_core, "search", _search)
-    return db
 
 
 def _wire_apps(monkeypatch):
@@ -134,10 +135,10 @@ def _wire_apps(monkeypatch):
     return planner, researcher, writer
 
 
-def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
+def test_triad_pipeline_completes_with_ledger(live_plane_url, monkeypatch):
     """UI path: POST /v1/tasks with no run_id — Planner registers the run."""
     _seed(
-        tmp_path,
+        live_plane_url,
         monkeypatch,
         [
             PolicyInstance(id="p-step", template="step_cap", params={"max_steps": 40}),
@@ -172,27 +173,26 @@ def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
     assert any(s["agent"] == "researcher" and s["action"] == "search" for s in body["steps"])
     assert any(s["agent"] == "writer" for s in body["steps"])
 
-    store = Store(tmp_path / "triad.db", auto_seed=False)
-    rec = store.get_run(body["run_id"])
+    hs = HttpStore(live_plane_url)
+    rec = hs.get_run(body["run_id"])
     assert rec is not None
     assert rec.status == "completed"
-    assert rec.cost_micros > 0
-    reg = (
-        store.get_run_registration(body["run_id"])
-        if hasattr(store, "get_run_registration")
-        else store.resolve_run(body["run_id"])
-    )
+    # rec.cost_micros is NOT asserted here: control-plane 0.2.x deliberately drops
+    # client-PATCHed steps/cost_micros on the dashboard row ("derived server-side")
+    # but doesn't yet derive them from ledger events — the authoritative number is
+    # body["cost_micros"] (the live governed run's own ledger, asserted above).
+    reg = hs.resolve_run(body["run_id"])
     # §1 hardening (28337d1): the agent's own intent (instrument_app(intent=...))
     # wins over a payload-supplied one — a caller cannot spoof intent to dodge
     # intent-scoped governance. The planner hardcodes INTENT = "triad_plan".
     assert reg.intent == "triad_plan"
-    store.close()
+    hs.close()
 
 
-def test_triad_cost_not_double_counted_without_parent_rollup(monkeypatch, tmp_path):
+def test_triad_cost_not_double_counted_without_parent_rollup(live_plane_url, monkeypatch):
     """Child LLM spend is in the shared ledger once — parent must not re-add rollup."""
     _seed(
-        tmp_path,
+        live_plane_url,
         monkeypatch,
         [
             PolicyInstance(id="p-step", template="step_cap", params={"max_steps": 40}),
@@ -226,15 +226,15 @@ def test_triad_cost_not_double_counted_without_parent_rollup(monkeypatch, tmp_pa
     # plan 160 + research 210 + write 260 = 630 (search tool is not LLM-priced)
     assert body["cost_micros"] == 630
     # Same run_id must be shared (propagation + no soft orphan runs for children).
-    store = Store(tmp_path / "triad.db", auto_seed=False)
-    assert store.resolve_run(body["run_id"]).run_id == body["run_id"]
-    store.close()
+    hs = HttpStore(live_plane_url)
+    assert hs.resolve_run(body["run_id"]).run_id == body["run_id"]
+    hs.close()
 
 
-def test_triad_per_agent_step_cap_only_on_researcher(monkeypatch, tmp_path):
+def test_triad_per_agent_step_cap_only_on_researcher(live_plane_url, monkeypatch):
     """Governor config is filtered by agent name — researcher-only step_cap."""
     _seed(
-        tmp_path,
+        live_plane_url,
         monkeypatch,
         [
             PolicyInstance(
@@ -283,9 +283,9 @@ def test_triad_per_agent_step_cap_only_on_researcher(monkeypatch, tmp_path):
     assert "step" in (body.get("halt_reason") or "").lower()
 
 
-def test_triad_step_cap_halts(monkeypatch, tmp_path):
+def test_triad_step_cap_halts(live_plane_url, monkeypatch):
     _seed(
-        tmp_path,
+        live_plane_url,
         monkeypatch,
         [PolicyInstance(id="p", template="step_cap", params={"max_steps": 2}, agent="researcher")],
     )
@@ -321,9 +321,9 @@ def test_triad_step_cap_halts(monkeypatch, tmp_path):
     assert body["cost_micros"] > 0
 
 
-def test_triad_cost_budget_halts_on_researcher(monkeypatch, tmp_path):
+def test_triad_cost_budget_halts_on_researcher(live_plane_url, monkeypatch):
     _seed(
-        tmp_path,
+        live_plane_url,
         monkeypatch,
         [
             PolicyInstance(

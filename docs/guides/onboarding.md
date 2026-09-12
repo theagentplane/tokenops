@@ -31,7 +31,7 @@ Chronicle records decision boundaries; TokenOps observes them for cost/governanc
 | **Python 3.10+** | Required |
 | **`pip install agent-tokenops`** | Import is still `tokenops`. Pulls Chronicle ≥0.2.0, FastAPI, httpx, provider clients, etc. |
 | **Control plane + shared DB** *(multi-process)* | `TOKENOPS_URL` (e.g. `http://localhost:7700`) and `TOKENOPS_DB` shared by plane + agents. Seed governance once (`make db-reset`). |
-| **Or embedded Store** *(single-process / tests)* | Omit `TOKENOPS_URL` or set `TOKENOPS_EMBEDDED=1`. |
+| **Or a test-only local `Store`** *(no running plane needed)* | `tokenops_run(store=...)` / `ControlPlaneClient(store=...)` — never the default; tokenops has no env var that selects a local ledger. |
 | **LLM API keys** | Only for real model calls — not required for TokenOps itself or offline tests. |
 | **FastAPI** | Only if you use `instrument_app`. Non-FastAPI: pass kwargs / `RequestContext` to `tokenops_run`. |
 | **Chronicle `@boundary`** | Tools *and* LLM: `kind="llm"` runs pre_call via `on_enter`; tools stay observe-only. LLM-only stacks can use bare `@boundary(..., kind="llm")` under `tokenops_run` instead of `wrap_complete`. |
@@ -135,16 +135,19 @@ The **agent** (via `instrument_app` / `tokenops_run` kwargs), not the UI. Client
 - **LLM calls:** `@boundary(..., kind="llm")` under `tokenops_run` runs **pre_call** (via `on_enter`) and observe — enough for LLM-only stacks without `wrap_complete`.
 - **Tools** (search, fetch, etc.): still need `@boundary` + the crossing hook so they appear on the ledger / are governed. Without that, TokenOps only sees LLM crossings you decorate (or put through `wrap_complete`).
 
-### Embedded Store vs `TOKENOPS_URL`?
+### Do I need a control plane running?
 
-| Mode | When |
-|------|------|
-| `TOKENOPS_URL` set | Production / multi-process: register via HTTP; share `TOKENOPS_DB` with the plane. Agents must **not** mount `/v1/runs`. |
-| `TOKENOPS_EMBEDDED=1` or no URL | Tests / single process: in-process `Store`. |
+Yes, always — tokenops has no ledger or run registry of its own. `ControlPlaneClient.from_env()`
+raises if `TOKENOPS_URL`/`CONTROL_PLANE_URL` isn't set. Run one locally (`control-plane serve`,
+part of the `agentplane-control-plane` package, or its Docker image) and point every agent
+process at it; they'll share one budget by construction. Tests that don't want a real plane
+running use `tokenops_run(store=...)` / `ControlPlaneClient(store=...)` with a local `Store` —
+an explicit, visible test double, not a production mode.
 
 ### Do I construct `Store(...)` in the agent?
 
-Prefer `ControlPlaneClient.from_env()` and `tokenops_run`. Happy path does not require user-facing `Store(...)` construction.
+No — `ControlPlaneClient.from_env()` and `tokenops_run()` are the only supported production
+path. `Store(...)` is a test-only construct for exercising policy logic without a running plane.
 
 ### Tools usually cost $0 — why govern them?
 

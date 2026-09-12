@@ -14,24 +14,25 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO = REPO_ROOT / "src" / "tokenops" / "demo.py"
 
 
 def test_demo_shows_the_governed_run_halting(tmp_path):
-    """It runs standalone, spends, and stops itself. No API keys, no server."""
+    """It runs standalone, spends, and stops itself. No API keys, no server to run
+    yourself — it launches a real, throwaway control plane in-process (tokenops#118:
+    no embedded ledger to fall back to instead)."""
+    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
     env = dict(os.environ)
-    # A user's shell has neither of these. conftest sets SKIP_GOVERNANCE_SEED for
-    # the suite, and inheriting it seeds no policies at all, so nothing enforces.
+    # A user's shell has none of these. conftest sets SKIP_GOVERNANCE_SEED for the
+    # suite; the demo seeds its own budget/policy via the plane's HTTP API regardless.
+    env.pop("CONTROL_PLANE_URL", None)
     env.pop("TOKENOPS_URL", None)
     env.pop("TOKENOPS_SKIP_GOVERNANCE_SEED", None)
     env.update(
         {
-            "TOKENOPS_EMBEDDED": "1",
-            "TOKENOPS_DB": str(tmp_path / "demo.db"),
-            # Pin the seed the README quotes. The suite and the Makefile both set
-            # TOKENOPS_CONFIG, and inheriting either changes the budget under test.
-            "TOKENOPS_CONFIG": str(REPO_ROOT / "src" / "tokenops" / "config" / "default.yaml"),
             # cp1252 is the default Windows console encoding; a non-ASCII byte in
             # any halt reason on this path would raise UnicodeEncodeError here.
             "PYTHONIOENCODING": "cp1252",

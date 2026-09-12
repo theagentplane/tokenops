@@ -28,7 +28,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -e ".[dev]"
+          # agentplane-control-plane 0.2.0 isn't on PyPI yet — install straight from
+          # the repo so the [contract] tests (real control-plane, not just the fake)
+          # actually run in CI instead of silently skipping. tokenops has no embedded
+          # ledger to fall back to (tokenops#118), so these are load-bearing, not
+          # optional coverage.
+          python -m pip install "agentplane-control-plane @ git+https://github.com/theagentplane/control-plane@main"
+          python -m pip install -e ".[dev,contract]"
 
       - name: Ruff check
         run: python -m ruff check src tests examples

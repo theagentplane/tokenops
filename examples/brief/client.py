@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage, task_request
 from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
@@ -49,11 +47,6 @@ def submit_brief_sync_with_meta(
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[RunResult, dict[str, object]]:
     """POST the topic to Scout (entry). Scout registers the run when run_id is omitted."""
-    if (
-        not (os.environ.get("TOKENOPS_URL") or "").strip()
-        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
-    ):
-        os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = task_request(task=topic, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
         payload["user_dims"] = user_dims

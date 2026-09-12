@@ -179,6 +179,27 @@ def http_backend(plane_app_factory):
         client.close()
 
 
+@pytest.fixture
+def live_plane_url(monkeypatch):
+    """A real control plane on a real localhost TCP port, with ``CONTROL_PLANE_URL``
+    pointed at it — for tests that must exercise ``ControlPlaneClient.from_env()``
+    itself (no ``store=``/injected-client escape hatch reaches ``from_env()`` by
+    design — tokenops#118: no env var may select a local ledger). An in-process ASGI
+    app (``plane_app_factory``/``http_backend``) isn't reachable this way since
+    ``from_env()`` builds its own plain ``httpx.Client(base_url=...)``.
+    """
+    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
+    from tokenops.control.dev_plane import launch
+
+    db = str(Path(tempfile.mkdtemp()) / "cp.db")
+    plane = launch(db)
+    monkeypatch.setenv("CONTROL_PLANE_URL", plane.url)
+    monkeypatch.delenv("TOKENOPS_URL", raising=False)
+    monkeypatch.delenv("TOKENOPS_CONTROL_PLANE_URL", raising=False)
+    yield plane.url
+    plane.stop()
+
+
 @pytest.fixture(params=["fake", "http"])
 def any_backend(request):
     """Parametrised over both backends — for the verified-fake contract suite.

@@ -61,14 +61,21 @@ def test_post_v1_runs_conflict(plane_client):
     assert conflict.status_code == 409
 
 
-def test_agent_skips_mount_when_tokenops_url(monkeypatch, tmp_path):
-    """With TOKENOPS_URL set, agents must not expose POST /v1/runs."""
-    monkeypatch.setenv("TOKENOPS_DB", str(tmp_path / "r.db"))
-    monkeypatch.setenv("TOKENOPS_URL", "http://tokenops:7700")
-    monkeypatch.delenv("TOKENOPS_EMBEDDED", raising=False)
-
+def test_should_mount_run_registration_is_always_false(monkeypatch):
+    """tokenops#118: registration is always centralized on the plane now — there is
+    no embedded mode left for an agent to self-host POST /v1/runs under, regardless
+    of what's in the environment."""
+    monkeypatch.delenv("TOKENOPS_URL", raising=False)
     assert should_mount_run_registration() is False
 
+    monkeypatch.setenv("TOKENOPS_URL", "http://tokenops:7700")
+    assert should_mount_run_registration() is False
+
+
+def test_agent_skips_mount_when_should_mount_is_false(tmp_path):
+    """The (now-dead, since should_mount_run_registration() is always False)
+    if should_mount_run_registration(): mount_run_registration(...) call sites in the
+    example servers must not expose POST /v1/runs."""
     store = Store(str(tmp_path / "r.db"))
     app = FastAPI()
     if should_mount_run_registration():
@@ -79,12 +86,10 @@ def test_agent_skips_mount_when_tokenops_url(monkeypatch, tmp_path):
     store.close()
 
 
-def test_agent_mounts_when_embedded(monkeypatch, tmp_path):
-    monkeypatch.setenv("TOKENOPS_DB", str(tmp_path / "e.db"))
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
-
-    assert should_mount_run_registration() is True
+def test_mount_run_registration_still_works_when_called_directly(tmp_path):
+    """mount_run_registration() itself is unconditional — a standalone deployment
+    (src/tokenops/server) can still call it directly without going through
+    should_mount_run_registration()."""
     store = Store(str(tmp_path / "e.db"))
     app = FastAPI()
     mount_run_registration(app, store)

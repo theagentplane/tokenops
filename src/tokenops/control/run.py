@@ -220,17 +220,27 @@ def tokenops_run(
     if governor is None:
         price_fn = price if price is not None else build_price_book()
         # §10: cached config (via Store / client); fresh Governor each run — no clone.
-        if store is not None:
+        # Ledger construction follows client_obj (not the local store= param): an
+        # embedded test client built from an explicit store=, whether passed to
+        # tokenops_run() directly or already embedded in a client= the caller built,
+        # keeps using that Store. Everything else (from_env(), always remote — there
+        # is no local ledger to fall back to, tokenops#118) uses the plane's
+        # LedgerBackend (precheck/events:batch) — never store_obj, which in that case
+        # is registration/dashboard HTTP only (HttpStore).
+        if client_obj.embedded:
             config = store_obj.governance_config_for(svc)
+            ledger_store, ledger_backend = store_obj, None
         else:
             config = client_obj.governance_config_for(svc)
+            ledger_store, ledger_backend = None, client_obj.backend
         if controls is not None:
             enforce = gov_mode is not GovernanceMode.PREVIEW
             gov = build_governor(
                 config,
                 price_fn,
                 controls,
-                store=store_obj,
+                store=ledger_store,
+                backend=ledger_backend,
                 enforce=enforce,
             )
             ctrl = controls
@@ -238,7 +248,8 @@ def tokenops_run(
             gov, ctrl = build_governance_stack(
                 config,
                 price_fn,
-                store=store_obj,
+                store=ledger_store,
+                backend=ledger_backend,
                 mode=gov_mode,
             )
     else:

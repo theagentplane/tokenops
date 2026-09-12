@@ -96,10 +96,6 @@ def test_upsert_invalidates_cache(store, monkeypatch):
 
 def test_client_governance_config_for_uses_cache(tmp_path, monkeypatch):
     db = str(tmp_path / "client_cache.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-
     store = Store(db, auto_seed=False)
     store.upsert_policy_instance(
         PolicyInstance(id="p1", template="step_cap", params={"max_steps": 2}, agent="writer"),

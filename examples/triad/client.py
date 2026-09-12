@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage, task_request
 from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
@@ -67,11 +65,6 @@ def submit_goal_sync_with_meta(
     The Planner registers the run on the control plane when ``X-TokenOps-Run-Id``
     is absent — clients should not call ``/v1/runs`` themselves for the triad UI.
     """
-    if (
-        not (os.environ.get("TOKENOPS_URL") or "").strip()
-        and os.environ.get("TOKENOPS_EMBEDDED") != "1"
-    ):
-        os.environ.setdefault("TOKENOPS_EMBEDDED", "1")
     payload = task_request(task=goal, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
         payload["user_dims"] = user_dims

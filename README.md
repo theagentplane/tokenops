@@ -184,8 +184,8 @@ export TOKENOPS_URL=http://localhost:7700
 export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
 ```
 
-> `TOKENOPS_EMBEDDED=1` overrides `TOKENOPS_URL`. Leave it unset here, or each
-> process silently falls back to its own local ledger and gets the full budget.
+> tokenops has no ledger of its own — every process governs against the plane at
+> `TOKENOPS_URL`. There is no local-fallback env var to accidentally leave unset.
 
 PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
 `pip install "agent-tokenops[examples]"` for the LangChain benches,
@@ -251,21 +251,14 @@ Chronicle records decision boundaries; TokenOps attaches as the cost/governance 
 
 | Variable | Purpose |
 |---|---|
-| `TOKENOPS_URL` | Remote plane base URL (e.g. `http://localhost:7700`) → HTTP `register_run` |
-| `TOKENOPS_EMBEDDED` | Set to `1` to force in-process `Store` (tests / single-process) |
-| `TOKENOPS_DB` | SQLite path shared by plane + agents |
+| `TOKENOPS_URL` (or `CONTROL_PLANE_URL`) | The control plane's base URL (e.g. `http://localhost:8800`) — **required** |
 | `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`) |
 
-`TOKENOPS_URL` also accepts the aliases `CONTROL_PLANE_URL` and
+tokenops has no ledger or run registry of its own — `ControlPlaneClient.from_env()`
+raises if `TOKENOPS_URL`/`CONTROL_PLANE_URL` isn't set, rather than silently falling
+back to anything local. Every process talks to the same plane, so they share one
+budget by construction. `TOKENOPS_URL` also accepts the alias
 `TOKENOPS_CONTROL_PLANE_URL`.
-
-Production / multi-process: set `TOKENOPS_URL`; agents must **not** mount `/v1/runs`. Tests: `TOKENOPS_EMBEDDED=1` (or omit URL).
-
-> **Precedence.** `ControlPlaneClient.from_env` takes the HTTP path only when a
-> URL is set **and** `TOKENOPS_EMBEDDED` is not `1`. Setting both falls back to a
-> local SQLite file with no warning, and every process then gets its own full
-> budget. Check with
-> `print("embedded" if client.embedded else client.url)`.
 
 </details>
 

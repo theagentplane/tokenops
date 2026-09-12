@@ -29,11 +29,10 @@ from tokenops.control.store import Store
 
 
 @pytest.fixture
-def store(tmp_path, monkeypatch):
+def store(tmp_path):
+    """Explicit test-injection Store — tokenops_run(store=store) / ControlPlaneClient
+    (store=store) — never reachable from ControlPlaneClient.from_env() (tokenops#118)."""
     db = str(tmp_path / "wave1.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
     clear_governance_config_cache()
     s = Store(db)
     yield s
@@ -50,15 +49,22 @@ def test_init_installs_crossing_hook():
     assert session.on_crossing is on_crossing
 
 
-def test_from_env_installs_crossing_hook(monkeypatch, tmp_path):
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.setenv("TOKENOPS_EMBEDDED", "1")
-    monkeypatch.setenv("TOKENOPS_DB", str(tmp_path / "env.db"))
+def test_from_env_installs_crossing_hook(live_plane_url):
     # Force a fresh look: hook is already installed in-process; still must not raise.
     client = ControlPlaneClient.from_env()
-    assert client.embedded
+    assert not client.embedded
+    assert client.url == live_plane_url
     assert getattr(chronicle_session.reset_session, "_tokenops_crossing_hook", False)
     install_crossing_hook()  # idempotent
+
+
+def test_from_env_raises_without_a_url(monkeypatch):
+    """tokenops#118: no embedded fallback — from_env() must fail closed."""
+    monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
+    monkeypatch.delenv("TOKENOPS_URL", raising=False)
+    monkeypatch.delenv("TOKENOPS_CONTROL_PLANE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="CONTROL_PLANE_URL"):
+        ControlPlaneClient.from_env()
 
 
 def test_tokenops_run_registers_when_no_run_id(store):
@@ -85,8 +91,8 @@ def test_tokenops_run_registers_when_no_run_id(store):
     assert current_governance() is None
 
 
-def test_tokenops_run_without_user_passed_store(store):
-    """§6 happy path: embedded from_env — no store= from the caller."""
+def test_tokenops_run_without_user_passed_store(live_plane_url):
+    """§6 happy path: from_env's real remote client — no store= from the caller."""
     clear()
     with tokenops_run(
         headers={},
@@ -96,8 +102,10 @@ def test_tokenops_run_without_user_passed_store(store):
         mode="preview",
     ) as bound:
         assert bound.registration.intent == "triad_plan"
-        assert bound.client.embedded
+        assert not bound.client.embedded
+        assert bound.client.url == live_plane_url
         assert bound.store is bound.client.require_store()
+        assert bound.governor.ledger._backend is bound.client.backend
         assert current_governance() is not None
     clear()
 
@@ -147,7 +155,7 @@ def test_agent_intent_beats_empty_and_payload_intent(store):
     clear()
 
 
-def test_request_context_ambient(store):
+def test_request_context_ambient(live_plane_url):
     clear()
     clear_request_context()
     bind_request_context(
@@ -173,7 +181,7 @@ def test_request_context_ambient(store):
         clear()
 
 
-def test_instrument_app_binds_context_and_hook(store):
+def test_instrument_app_binds_context_and_hook(live_plane_url):
     app = FastAPI()
     instrument_app(app, service="planner", intent="mw_intent", mode="enforce")
 

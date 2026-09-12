@@ -17,10 +17,9 @@ Agents in your app (or `examples/`) set `TOKENOPS_URL=http://tokenops:7700` so t
 
 | Var | Meaning |
 |-----|---------|
-| `TOKENOPS_URL` | Plane base URL for `ControlPlaneClient` |
+| `TOKENOPS_URL` | Plane base URL for `ControlPlaneClient` — **required**; tokenops has no local-ledger fallback |
 | `TOKENOPS_DB` | Shared SQLite path |
 | `TOKENOPS_CONFIG` | Governance seed YAML |
-| `TOKENOPS_EMBEDDED=1` | Force in-process Store (tests) |
 
 ## Run compose (plane only)
 
