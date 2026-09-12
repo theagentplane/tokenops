@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migration) and round-tripped through `governance_config_for`; not yet consumed by
   `build_governor` — the Governor doesn't group detectors by scope until the
   `LedgerBackend` rewire lands.
+- `Ledger(backend=...)` — routes every write through `LedgerBackend.apply_events` and
+  every spend/inflight/halt read through `read_state` (`precheck`), alongside the
+  existing `store=`/in-memory modes (mutually exclusive with `store`) (#118).
+  `step`/`spent_add` batch together per crossing so the ack's `totals` cover the run
+  total in one round trip; `admit`/`complete`/`halt_mark`/`halt_clear` are separate
+  one-shot writes. `velocity`/`recent`/`window`/`step_count` stay Tier-1-only (never a
+  backend round trip) — those are inherently local, per-process reads. Not yet wired
+  into `build_governor`/`ControlPlaneClient`; `tests/test_ledger_backend_mode.py`
+  exercises it directly against `FakeLedgerBackend`, including two `Ledger` instances
+  sharing one backend (the cross-process case).
 
 ### Changed
 
