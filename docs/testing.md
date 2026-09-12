@@ -1,7 +1,10 @@
 # Testing the TokenOps control plane
 
 How to run the tests yourself, what each suite proves, and how to add a test when you add a
-policy. Default CI runs **offline core tests only** (no API keys).
+policy. Default CI runs **everything that needs no real API key or vendored framework** —
+including the example-bench end-to-end tests (real servers, real Governor, real policy
+HALT/MUTATE decisions; only the model call and search tool are faked, so no network or key
+is needed). Only `live` (genuinely needs an API key / vendored framework) is excluded.
 
 ---
 
@@ -14,14 +17,17 @@ python -m pytest -q
 ```
 
 Pytest config lives in `pyproject.toml` (`testpaths=["tests"]`, `pythonpath=["src", "."]`,
-`addopts = "-m 'not e2e and not live'"`). Example / live suites are excluded by default.
+`addopts = "-m 'not live'"`). Only the `live` suite is excluded by default; `e2e` is part of
+the regular run precisely so a real run+policy regression can't go unnoticed the way #127
+did (two example-bench e2e tests silently broke against `main` for a while because they
+were excluded from CI at the time).
 
 Useful variants:
 
 ```bash
 python -m pytest -q tests/test_cost_budget.py      # one policy
 python -m pytest -q -k "halt or budget"            # by keyword
-python -m pytest -q -m e2e                         # example benches (mocked LLM)
+python -m pytest -q -m e2e                         # only the example benches
 python -m pytest -q -m live                        # needs keys / vendored frameworks
 python -m pytest -v                                # show every test name
 python -m pytest -x                                # stop at first failure
@@ -43,7 +49,7 @@ python -m pytest -x                                # stop at first failure
 | `test_attribution_ledger_policies_e2e.py` | register → ledger → HALT (in-process + HTTP) |
 | `test_cross_process_budget_gating.py` | shared SQLite spend/halt across Governors |
 | `test_server_enforcement.py` | Admin store → server → HALT → RunRecord |
-| `tests/examples/` | A2A bench / triad e2e (marker: `e2e`) |
+| `tests/examples/` | real A2A bench / triad servers, real Governor + policy HALT/MUTATE, real multi-agent shared ledger (marker: `e2e`, no key needed, **now in the default run**) |
 | `tests/benchmarking/` | harness unit tests; MetaGPT/browser-use need vendor (marker: `live` where applicable) |
 
 ## How the tests stay isolated
@@ -63,9 +69,9 @@ make db-reseed     # replace governance from default.yaml
 make db-reset      # clear + reseed
 ```
 
-## Example e2e (offline, mocked LLM)
+## Example e2e (offline, mocked LLM — part of the default run)
 
 ```bash
 pip install -e ".[dev,examples]"
-python -m pytest -q -m e2e
+python -m pytest -q -m e2e   # just this slice, e.g. while iterating on it
 ```

@@ -182,7 +182,10 @@ def test_triad_pipeline_completes_with_ledger(monkeypatch, tmp_path):
         if hasattr(store, "get_run_registration")
         else store.resolve_run(body["run_id"])
     )
-    assert reg.intent == "triad-demo"
+    # §1 hardening (28337d1): the agent's own intent (instrument_app(intent=...))
+    # wins over a payload-supplied one — a caller cannot spoof intent to dodge
+    # intent-scoped governance. The planner hardcodes INTENT = "triad_plan".
+    assert reg.intent == "triad_plan"
     store.close()
 
 
@@ -203,15 +206,14 @@ def test_triad_cost_not_double_counted_without_parent_rollup(monkeypatch, tmp_pa
     )
     _research_search_then_finish.n = 0
 
-    # Deterministic pricing: 1 micro per token (patch each server module bind).
-    from examples.triad.planner import server as planner_srv
-    from examples.triad.researcher import server as researcher_srv
-    from examples.triad.writer import server as writer_srv
+    # Deterministic pricing: 1 micro per token. All three servers call the same
+    # tokenops_run(), which resolves pricing via tokenops.control.run.build_price_book
+    # (imported there, not into the per-agent server modules) when price=None — patch
+    # it once, at the source, rather than three (nonexistent) per-module bindings.
+    import tokenops.control.run as tokenops_run_module
 
     unit_price = lambda: lambda provider, model, usage: int(usage.input) + int(usage.output)
-    monkeypatch.setattr(planner_srv, "build_price_book", unit_price)
-    monkeypatch.setattr(researcher_srv, "build_price_book", unit_price)
-    monkeypatch.setattr(writer_srv, "build_price_book", unit_price)
+    monkeypatch.setattr(tokenops_run_module, "build_price_book", unit_price)
 
     planner, _researcher, _writer = _wire_apps(monkeypatch)
 

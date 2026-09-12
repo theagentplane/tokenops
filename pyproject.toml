@@ -82,10 +82,13 @@ testpaths = ["tests"]
 pythonpath = ["src", "."]
 asyncio_mode = "strict"
 markers = [
-  "e2e: example / bench end-to-end tests (not run in default CI)",
-  "live: requires API keys or vendored frameworks",
+  "e2e: example / bench end-to-end tests — real servers, real Governor/policy",
+  "     enforcement, faked model+network only. Part of the default suite (see",
+  "     addopts) precisely so real run+policy regressions are caught.",
+  "live: requires real API keys or vendored frameworks — self-skips without them,",
+  "      excluded from the default run since it needs secrets to do anything.",
 ]
-addopts = "-m 'not e2e and not live'"
+addopts = "-m 'not live'"
 
 [tool.ruff]
 target-version = "py310"

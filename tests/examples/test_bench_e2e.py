@@ -178,8 +178,11 @@ def test_tool_output_cap_substitutes_result(monkeypatch, tmp_path):
     )  # deep swap landed in context
 
 
-# 5) custom tag flows onto the persisted RunRecord (segmentation backbone)
-def test_run_dims_persisted_for_segmentation(monkeypatch, tmp_path):
+# 5) only allow-listed payload dims reach the persisted RunRecord (segmentation
+#    backbone, and the attribution-hardening boundary — an untrusted request body
+#    must not be able to inject arbitrary segmentation tags; see
+#    attribution._PAYLOAD_USER_DIM_ALLOWLIST, commit 28337d1 "Harden ...").
+def test_run_dims_only_allowlisted_payload_keys_persist(monkeypatch, tmp_path):
     import os
 
     from tokenops.control.store import Store
@@ -194,6 +197,7 @@ def test_run_dims_persisted_for_segmentation(monkeypatch, tmp_path):
     run_id = body["run_id"]
     s = Store(os.environ["TOKENOPS_DB"], auto_seed=False)
     rec = s.get_run(run_id)
-    assert rec.dims.get("team") == "growth"  # custom tag persisted on the run
-    assert "team" in s.run_tag_keys()  # dashboard can group by it
+    assert rec.dims.get("user_id") == "alice"  # allow-listed payload key persists
+    assert "team" not in rec.dims  # arbitrary payload tag must not leak into segmentation
+    assert "team" not in s.run_tag_keys()
     s.close()
