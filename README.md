@@ -16,8 +16,6 @@
 [![Featured by Command Line](https://img.shields.io/badge/Featured-Command%20Line-5E5E5E)](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)
 [![Featured by AI Engineer World's Fair](https://img.shields.io/badge/Featured-AI%20Engineer%20World's%20Fair-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=GJX19pNhmSw)
 
-<sub>Participant in the <a href="https://github.com/open-source/github-secure-open-source-fund">GitHub Secure Open Source Fund</a>, Session 5</sub>
-
 <sub>Built by <b><a href="https://www.linkedin.com/in/susheemkoul/">Susheem Koul</a></b> and <b><a href="https://www.linkedin.com/in/tisha-chawla/">Tisha Chawla</a></b></sub>
 
 <table><tr><td>
