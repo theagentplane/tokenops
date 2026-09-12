@@ -78,10 +78,19 @@ class BudgetSpec:
     period: str = "lifetime"
 
 
+DataScope = Literal["local", "global"]
+
+
 @dataclass
 class PolicyInstance:
     """One configured policy = a template + params, optionally scoped to an agent and
-    attached to a budget and/or segment."""
+    attached to a budget and/or segment.
+
+    ``data_scope`` says which tier its detector reads: ``local`` (Tier-1
+    ``LocalRunState`` cache, no round trip) or ``global`` (the plane's authoritative
+    `run_state`/spend via `precheck`, needed for anything that must be correct across
+    processes — e.g. cost budgets). The Governor groups detectors by this field so a
+    call needs at most one `precheck` regardless of how many `global` policies it has."""
 
     id: str
     template: str  # a key of control.config._TEMPLATES
@@ -90,6 +99,7 @@ class PolicyInstance:
     budget_id: str | None = None
     segment_id: str | None = None
     enabled: bool = True
+    data_scope: DataScope = "local"
 
 
 @dataclass

@@ -4,11 +4,11 @@ State is exactly the LLD's three maps. They are separate on purpose: one boundar
 crossing can increment *many* budget accumulators at once, so spend cannot live inside
 a single run object.
 
-    runs:     run_id      -> RunState          (per-run ephemeral: steps, window, halted)
+    runs:     run_id      -> LocalRunState      (per-run ephemeral: steps, window, halted)
     spent:    (budget_id, segment_key, period) -> micros   (one budget bound to a segment)
     inflight: segment_key -> int               (concurrent calls in flight, admit/complete)
 
-Why three maps, not fields on RunState:
+Why three maps, not fields on LocalRunState:
   * ``spent`` is budget-scoped — a tenant's monthly cap and this run's cap are two
     accumulators the *same* event feeds. Keying by run would lose that fan-out.
   * ``inflight`` is segment-scoped for concurrency only — it is admit/complete state,
@@ -141,9 +141,13 @@ def segment_key(attr: Attribution, budget: Budget) -> str | None:
 
 
 @dataclass
-class RunState:
-    """Ephemeral per-run state. The dict key in ``Ledger.runs`` is the run_id — there is
-    deliberately no run_id field here (the index is not a field)."""
+class LocalRunState:
+    """Ephemeral per-process, per-run cache (Tier 1). The dict key in ``Ledger.runs`` is
+    the run_id — there is deliberately no run_id field here (the index is not a field).
+
+    This is the per-process cache in the two-tier model: cheap reads for `local`-scope
+    policies without a round trip. `global`-scope policies read the plane's `run_state`
+    table instead (via `precheck`), since that is authoritative across processes."""
 
     steps: int = 0
     window: list[BoundaryStep] = field(default_factory=list)
@@ -173,7 +177,7 @@ class Ledger:
     ) -> None:
         self._lock = threading.RLock()
         self._store = store
-        self.runs: dict[str, RunState] = {}
+        self.runs: dict[str, LocalRunState] = {}
         self._spent: dict[tuple[str, str, str], Micros] = defaultdict(int)
         self._inflight: dict[str, int] = defaultdict(int)
         self._budgets: list[Budget] = [RUN_TOTAL_BUDGET, *budgets]
@@ -205,13 +209,13 @@ class Ledger:
 
     def open_run(self, run_id: str, parent_run: str | None = None) -> None:
         with self._lock:
-            self.runs[run_id] = RunState(parent_run=parent_run)
+            self.runs[run_id] = LocalRunState(parent_run=parent_run)
 
     def close_run(self, run_id: str) -> None:
-        """Drop the per-process :class:`RunState` for a finished run. Idempotent.
+        """Drop the per-process :class:`LocalRunState` for a finished run. Idempotent.
 
         ``tokenops_run`` calls this on scope exit for the run it opened, so a
-        long-lived / shared-governor process does not accumulate ``RunState``
+        long-lived / shared-governor process does not accumulate ``LocalRunState``
         entries (each holds a full ``window`` of ``BoundaryStep``s).
         """
         with self._lock:
@@ -290,7 +294,7 @@ class Ledger:
         with self._lock:
             rs = self.runs.get(run_id)
             if rs is None:
-                rs = self.runs[run_id] = RunState()
+                rs = self.runs[run_id] = LocalRunState()
             rs.halted = True
             rs.halt_reason = reason or rs.halt_reason
             if self._store is not None:

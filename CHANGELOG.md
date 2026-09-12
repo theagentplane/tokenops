@@ -20,12 +20,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[contract]` optional-dependency group (`agentplane-control-plane>=0.2.0`). Kept out
   of `[dev]` while the 0.2.0 line is unreleased; the plane-backed tests
   `importorskip("control_plane")`, so `[dev]`-only CI stays green.
-- `Ledger.close_run(run_id)` — drops the per-process `RunState`; called by
+- `Ledger.close_run(run_id)` — drops the per-process `LocalRunState`; called by
   `tokenops_run` on scope exit so a long-lived / shared-governor process does not
   accumulate per-run window state (#115).
+- `PolicyInstance.data_scope` (`local` | `global`, default `local`) — which tier a
+  policy's detector reads: Tier-1 `LocalRunState` cache, or the plane's authoritative
+  state via `precheck` (#118). Persisted (`policy_instances.data_scope`, additive
+  migration) and round-tripped through `governance_config_for`; not yet consumed by
+  `build_governor` — the Governor doesn't group detectors by scope until the
+  `LedgerBackend` rewire lands.
 
 ### Changed
 
+- `Ledger`'s `RunState` renamed `LocalRunState` (#118, locked decision #9) — makes the
+  two-tier model explicit ahead of the `LedgerBackend` rewire: this is the per-process
+  Tier-1 cache, not the plane's authoritative `run_state`.
 - `Ledger.record` no longer writes a zero-delta spend row for non-priced crossings
   (tool calls, un-rolled-up delegates) — a free crossing is a *step*, not spend. The
   cost ledger only moves on priced events (#118).
