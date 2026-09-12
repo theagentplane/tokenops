@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS budgets (
 );
 CREATE TABLE IF NOT EXISTS policy_instances (
   id TEXT PRIMARY KEY, template TEXT NOT NULL, params TEXT NOT NULL DEFAULT '{}',
-  agent TEXT, budget_id TEXT, segment_id TEXT, enabled INTEGER NOT NULL DEFAULT 1
+  agent TEXT, budget_id TEXT, segment_id TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+  data_scope TEXT NOT NULL DEFAULT 'local'
 );
 CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, status TEXT NOT NULL,
@@ -169,6 +170,11 @@ class Store:
             self._db.execute("ALTER TABLE runs ADD COLUMN dims TEXT NOT NULL DEFAULT '{}'")
         if "parent_span" not in cols:
             self._db.execute("ALTER TABLE runs ADD COLUMN parent_span TEXT")
+        pol_cols = {row[1] for row in self._db.execute("PRAGMA table_info(policy_instances)")}
+        if "data_scope" not in pol_cols:
+            self._db.execute(
+                "ALTER TABLE policy_instances ADD COLUMN data_scope TEXT NOT NULL DEFAULT 'local'"
+            )
         reg_cols = {row[1] for row in self._db.execute("PRAGMA table_info(run_registrations)")}
         if "mode" not in reg_cols:
             self._db.execute(
@@ -257,8 +263,9 @@ class Store:
                 f"unknown policy template {pi.template!r}; known: {sorted(_known_policy_templates())}"
             )
         self._db.execute(
-            "REPLACE INTO policy_instances(id, template, params, agent, budget_id, segment_id, enabled) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "REPLACE INTO policy_instances"
+            "(id, template, params, agent, budget_id, segment_id, enabled, data_scope) "
+            "VALUES (?,?,?,?,?,?,?,?)",
             (
                 pi.id,
                 pi.template,
@@ -267,6 +274,7 @@ class Store:
                 pi.budget_id,
                 pi.segment_id,
                 1 if pi.enabled else 0,
+                pi.data_scope,
             ),
         )
         self._db.commit()
@@ -452,6 +460,10 @@ class Store:
                     params.setdefault("dimension", seg.dimension)
                     if seg.tag_key:
                         params.setdefault("tag_key", seg.tag_key)
+            # Not yet consumed by build_governor/_TEMPLATES — the Governor doesn't group
+            # detectors by data_scope until the LedgerBackend rewire lands. Round-tripped
+            # here now so a policy's configured scope isn't silently dropped in the interim.
+            params["data_scope"] = pi.data_scope
             policies[pi.template] = params
         return {"governance": {"budgets": budgets, "policies": policies}}
 
@@ -911,6 +923,7 @@ def _budget_dict(b: BudgetSpec) -> dict:
 
 
 def _policy(r: sqlite3.Row) -> PolicyInstance:
+    keys = r.keys()
     return PolicyInstance(
         id=r["id"],
         template=r["template"],
@@ -919,6 +932,7 @@ def _policy(r: sqlite3.Row) -> PolicyInstance:
         budget_id=r["budget_id"],
         segment_id=r["segment_id"],
         enabled=bool(r["enabled"]),
+        data_scope=r["data_scope"] if "data_scope" in keys else "local",
     )
 
 

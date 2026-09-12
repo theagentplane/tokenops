@@ -62,7 +62,7 @@ from tokenops.control.integration import (
     wrap_complete,
     wrap_stream,
 )
-from tokenops.control.ledger import Budget, Ledger, RunState, segment_key
+from tokenops.control.ledger import Budget, Ledger, LocalRunState, segment_key
 from tokenops.control.ledger_backend import (
     AggregateState,
     ApplyResult,
@@ -112,7 +112,7 @@ __all__ = [
     # ledger
     "Budget",
     "Ledger",
-    "RunState",
+    "LocalRunState",
     "segment_key",
     # ledger backend (remote-only)
     "LedgerBackend",
