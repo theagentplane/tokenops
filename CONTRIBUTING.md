@@ -68,6 +68,11 @@ issue describing the problem or the feature, and wait for a maintainer to agree
 on the approach before you write the patch. It keeps you from spending a weekend
 on a change we cannot merge, and it gives the PR something to close.
 
+Write it as **context, problem, proposed approach, tradeoffs and non-scope**, for
+a reader who has never opened this repo.
+[`.claude/skills/raise-issue/SKILL.md`](.claude/skills/raise-issue/SKILL.md) has
+the full structure and a checklist; in Claude Code, `/raise-issue` applies it.
+
 1. Open an issue and get agreement on the approach.
 2. Branch, then keep the PR focused (one concern per change).
 3. Add or update tests when behavior changes.
