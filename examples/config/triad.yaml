@@ -71,7 +71,6 @@ governance:
       mode: minimize
     context_compaction:
       ctx_max: 100000
-      has_hook: false
     output_runaway:
       repeats: 4
       max_retries: 2

@@ -36,6 +36,7 @@ class BoundRun:
 _registration: ContextVar[RunRegistration | None] = ContextVar("run_registration", default=None)
 _span: ContextVar[SpanContext | None] = ContextVar("run_span", default=None)
 _governance: ContextVar[GovernanceContext | None] = ContextVar("governance", default=None)
+_current_controls: ContextVar[Any | None] = ContextVar("current_controls", default=None)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -58,6 +59,21 @@ def bind_governance(governance: GovernanceContext) -> None:
 
 def clear_governance() -> None:
     _governance.set(None)
+
+
+def current_controls() -> Any:
+    """Return the active ``AgentControls`` for the current governed call, or ``None``."""
+    return _current_controls.get()
+
+
+def set_current_controls(controls: Any) -> Any:
+    """Set the active controls context; returns a token for ``reset_current_controls``."""
+    return _current_controls.set(controls)
+
+
+def reset_current_controls(token: Any) -> None:
+    """Reset the controls context to its previous value."""
+    _current_controls.reset(token)
 
 
 def current_registration() -> RunRegistration | None:
@@ -90,6 +106,7 @@ def clear() -> None:
     _registration.set(None)
     _span.set(None)
     _governance.set(None)
+    _current_controls.set(None)
 
 
 @contextmanager

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind, CallRequest, Usage
+from tokenops.control.context import reset_current_controls, set_current_controls
+from tokenops.control.engine import ApplyControls
 from tokenops.control.policies import context_compaction
 
 
@@ -13,11 +15,23 @@ def _req(est):
     )
 
 
+def _with_compaction_supported():
+    """Set up a controls context where compaction is supported (simulates wrap_complete)."""
+    controls = ApplyControls()
+    controls.compaction_supported = True
+    tok = set_current_controls(controls)
+    return tok
+
+
 def test_trips_at_ctx_max_and_mutates():
     det, pol = context_compaction.build(ctx_max=10_000)
     sig = det.pre_call(_req(10_000), FakeView())
     assert sig.severity.value == "warn"
-    assert pol.decide(sig, FakeView()).kind is ActionKind.MUTATE
+    tok = _with_compaction_supported()
+    try:
+        assert pol.decide(sig, FakeView()).kind is ActionKind.MUTATE
+    finally:
+        reset_current_controls(tok)
 
 
 def test_below_silent():
@@ -33,6 +47,8 @@ def test_rising_trend_trips_early():
 
 
 def test_no_hook_is_telemetry_only():
-    det, pol = context_compaction.build(ctx_max=10_000, has_hook=False)
+    """Without compaction_supported on controls, the policy returns ALLOW (telemetry only)."""
+    det, pol = context_compaction.build(ctx_max=10_000)
     sig = det.pre_call(_req(10_000), FakeView())
-    assert pol.decide(sig, FakeView()).kind is ActionKind.ALLOW  # never HALT, never mutate
+    # No controls in context → compaction not supported → ALLOW
+    assert pol.decide(sig, FakeView()).kind is ActionKind.ALLOW
