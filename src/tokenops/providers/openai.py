@@ -31,6 +31,12 @@ def chat(
             content=content,
             input_tokens=usage.prompt_tokens if usage else 0,
             output_tokens=usage.completion_tokens if usage else 0,
+            cached_tokens=getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0)
+            or 0,
+            reasoning_tokens=getattr(
+                getattr(usage, "completion_tokens_details", None), "reasoning_tokens", 0
+            )
+            or 0,
         )
 
     # Anthropic via OpenAI-compatible path not used; delegate to anthropic module
