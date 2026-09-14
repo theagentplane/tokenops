@@ -61,11 +61,14 @@ NodeType = Literal["llm", "tool", "delegate"]
 
 @dataclass(frozen=True, kw_only=True)
 class Usage:
-    """Provider-reported token *totals* for one call — never the streamed text.
+    """Disjoint, independently priceable token buckets for one call.
 
-    ``cached`` and ``reasoning`` mirror the hidden, costly categories providers report
-    (OpenAI ``*_tokens_details``; Anthropic ``cache_read_input_tokens``). Track them or
-    the spend most likely to surprise you stays invisible.
+    ``input`` excludes cache reads; ``output`` excludes reasoning. ``cached`` and
+    ``reasoning`` are billed separately, never added to inclusive provider totals.
+    Prompt/context size is ``input + cached``; completion size is ``output + reasoning``.
+    Dispatch adapters and agent steps report inclusive totals and are normalized at
+    the boundary. Native Anthropic input already excludes cache reads. Cache-write
+    premium accounting is not yet supported.
     """
 
     input: int = 0

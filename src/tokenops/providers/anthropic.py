@@ -27,6 +27,10 @@ def messages(
     text_blocks = [b.text for b in response.content if b.type == "text"]
     return ModelResponse(
         content="".join(text_blocks),
-        input_tokens=usage.input_tokens if usage else 0,
+        # ModelResponse uses inclusive totals even though the native SDK does not.
+        input_tokens=(usage.input_tokens + (getattr(usage, "cache_read_input_tokens", 0) or 0))
+        if usage
+        else 0,
+        cached_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
         output_tokens=usage.output_tokens if usage else 0,
     )

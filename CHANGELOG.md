@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Carry cache-read and reasoning tokens from native SDK responses, bundled adapters,
+  and flat agent steps into disjoint `Usage` buckets, avoiding double billing while
+  retaining total prompt size for context-compaction trends. Flat dispatch/step
+  input and output remain inclusive totals; direct `Usage` producers must exclude
+  cached/reasoning subsets from input/output (#137, thanks @kevin-lozada-santos).
+  Cache-write premiums and streaming usage remain outside this change.
+
 ## [0.3.0] - 2026-09-12
 
 ### Added

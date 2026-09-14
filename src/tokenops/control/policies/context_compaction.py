@@ -2,7 +2,7 @@
 
 LLD row:
     Detect: est_input ≥ ctx_max OR est_input rising over recent(run, W) (estimate from last
-            llm step's usage.input, never tokenize on the hot path).
+            llm step's usage.input + usage.cached, never tokenize on the hot path).
     Fix:    MUTATE the outgoing prompt: (1) move volatile values below the static prefix to
             restore the prompt-cache discount, (2) dedup tool outputs by hash, (3) summarize
             only filler, pinning system prompt, schema, constraints, state. No hook → degrade
@@ -46,10 +46,15 @@ class ContextCompactionDetector(Detector):
         rising = False
         if len(recent_llm) >= 2:
             rising = all(
-                (a.usage.input if a.usage else 0) <= (b.usage.input if b.usage else 0)
+                (a.usage.input + a.usage.cached if a.usage else 0)
+                <= (b.usage.input + b.usage.cached if b.usage else 0)
                 for a, b in zip(recent_llm, recent_llm[1:])
-            ) and (recent_llm[-1].usage.input if recent_llm[-1].usage else 0) > (
-                recent_llm[0].usage.input if recent_llm[0].usage else 0
+            ) and (
+                recent_llm[-1].usage.input + recent_llm[-1].usage.cached
+                if recent_llm[-1].usage
+                else 0
+            ) > (
+                recent_llm[0].usage.input + recent_llm[0].usage.cached if recent_llm[0].usage else 0
             )
         if est >= self.ctx_max or (rising and est >= self.ctx_max // 2):
             return Signal(

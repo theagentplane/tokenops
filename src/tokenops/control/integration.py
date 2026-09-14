@@ -24,8 +24,9 @@ from collections.abc import Callable, Sequence
 from chronicle import wrap_llm
 
 from tokenops.control.context import current_span
-from tokenops.control.core import Attribution, CallRequest, Observation, Usage
+from tokenops.control.core import Attribution, CallRequest, Observation
 from tokenops.control.crossing import install_crossing_hook
+from tokenops.control.usage import usage_from_counts
 
 
 def tool_signature(name: str, args) -> str:
@@ -62,10 +63,7 @@ def step_to_observation(
     span = _span_fields(service=service)
     if action == "model":
         tu = getattr(step, "tokens", None)
-        usage = Usage(
-            input=getattr(tu, "input_tokens", 0) if tu else 0,
-            output=getattr(tu, "output_tokens", 0) if tu else 0,
-        )
+        usage = usage_from_counts(tu)
         boundary_tags = {
             "node_type": "llm",
             "provider": provider,
