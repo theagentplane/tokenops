@@ -43,7 +43,7 @@ def _steering_policies(*, limit_micros: int) -> dict[str, Any]:
         "tool_fix": {"registry": list(BROWSERUSE_ACTION_REGISTRY), "k": 2},
         "tool_output_cap": {"cap_tokens": 8000},
         "output_runaway": {"repeats": 12, "domination": 0.9, "max_retries": 2},
-        "context_compaction": {"ctx_max": 100_000, "has_hook": True},
+        "context_compaction": {"ctx_max": 100_000},
         "cost_guard": {"budget": "run_llm_cap", "threshold": 0.8, "mode": "minimize"},
     }
 

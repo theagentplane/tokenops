@@ -173,7 +173,7 @@ def test_deep_compaction_rewrites_outgoing_messages():
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
     gov = Governor(ledger, controls)
-    gov.register(*context_compaction.build(ctx_max=10, has_hook=True))  # tiny ctx → always trips
+    gov.register(*context_compaction.build(ctx_max=10))  # tiny ctx → always trips
     attr = _attr("r3")
     ledger.open_run("r3")
 

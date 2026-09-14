@@ -26,7 +26,7 @@ def tokenops_config_steering(*, limit_micros: int, max_react_loop: int = 100) ->
             "tool_fix": {"registry": list(METAGPT_ACTION_REGISTRY), "k": 2},
             "tool_output_cap": {"cap_tokens": 6000},
             "output_runaway": {"repeats": 10, "domination": 0.88, "max_retries": 2},
-            "context_compaction": {"ctx_max": 80_000, "has_hook": True},
+            "context_compaction": {"ctx_max": 80_000},
             "cost_guard": {"budget": "run_llm_cap", "threshold": 0.8, "mode": "minimize"},
         },
     }

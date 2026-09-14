@@ -7,7 +7,7 @@ agents:
     summarize_url: http://localhost:8002
     framework: native
     provider: openai
-    model: gpt-4o-mini
+    model: gemini-2.0-flash
     port: 8001
     max_steps: 5
     satisfaction_threshold: 0.7
@@ -15,13 +15,13 @@ agents:
     url: http://localhost:8002
     framework: native
     provider: openai
-    model: gpt-4o-mini
+    model: gemini-2.0-flash
     port: 8002
   # Triad bench (Planner → Researcher → Writer). Optional; see triad.yaml / make run-triad.
   planner:
     url: http://localhost:8011
     provider: openai
-    model: gpt-4o-mini
+    model: gemini-2.0-flash
     port: 8011
     max_questions: 3
     researcher_url: http://localhost:8012
@@ -29,14 +29,14 @@ agents:
   researcher:
     url: http://localhost:8012
     provider: openai
-    model: gpt-4o-mini
+    model: gemini-2.0-flash
     port: 8012
     max_steps: 5
     satisfaction_threshold: 0.7
   writer:
     url: http://localhost:8013
     provider: openai
-    model: gpt-4o-mini
+    model: gemini-2.0-flash
     port: 8013
 
 # TokenOps control plane. Consumed by tokenops.control.build_governor(...).
@@ -73,7 +73,6 @@ governance:
       mode: minimize
     context_compaction:
       ctx_max: 100000
-      has_hook: false
     output_runaway:
       repeats: 4
       max_retries: 2

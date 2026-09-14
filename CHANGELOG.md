@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `context_compaction` derives compaction capability from `controls.compaction_supported`
+  (set by `wrap_complete`) instead of a `has_hook` config flag. The flag is removed from
+  governance config — compaction works automatically when using `wrap_complete` (the
+  documented integration path). A one-time warning is logged when the policy degrades to
+  telemetry (no hook available).
+
 ## [0.3.0] - 2026-09-12
 
 ### Added

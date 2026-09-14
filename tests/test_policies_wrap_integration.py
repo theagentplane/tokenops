@@ -354,7 +354,7 @@ def test_it_progress_guard_injects_then_halts():
 def test_it_context_compaction_rewrites_messages_via_wrap():
     controls = ApplyControls()
     gov = Governor(Ledger(price=toy_price), controls)
-    gov.register(*context_compaction.build(ctx_max=10, has_hook=True))
+    gov.register(*context_compaction.build(ctx_max=10))
     attr = _attr("r-ccx")
     gov.ledger.open_run("r-ccx")
     dispatch, calls = _dispatch()

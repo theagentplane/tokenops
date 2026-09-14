@@ -231,6 +231,7 @@ def wrap_complete(
     seg = f"run:{attr.run_id}"
     boundary_id = f"{service or attr.agent}.chat"
     traced = wrap_llm(boundary_id, dispatch)
+    controls.compaction_supported = True  # wrap_complete IS the prompt-assembly hook
 
     def governed(p: str, m: str, messages) -> object:
         from tokenops.control.crossing import reset_wrap_owns_precall, wrap_owns_precall

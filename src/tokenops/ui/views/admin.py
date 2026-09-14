@@ -33,7 +33,7 @@ _TEMPLATE_DEFAULTS: dict[str, str] = {
     "tool_output_cap": '{"cap_tokens": 8000}',
     "progress_guard": '{"window": 6, "repeats": 3, "max_corrections": 2}',
     "cost_guard": '{"threshold": 0.8, "mode": "minimize"}',
-    "context_compaction": '{"ctx_max": 100000, "has_hook": false}',
+    "context_compaction": '{"ctx_max": 100000}',
     "output_runaway": '{"repeats": 4, "max_retries": 2}',
 }
 

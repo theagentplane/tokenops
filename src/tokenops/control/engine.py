@@ -118,8 +118,14 @@ class ApplyControls:
     **Directives are bounded.** ``carry`` dedups and stops at ``max_carry``. ``cost_guard``
     fires *because* spend is high, so an unbounded pile of steer messages would add prompt
     tokens at exactly the wrong moment.
+
+    ``compaction_supported`` advertises that the host can honour a MUTATE ``compact``
+    action (set by ``wrap_complete`` which supplies the prompt-assembly hook). Policies
+    that need the hook read this instead of a config flag — capability is derived, not
+    declared.
     """
 
+    compaction_supported: bool = False
     carry: list[str] = field(default_factory=list)
     event_log: list[Action] = field(default_factory=list)
     call: _ResolvedCall = field(default_factory=_ResolvedCall)
@@ -321,13 +327,19 @@ class Governor:
             )
 
     def _enforce(self, signals: Sequence[Signal]) -> None:
-        for sig in sorted(signals, key=lambda s: _SEVERITY_RANK[s.severity], reverse=True):
-            policy = self._policy_by_name.get(sig.detector)
-            if policy is None:
-                continue  # a detector with no paired policy is observe-only telemetry
-            action = policy.decide(sig, self.ledger)
-            if action.kind is ActionKind.HALT and self.enforce:
-                # set the durable flag BEFORE applying, so the kill switch survives a
-                # swallowed raise. Idempotent — marking twice is harmless.
-                self.ledger.mark_halted(action.run_id, action.reason)
-            self.controls.apply(action)  # may raise Halt and unwind the agent loop
+        from tokenops.control.context import reset_current_controls, set_current_controls
+
+        tok = set_current_controls(self.controls)
+        try:
+            for sig in sorted(signals, key=lambda s: _SEVERITY_RANK[s.severity], reverse=True):
+                policy = self._policy_by_name.get(sig.detector)
+                if policy is None:
+                    continue  # a detector with no paired policy is observe-only telemetry
+                action = policy.decide(sig, self.ledger)
+                if action.kind is ActionKind.HALT and self.enforce:
+                    # set the durable flag BEFORE applying, so the kill switch survives a
+                    # swallowed raise. Idempotent — marking twice is harmless.
+                    self.ledger.mark_halted(action.run_id, action.reason)
+                self.controls.apply(action)  # may raise Halt and unwind the agent loop
+        finally:
+            reset_current_controls(tok)
