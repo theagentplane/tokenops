@@ -183,25 +183,41 @@ def consume_carry(
 
 
 def _compact_messages(messages):
-    """Deep context_compaction MUTATE: rewrite the outgoing messages — pin every system
-    message, drop duplicate non-system messages (deduped tool outputs / repeated context)."""
+    """Deep context_compaction MUTATE: rewrite the outgoing messages into a cache-friendly
+    shape and drop redundant context.
+
+    Two moves, both aimed at the prompt-cache discount (cached prefix tokens bill far cheaper
+    than fresh ones):
+
+    * **Hoist system messages into a stable leading prefix.** The static instructions
+      (system prompt, schema, constraints) form the cacheable prefix; the volatile
+      conversation follows. Relative order within the system block, and within the tail, is
+      preserved, so this is a no-op for the common case where system is already first.
+    * **Drop duplicate non-system messages** (deduped tool outputs / repeated context),
+      keeping the first occurrence so the prefix stays stable across calls.
+
+    Trajectory hints are steer context and stay in the tail (recency favors the correction).
+    Note: the first reorder after an interleaved system message busts the old cache once, then
+    the new stable order caches; net win only when the system block is stable across calls.
+    """
     seen: set = set()
-    out: list = []
+    system_msgs: list = []
+    tail: list = []
     for msg in messages:
         role = msg.get("role") if isinstance(msg, dict) else None
         content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
         if role == "system":
-            out.append(msg)
+            system_msgs.append(msg)
             continue
         if isinstance(content, str) and content.startswith("[TokenOps trajectory hint"):
-            out.append(msg)
+            tail.append(msg)
             continue
         key = (role, content)
         if key in seen:
             continue
         seen.add(key)
-        out.append(msg)
-    return out
+        tail.append(msg)
+    return system_msgs + tail
 
 
 def wrap_complete(

@@ -36,3 +36,32 @@ def test_no_hook_is_telemetry_only():
     det, pol = context_compaction.build(ctx_max=10_000, has_hook=False)
     sig = det.pre_call(_req(10_000), FakeView())
     assert pol.decide(sig, FakeView()).kind is ActionKind.ALLOW  # never HALT, never mutate
+
+
+def test_compact_hoists_system_into_stable_prefix():
+    from tokenops.control.integration import _compact_messages
+
+    msgs = [
+        {"role": "user", "content": "u1"},
+        {"role": "system", "content": "sys-a"},
+        {"role": "assistant", "content": "a1"},
+        {"role": "user", "content": "u1"},  # duplicate of first user turn
+        {"role": "system", "content": "sys-b"},
+    ]
+    out = _compact_messages(msgs)
+    # system messages hoisted to the front, in their original relative order
+    assert [m["role"] for m in out[:2]] == ["system", "system"]
+    assert [m["content"] for m in out[:2]] == ["sys-a", "sys-b"]
+    # tail keeps non-system order and drops the duplicate user turn
+    assert [m["content"] for m in out[2:]] == ["u1", "a1"]
+
+
+def test_compact_is_noop_when_system_already_first():
+    from tokenops.control.integration import _compact_messages
+
+    msgs = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "u1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+    assert _compact_messages(msgs) == msgs
