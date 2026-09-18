@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: python -m mypy
+        entry: .venv/bin/python -m mypy --python-version 3.12
         language: system
         pass_filenames: false
         types: [python]

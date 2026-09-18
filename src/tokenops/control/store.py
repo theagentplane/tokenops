@@ -30,6 +30,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from datetime import date, datetime
 from typing import Any, TypeVar
 
 from tokenops.control.ledger import LIFETIME, RUN_TOTAL_BUDGET
@@ -62,6 +63,26 @@ def _known_policy_templates() -> frozenset[str]:
     from tokenops.control.config import _TEMPLATES
 
     return frozenset({*_TEMPLATES, "trajectory_hint"})
+
+
+def _coerce_epoch(value: float | str | date | None) -> float | None:
+    """Coerce a timestamp value to epoch float.
+
+    Accepts epoch floats (pass-through), ISO date strings (``"2026-09-19"``),
+    ``datetime.date`` objects, or ``None``.  Dates are converted to start-of-day
+    epoch seconds so they compare correctly against the ``started_at`` REAL column.
+    """
+    if value is None:
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return datetime.combine(value, datetime.min.time()).timestamp()
+    if isinstance(value, str):
+        return datetime.fromisoformat(value).timestamp()
+    if isinstance(value, datetime):
+        return value.timestamp()
+    return float(value)
 
 
 _SCHEMA = """
@@ -518,6 +539,49 @@ class Store:
             sql += " WHERE status IN ('halted','throttled','error')"
         sql += " ORDER BY started_at DESC LIMIT ?"
         return [self._run_with_ledger_cost(r) for r in self._db.execute(sql, (limit,))]
+
+    @_locked
+    def export_runs(
+        self,
+        *,
+        from_at: float | None = None,
+        to_at: float | None = None,
+        agent: str | None = None,
+        status: str | None = None,
+        tenant: str | None = None,
+        limit: int = 5000,
+    ) -> list[RunRecord]:
+        """Export run-records filtered by time range, agent, status, or tenant.
+
+        Used by the ``GET /v1/export`` route for FinOps / chargeback CSV and JSON.
+        Returns at most *limit* rows (capped at 10 000) ordered by ``started_at`` DESC.
+        """
+        limit = min(limit, 10_000)
+        from_at = _coerce_epoch(from_at)
+        to_at = _coerce_epoch(to_at)
+        where: list[str] = []
+        params: list[object] = []
+        if from_at is not None:
+            where.append("started_at >= ?")
+            params.append(from_at)
+        if to_at is not None:
+            where.append("started_at <= ?")
+            params.append(to_at)
+        if agent is not None:
+            where.append("agent = ?")
+            params.append(agent)
+        if status is not None:
+            where.append("status = ?")
+            params.append(status)
+        if tenant is not None:
+            where.append("json_extract(dims, '$.tenant') = ?")
+            params.append(tenant)
+        sql = "SELECT * FROM runs"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY started_at DESC LIMIT ?"
+        params.append(limit)
+        return [self._run_with_ledger_cost(r) for r in self._db.execute(sql, tuple(params))]
 
     def _run_with_ledger_cost(self, row: sqlite3.Row) -> RunRecord:
         """Build a RunRecord; prefer ``__run_total__`` ledger spend when present."""

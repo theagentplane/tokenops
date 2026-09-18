@@ -6,14 +6,18 @@ wrap handlers here so Halt/Throttled map to HTTP responses.
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 import os
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import asdict
 from typing import Any
 
 import httpx
 from chronicle.session import reset_session
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from tokenops.control.core import Halt
 from tokenops.control.engine import Throttled
@@ -63,6 +67,70 @@ def mount_run_registration(app: FastAPI, store: Store) -> None:
             {"run_id": reg.run_id, "status": "registered", "mode": reg.mode.value},
             status_code=201,
         )
+
+
+_EXPORT_CSV_COLUMNS = [
+    "run_id",
+    "agent",
+    "status",
+    "cost_micros",
+    "steps",
+    "started_at",
+    "ended_at",
+    "duration_s",
+    "dims",
+    "halt_reason",
+    "detector",
+    "governance_events",
+]
+
+
+def _run_to_csv_row(rec):  # type: ignore[no-untyped-def]
+    d = asdict(rec)
+    d["duration_s"] = round(rec.ended_at - rec.started_at, 2) if rec.ended_at else ""
+    d["dims"] = json.dumps(rec.dims) if rec.dims else ""
+    d["governance_events"] = json.dumps(rec.governance_events) if rec.governance_events else ""
+    return [d.get(col, "") for col in _EXPORT_CSV_COLUMNS]
+
+
+def mount_export(app: FastAPI, store: Store) -> None:
+    """Mount ``GET /v1/export`` — on-demand run-record export (CSV / JSON)."""
+
+    @app.get("/v1/export")
+    def export_runs(
+        from_at: float | None = Query(None, description="Start timestamp (epoch seconds)"),
+        to_at: float | None = Query(None, description="End timestamp (epoch seconds)"),
+        agent: str | None = Query(None, description="Filter by agent name"),
+        status: str | None = Query(None, description="Filter by run status"),
+        tenant: str | None = Query(None, description="Filter by tenant (from dims)"),
+        format: str = Query("json", description="Output format: json or csv"),
+        limit: int = Query(5000, ge=1, le=10_000, description="Max rows to return"),
+    ) -> Response:
+        runs = store.export_runs(
+            from_at=from_at,
+            to_at=to_at,
+            agent=agent,
+            status=status,
+            tenant=tenant,
+            limit=limit,
+        )
+
+        if format == "csv":
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(_EXPORT_CSV_COLUMNS)
+            for rec in runs:
+                writer.writerow(_run_to_csv_row(rec))
+            buf.seek(0)
+            return StreamingResponse(
+                iter([buf.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": 'attachment; filename="export.csv"'},
+            )
+
+        # JSON (default)
+        rows = [asdict(rec) for rec in runs]
+        return JSONResponse(rows, headers={"X-Total-Count": str(len(rows))})
 
 
 def with_governance_errors(handler: Handler) -> Handler:

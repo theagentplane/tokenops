@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+from dataclasses import asdict
+from datetime import datetime, time
+
 import altair as alt
 import pandas as pd
 import streamlit as st
@@ -168,6 +174,87 @@ with st.expander("Fleet overview", expanded=fleet_expanded):
         ]
     )
     st.dataframe(table, use_container_width=True, hide_index=True)
+
+# ---- export (CSV / JSON download) ---------------------------------------- #
+_EXPORT_COLUMNS = [
+    "run_id",
+    "agent",
+    "status",
+    "cost_micros",
+    "steps",
+    "started_at",
+    "ended_at",
+    "duration_s",
+    "dims",
+    "halt_reason",
+    "detector",
+    "governance_events",
+]
+
+
+def _to_csv(runs_list):
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_EXPORT_COLUMNS)
+    for rec in runs_list:
+        d = asdict(rec)
+        d["duration_s"] = round(rec.ended_at - rec.started_at, 2) if rec.ended_at else ""
+        d["dims"] = json.dumps(rec.dims) if rec.dims else ""
+        d["governance_events"] = json.dumps(rec.governance_events) if rec.governance_events else ""
+        writer.writerow([d.get(c, "") for c in _EXPORT_COLUMNS])
+    return buf.getvalue()
+
+
+def _date_to_epoch(d, end_of_day: bool = False) -> float:
+    """Convert a date to epoch seconds. ``end_of_day`` returns 23:59:59.999."""
+    t = time.max if end_of_day else time.min
+    return datetime.combine(d, t).timestamp()
+
+
+with st.expander("Export run data", expanded=False):
+    agents = sorted({r.agent for r in runs})
+    ecol1, ecol2, ecol3, ecol4 = st.columns(4)
+    with ecol1:
+        export_from = st.date_input("From", value=None, key="export_from")
+    with ecol2:
+        export_to = st.date_input("To", value=None, key="export_to")
+    with ecol3:
+        export_agent = st.selectbox("Agent", ["All"] + agents, key="export_agent")
+    with ecol4:
+        export_status = st.selectbox(
+            "Status",
+            ["All", "completed", "halted", "error", "running"],
+            key="export_status",
+        )
+
+    export_runs = store.export_runs(
+        from_at=_date_to_epoch(export_from) if export_from else None,
+        to_at=_date_to_epoch(export_to, end_of_day=True) if export_to else None,
+        agent=export_agent if export_agent != "All" else None,
+        status=export_status if export_status != "All" else None,
+        limit=10_000,
+    )
+
+    st.caption(f"{len(export_runs)} runs matched")
+    st.markdown(
+        "<style>div[data-testid='stHorizontalBlock']{gap:0.5rem}</style>",
+        unsafe_allow_html=True,
+    )
+    dl_col1, dl_col2, _ = st.columns([1, 1, 6])
+    with dl_col1:
+        st.download_button(
+            "Download CSV",
+            data=_to_csv(export_runs),
+            file_name="export.csv",
+            mime="text/csv",
+        )
+    with dl_col2:
+        st.download_button(
+            "Download JSON",
+            data=json.dumps([asdict(r) for r in export_runs], default=str, indent=2),
+            file_name="export.json",
+            mime="application/json",
+        )
 
 # ---- run detail picker (when not already focused) ------------------------ #
 if not focus_run:
