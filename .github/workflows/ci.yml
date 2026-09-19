@@ -55,6 +55,8 @@ jobs:
   # workflow green while the job (and its step summary) still shows the failing fields.
   schema-compat:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     continue-on-error: true
     strategy:
