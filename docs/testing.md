@@ -75,3 +75,68 @@ make db-reset      # clear + reseed
 pip install -e ".[dev,examples]"
 python -m pytest -q -m e2e   # just this slice, e.g. while iterating on it
 ```
+
+## The control plane in tests (no fake)
+
+The control plane is a **separate repo** (`theagentplane/control-plane`) with its own tests and
+CI. Tokenops CI does not run the plane's test suite and should not.
+
+There is also **no fake plane**. Every test that touches the ledger runs against the real
+`control_plane.app`, in-process over ASGI on a throwaway SQLite file, through the same
+`HttpLedgerBackend` production uses. A hand-written stand-in has to be kept in sync with
+the thing it copies, and it wasn't: the old in-memory fake kept `step.compaction` while the
+plane dropped it, so tests passed for a feature that did not work (control-plane#18). The
+real plane costs about a second across the ledger tests.
+
+Fixtures (`tests/conftest.py`):
+
+| Fixture | Use |
+|---------|-----|
+| `plane_backend` | `HttpLedgerBackend` over a fresh real plane — the default ledger backend for tests |
+| `recording_backend` | the same, wrapped in a spy that records every `apply_events` batch. Use it to assert what the SDK **sent**, independent of what the plane stores |
+| `plane_app_factory` | the raw app, when you need to build several planes or set `Settings` |
+| `live_plane_url` | a plane on a real TCP port, for `ControlPlaneClient.from_env()` |
+
+The plane is a **required** test dependency (`make install` includes it). A missing install
+fails the test instead of skipping it, because a skip reads as a pass.
+
+## Wire-schema compatibility (non-blocking)
+
+Two layers guard the SDK-to-plane wire format:
+
+1. **`tests/test_wire_samples.py` (blocking, no plane).** Every field on `LedgerEvent` must
+   have a sample in `tests/wire_samples.py` and an *observer*, a function that reads the
+   field back through a public plane read path. Add a field to the TypedDict and this
+   fails until you enroll it. It is what makes "the SDK sends a new field" automatically
+   become "the plane is checked for it".
+2. **`tests/compat/` (non-blocking).** Marked `compat` and excluded from the default run.
+   It sends each sample to a real plane and asserts every field comes back. There is one
+   case per field, so a failure names it:
+
+   ```
+   FAILED tests/compat/test_wire_schema_compat.py::test_plane_keeps_field[step.compaction]
+   ```
+
+   CI runs it as a separate `schema-compat` job with `continue-on-error`, against both the
+   oldest plane the SDK claims to support (`v0.2.0`, per `pyproject.toml`) and `main`. It
+   can fail without blocking a merge: a failure means the plane is older than, or has
+   diverged from, the SDK, which is worth knowing but is not an SDK bug.
+
+```bash
+make test-compat          # against whatever plane is installed
+```
+
+A field the plane accepts but exposes through no read path is listed in `UNOBSERVABLE`
+with the reason, so the gap is visible rather than silently untested.
+
+### Changing what the SDK sends the plane
+
+1. **Name the plane-side work in the issue.** "Attach X to the ledger event" is half a task.
+   The acceptance criteria must say where X is stored and how it is read back, and link a
+   `theagentplane/control-plane` issue for it.
+2. **Enroll the field** in `tests/wire_samples.py` (the blocking test tells you to).
+3. **Assert what the SDK sends** in a unit test with `recording_backend`.
+4. **Land the plane change first.** Until it does, the new field's compat case fails. That
+   is expected and non-blocking; do not add an `xfail` to the default suite.
+5. **Update the wire contract doc** (`docs/api-contract.md`) in the plane repo in the same
+   change that adds the field.

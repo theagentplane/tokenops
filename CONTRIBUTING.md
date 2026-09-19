@@ -12,7 +12,7 @@ Requires Python 3.10+.
 ```bash
 git clone https://github.com/theagentplane/tokenops.git
 cd tokenops
-make install          # pip install -e ".[dev,examples]"
+make install          # pip install -e ".[dev,contract,examples]"
 cp .env.example .env  # optional API keys for live demos
 ```
 

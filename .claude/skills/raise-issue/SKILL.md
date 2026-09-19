@@ -128,6 +128,7 @@ and scope growing until nothing ships.
 - [ ] Open questions carry recommendations
 - [ ] Out-of-scope items link an issue or ask for one
 - [ ] Searched open issues for overlap; cross-referenced neighbours
+- [ ] If the SDK sends new data to the control plane, the plane-side storage and read path is in the acceptance criteria and linked to a `theagentplane/control-plane` issue (see `docs/testing.md`, cross-repo section)
 - [ ] Title states the problem, not the solution
 ```
 

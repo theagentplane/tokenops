@@ -1,12 +1,11 @@
 """LedgerBackend — the single interface the SDK uses to reach the control plane.
 
 The remote-only rewrite (see the ``remote-only control plane`` epic) routes every
-ledger read/write through this protocol. Two implementations:
+ledger read/write through this protocol. There is one implementation:
 
-* :class:`HttpLedgerBackend` — direct ``httpx`` to a running plane. Production.
-* ``FakeLedgerBackend`` (``tests/fakes.py``) — in-memory, tests only. Kept honest by
-  ``tests/test_ledger_backend_contract.py`` (parametrised against the real plane over
-  ``httpx.ASGITransport``).
+* :class:`HttpLedgerBackend` — direct ``httpx`` to a running plane. Production, and in
+  tests too: they drive it against a real in-process ``control_plane.app``, not a fake,
+  so the SDK and the plane cannot drift (see ``docs/testing.md``).
 
 **The only write path is :meth:`apply_events`** — a list of :class:`LedgerEvent`. A
 future ``BufferedLedgerBackend`` wraps an inner backend and coalesces those calls

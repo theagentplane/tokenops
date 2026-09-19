@@ -15,7 +15,7 @@ export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
-	$(PYTHON) -m pip install -e ".[dev,examples]"
+	$(PYTHON) -m pip install -e ".[dev,contract,examples]"
 
 lint:
 	$(PYTHON) -m ruff check src tests examples
@@ -29,6 +29,10 @@ format:
 
 test:
 	$(PYTHON) -m pytest -q
+
+# Non-blocking wire-schema check against the installed control plane (see docs/testing.md)
+test-compat:
+	$(PYTHON) -m pytest -q -m compat tests/compat
 
 # Smallest end-to-end run: no API keys, no server, no Docker.
 # Ships inside the package, so `pip install agent-tokenops` is enough to run it.

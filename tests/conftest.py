@@ -114,23 +114,24 @@ import pytest
 
 
 @pytest.fixture
-def fake_backend():
-    """In-memory FakeLedgerBackend — the unit-test backend."""
-    from fakes import FakeLedgerBackend
-
-    return FakeLedgerBackend()
-
-
-@pytest.fixture
 def plane_app_factory():
     """Build a real control_plane.app over a throwaway SQLite file.
 
-    Skips the whole test when ``agentplane-control-plane`` (>= 0.2.0) is not installed
-    — it is not a hard dev dep (not on PyPI yet); ``pip install -e ".[dev,contract]"``
-    to run these. Yields a callable; every app it makes is torn down (connections
-    closed before the temp dir is removed — open SQLite handles block unlink on Windows).
+    The SDK has no in-memory ledger and no fake plane (tokenops#118), so tests that touch
+    the ledger run against the real plane. It is a required test dependency: a missing
+    install fails loudly rather than skipping, because a skip is indistinguishable from
+    a pass. ``pip install -e ".[dev,contract]"``. Yields a callable; every app it makes
+    is torn down (connections closed before the temp dir is removed — open SQLite
+    handles block unlink on Windows).
     """
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
+    try:
+        import control_plane  # noqa: F401
+    except ImportError:
+        pytest.fail(
+            "agentplane-control-plane>=0.2.0 is required to run the tests: "
+            'pip install -e ".[dev,contract]"',
+            pytrace=False,
+        )
     made: list[tuple] = []
 
     def _make(**settings_kw):
@@ -171,12 +172,41 @@ def _asgi_backend(app):
 
 
 @pytest.fixture
-def http_backend(plane_app_factory):
+def plane_backend(plane_app_factory):
+    """``HttpLedgerBackend`` over a fresh real in-process control plane."""
     backend, client = _asgi_backend(plane_app_factory())
     try:
         yield backend
     finally:
         client.close()
+
+
+class RecordingBackend:
+    """Spy over a real backend: records every ``apply_events`` batch, delegates the rest.
+
+    For asserting what the SDK *sent* (its own contract) without depending on what the
+    plane chooses to store — that half is ``tests/compat``.
+    """
+
+    def __init__(self, inner) -> None:
+        self._inner = inner
+        self.batches: list[list[dict]] = []
+
+    @property
+    def events(self) -> list[dict]:
+        return [ev for batch in self.batches for ev in batch]
+
+    def apply_events(self, events, **kw):
+        self.batches.append([dict(e) for e in events])
+        return self._inner.apply_events(events, **kw)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+@pytest.fixture
+def recording_backend(plane_backend):
+    return RecordingBackend(plane_backend)
 
 
 @pytest.fixture
@@ -185,7 +215,7 @@ def live_plane_url(monkeypatch):
     pointed at it — for tests that must exercise ``ControlPlaneClient.from_env()``
     itself (no ``store=``/injected-client escape hatch reaches ``from_env()`` by
     design — tokenops#118: no env var may select a local ledger). An in-process ASGI
-    app (``plane_app_factory``/``http_backend``) isn't reachable this way since
+    app (``plane_app_factory``/``plane_backend``) isn't reachable this way since
     ``from_env()`` builds its own plain ``httpx.Client(base_url=...)``.
     """
     pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
@@ -198,23 +228,3 @@ def live_plane_url(monkeypatch):
     monkeypatch.delenv("TOKENOPS_CONTROL_PLANE_URL", raising=False)
     yield plane.url
     plane.stop()
-
-
-@pytest.fixture(params=["fake", "http"])
-def any_backend(request):
-    """Parametrised over both backends — for the verified-fake contract suite.
-
-    The ``fake`` param always runs; the ``http`` param resolves ``plane_app_factory``
-    lazily, so it skips (not errors) when the real plane is not installed.
-    """
-    if request.param == "fake":
-        from fakes import FakeLedgerBackend
-
-        yield FakeLedgerBackend()
-        return
-    factory = request.getfixturevalue("plane_app_factory")
-    backend, client = _asgi_backend(factory())
-    try:
-        yield backend
-    finally:
-        client.close()
