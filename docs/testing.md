@@ -118,7 +118,7 @@ Two layers guard the SDK-to-plane wire format:
    ```
 
    CI runs it as a separate `schema-compat` job with `continue-on-error`, against both the
-   oldest plane the SDK claims to support (`v0.2.0`, per `pyproject.toml`) and `main`. It
+   oldest plane the SDK claims to support (`v0.2.2`, per `pyproject.toml`) and `main`. It
    can fail without blocking a merge: a failure means the plane is older than, or has
    diverged from, the SDK, which is worth knowing but is not an SDK bug.
 

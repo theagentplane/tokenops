@@ -28,11 +28,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # agentplane-control-plane 0.2.0 isn't on PyPI yet — install straight from
-          # the repo. The suite runs against a real in-process plane (no fake), and
-          # tokenops has no embedded ledger to fall back to (tokenops#118), so this is
-          # load-bearing, not optional coverage.
-          python -m pip install "agentplane-control-plane @ git+https://github.com/theagentplane/control-plane@main"
+          # The suite runs against a real in-process control plane (no fake), and tokenops
+          # has no embedded ledger to fall back to (tokenops#118), so it is load-bearing.
+          # The released plane comes from PyPI via the [contract] extra; plane `main` is
+          # checked separately, non-blockingly, by the schema-compat job below.
           python -m pip install -e ".[dev,contract]"
 
       - name: Ruff check
@@ -62,8 +61,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # oldest plane the SDK claims to support (pyproject: >=0.2.0), and current main
-        plane_ref: ["v0.2.0", "main"]
+        # oldest plane the SDK claims to support (pyproject: >=0.2.2), and current main
+        plane_ref: ["v0.2.2", "main"]
 
     steps:
       - uses: actions/checkout@v4

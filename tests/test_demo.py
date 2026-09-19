@@ -24,7 +24,7 @@ def test_demo_shows_the_governed_run_halting(tmp_path):
     """It runs standalone, spends, and stops itself. No API keys, no server to run
     yourself — it launches a real, throwaway control plane in-process (tokenops#118:
     no embedded ledger to fall back to instead)."""
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
+    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.2")
     env = dict(os.environ)
     # A user's shell has none of these. conftest sets SKIP_GOVERNANCE_SEED for the
     # suite; the demo seeds its own budget/policy via the plane's HTTP API regardless.

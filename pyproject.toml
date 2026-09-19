@@ -57,12 +57,11 @@ dev = [
   "types-PyYAML>=6.0",
 ]
 # The test suite runs against a real control plane in-process — there is no fake. It is
-# required for the tests (a missing install fails, it does not skip), but kept out of
-# `dev` while the 0.2.x line is not on PyPI. `make install` includes it. Otherwise:
-#   pip install -e ".[dev,contract]"      # once 0.2.x is released, or
-#   pip install "agentplane-control-plane @ git+https://github.com/theagentplane/control-plane@main"
+# required for the tests (a missing install fails, it does not skip). `make install`
+# includes it; otherwise `pip install -e ".[dev,contract]"`. 0.2.2 is the first release
+# that persists `step.compaction` (control-plane#18/#19).
 contract = [
-  "agentplane-control-plane>=0.2.0",
+  "agentplane-control-plane>=0.2.2",
 ]
 examples = [
   "ddgs>=9.0",

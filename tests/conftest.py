@@ -128,7 +128,7 @@ def plane_app_factory():
         import control_plane  # noqa: F401
     except ImportError:
         pytest.fail(
-            "agentplane-control-plane>=0.2.0 is required to run the tests: "
+            "agentplane-control-plane>=0.2.2 is required to run the tests: "
             'pip install -e ".[dev,contract]"',
             pytrace=False,
         )
@@ -218,7 +218,7 @@ def live_plane_url(monkeypatch):
     app (``plane_app_factory``/``plane_backend``) isn't reachable this way since
     ``from_env()`` builds its own plain ``httpx.Client(base_url=...)``.
     """
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
+    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.2")
     from tokenops.control.dev_plane import launch
 
     db = str(Path(tempfile.mkdtemp()) / "cp.db")

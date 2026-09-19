@@ -20,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Tests now run against the real control plane in-process instead of an in-memory
   `FakeLedgerBackend`, which is removed, so the SDK and plane can no longer drift.
-  `agentplane-control-plane` is a required test dependency (`make install` includes it).
+  `agentplane-control-plane` is a required test dependency (`make install` includes it),
+  and the `[contract]` floor is now `>=0.2.2`, the first release that persists
+  `step.compaction`. CI installs the released plane from PyPI instead of git `main`.
 - Added a non-blocking `schema-compat` CI job and `tests/compat/` that check the plane
   keeps every field the SDK sends; a blocking guard requires every `LedgerEvent` field to
   be enrolled (control-plane#18).
