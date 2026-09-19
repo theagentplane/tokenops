@@ -26,7 +26,12 @@ CASES = [(kind, f) for kind, ev in SAMPLES.items() for f in ev if f not in ENVEL
 
 
 def _send(backend, kind: str) -> dict:
-    """Apply the sample for *kind* (``complete`` needs an admit first)."""
+    """Apply the sample for *kind* (``complete`` needs an admit first).
+
+    The run is registered first: aggregates such as ``policy_stats`` are read off the run
+    record, which only exists for a registered run.
+    """
+    backend.register_run(intent="compat", run_id=SAMPLES[kind]["run_id"])
     if kind == "complete":
         backend.apply_events([SAMPLES["admit"]])
     ev = SAMPLES[kind]

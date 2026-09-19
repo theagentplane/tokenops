@@ -10,7 +10,8 @@ Shared by two suites:
   named after that field.
 
 An *observer* returns ``(expected, actual)`` for one field of one kind: what the SDK sent
-and what the plane now reports through a public read path.
+and what the plane now reports through a public read path (the precheck window, or
+the run record for aggregates).
 """
 
 from __future__ import annotations
@@ -103,6 +104,20 @@ def _inflight(backend: Any) -> int:
     return st.inflight.get(SEG, 0)
 
 
+def _compaction_stats(backend: Any, sent: dict[str, int]) -> dict[str, int] | None:
+    """The plane's per-run ``context_compaction`` aggregate, narrowed to the keys we sent.
+
+    One sample step means the sums equal the sample; ``calls`` is the plane's own counter.
+    Returns ``None`` when the plane has no ``policy_stats`` (older than 0.2.2).
+    """
+    try:
+        rec = backend._req("GET", f"/v1/run-records/{RUN}").json()
+    except Exception:  # run record absent: the plane kept nothing
+        return None
+    stats = (rec.get("policy_stats") or {}).get("context_compaction")
+    return None if stats is None else {k: stats.get(k) for k in sent}
+
+
 def _halt(backend: Any) -> Any:
     return backend.read_state(PrecheckRequest(run_id=RUN, want=["halt"]))
 
@@ -133,9 +148,14 @@ OBSERVERS: dict[tuple[str, str], Observer] = {
             "tags",
             "tool_signature",
             "result_hash",
-            "compaction",
         )
     },
+    # Not in the step window: the plane folds it into a per-run aggregate and exposes it
+    # as `policy_stats` on the run record (control-plane#18/#19, contract 0.2.2).
+    ("step", "compaction"): lambda b, ev: (
+        ev["compaction"],
+        _compaction_stats(b, ev["compaction"]),
+    ),
 }
 
 #: fields the plane accepts but exposes through no public read path. Listed so the gap is
