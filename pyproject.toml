@@ -56,13 +56,12 @@ dev = [
   "pre-commit>=4.0",
   "types-PyYAML>=6.0",
 ]
-# The verified-fake contract suite + e2e run against a real control plane in-process.
-# Not in `dev` because the 0.2.0 line is not on PyPI yet — the tests that need it
-# `pytest.importorskip("control_plane")`, so `[dev]` alone stays green. To run them:
-#   pip install -e ".[dev,contract]"      # once 0.2.0 is released, or
-#   pip install "agentplane-control-plane @ git+https://github.com/theagentplane/control-plane@main"
+# The test suite runs against a real control plane in-process — there is no fake. It is
+# required for the tests (a missing install fails, it does not skip). `make install`
+# includes it; otherwise `pip install -e ".[dev,contract]"`. 0.2.2 is the first release
+# that persists `step.compaction` (control-plane#18/#19).
 contract = [
-  "agentplane-control-plane>=0.2.0",
+  "agentplane-control-plane>=0.2.2",
 ]
 examples = [
   "ddgs>=9.0",
@@ -87,8 +86,11 @@ markers = [
   "     addopts) precisely so real run+policy regressions are caught.",
   "live: requires real API keys or vendored frameworks — self-skips without them,",
   "      excluded from the default run since it needs secrets to do anything.",
+  "compat: wire-schema compatibility against whatever control plane is installed.",
+  "        Excluded from the default run; CI runs it in a separate non-blocking job.",
+  "        `pytest -m compat tests/compat` (a later -m overrides the addopts one).",
 ]
-addopts = "-m 'not live'"
+addopts = "-m 'not live and not compat'"
 
 [tool.ruff]
 target-version = "py310"

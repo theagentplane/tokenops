@@ -375,12 +375,11 @@ def test_it_context_compaction_rewrites_messages_via_wrap():
     assert any(m.get("content") == "unique" for m in sent)
 
 
-def test_it_context_compaction_records_tokens_in_ledger_event():
+def test_it_context_compaction_records_tokens_in_ledger_event(recording_backend):
     """Compaction metadata (tokens_before / tokens_after / tokens_saved) flows through
-    wrap_complete → crossing hook → Observation → step event in the ledger."""
-    from fakes import FakeLedgerBackend
-
-    backend = FakeLedgerBackend()
+    wrap_complete → crossing hook → Observation → the step event the SDK sends. Asserts on
+    what was *sent*; whether the plane retains it is tests/compat."""
+    backend = recording_backend
     controls = ApplyControls()
     gov = Governor(Ledger(price=toy_price, backend=backend), controls)
     gov.register(*context_compaction.build(ctx_max=10))  # tiny ctx → always trips
@@ -400,12 +399,10 @@ def test_it_context_compaction_records_tokens_in_ledger_event():
 
     _with_scope(gov, attr, "r-cc-meta", run)
 
-    # Verify the step event in the backend carries compaction metadata
-    state = backend._run_state.get("r-cc-meta")
-    assert state is not None
-    recent = state["recent"]
-    assert len(recent) >= 1
-    llm_step = recent[-1]
+    # Verify the step event the SDK sent carries compaction metadata
+    steps = [e for e in backend.events if e["kind"] == "step" and e["run_id"] == "r-cc-meta"]
+    assert len(steps) >= 1
+    llm_step = steps[-1]
     assert llm_step.get("node_type") == "llm"
     comp = llm_step.get("compaction")
     assert comp is not None, "compaction metadata missing from step event"
