@@ -1,7 +1,11 @@
-# time_budget -- opt-in wall-clock ceiling
+# Time budget
 
-Code: `src/tokenops/control/policies/time_budget.py`
-Tests: `tests/test_time_budget.py`
+*Opt-in wall-clock ceiling.*
+
+**Policy ID:** [`time_budget`](../product/policies-index.md)
+
+Code: [`src/tokenops/control/policies/time_budget.py`](../../src/tokenops/control/policies/time_budget.py)
+Tests: [`tests/test_time_budget.py`](../../tests/test_time_budget.py)
 
 ---
 

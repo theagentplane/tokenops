@@ -70,6 +70,7 @@ class TraceEvent:
                     "parent_span_id",
                     "service",
                     "kind",
+                    "policy",
                     "severity",
                     "action",
                     "step",
@@ -140,6 +141,7 @@ class _LoggingPreviewControls(PreviewControls):
                 agent=self._agent,
                 run_id=action.run_id,
                 action=action.kind.value,
+                policy=action.policy_id,
                 reason=action.reason,
             )
         super().apply(action)
@@ -158,6 +160,7 @@ class _LoggingApplyControls(ApplyControls):
             agent=self._agent,
             run_id=action.run_id,
             action=action.kind.value,
+            policy=action.policy_id,
             reason=action.reason,
         )
         super().apply(action)
@@ -208,6 +211,7 @@ class _TraceGovernor(Governor):
                 sig.detector,
                 agent=self._agent,
                 run_id=sig.run_id,
+                policy=sig.detector,
                 severity=sig.severity.value,
                 reason=sig.reason,
             )

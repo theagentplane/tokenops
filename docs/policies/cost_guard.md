@@ -1,9 +1,13 @@
-# cost_guard — POC: instruction-based minimization
+# Cost guard
+
+*POC: instruction-based minimization.*
+
+**Policy ID:** [`cost_guard`](../product/policies-index.md)
 
 Companion to `halt.md`.
 
-Code: `tokenops-dev/src/tokenops/control/policies/cost_guard.py`
-Tests: `tokenops-dev/tests/test_cost_guard.py`
+Code: [`src/tokenops/control/policies/cost_guard.py`](../../src/tokenops/control/policies/cost_guard.py)
+Tests: [`tests/test_cost_guard.py`](../../tests/test_cost_guard.py)
 
 ---
 

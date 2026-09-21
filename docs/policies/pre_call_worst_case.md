@@ -1,9 +1,13 @@
-# pre_call_worst_case — preventive ceiling
+# Pre-call worst case
+
+*Preventive ceiling.*
+
+**Policy ID:** [`pre_call_worst_case`](../product/policies-index.md)
 
 Companion to `halt.md`. Default (preventive).
 
-Code: `tokenops-dev/src/tokenops/control/policies/pre_call_worst_case.py`
-Tests: `tokenops-dev/tests/test_pre_call_worst_case.py`
+Code: [`src/tokenops/control/policies/pre_call_worst_case.py`](../../src/tokenops/control/policies/pre_call_worst_case.py)
+Tests: [`tests/test_pre_call_worst_case.py`](../../tests/test_pre_call_worst_case.py)
 
 ---
 

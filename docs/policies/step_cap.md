@@ -1,9 +1,13 @@
-# step_cap — opt-in step ceiling
+# Step cap
 
-Companion to `halt.md`. Optional / opt-in (not a default).
+*Configurable step ceiling.*
 
-Code: `tokenops-dev/src/tokenops/control/policies/step_cap.py`
-Tests: `tokenops-dev/tests/test_step_cap.py`
+**Policy ID:** [`step_cap`](../product/policies-index.md)
+
+Companion to `halt.md`. Included in the default seed; custom configurations may omit it.
+
+Code: [`src/tokenops/control/policies/step_cap.py`](../../src/tokenops/control/policies/step_cap.py)
+Tests: [`tests/test_step_cap.py`](../../tests/test_step_cap.py)
 
 ---
 
@@ -27,7 +31,7 @@ Identical mechanism to `cost_budget` (see `halt.md`): `Signal(TRIP)` → `Action
 flag set before raise → sticky kill switch. The difference is purely the *trigger* (step
 count, not spend).
 
-## Why opt-in, not default
+## Choosing a step ceiling
 
 Step count is **task-dependent** — a legitimate research run may take 5 or 50 steps, so a
 fixed cap risks cutting off real work. Budget is the universal backstop; `step_cap` is for

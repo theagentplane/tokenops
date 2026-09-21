@@ -1,9 +1,13 @@
-# tool_output_cap — keep a giant tool payload out of context
+# Tool output cap
+
+*Keep a giant tool payload out of context.*
+
+**Policy ID:** [`tool_output_cap`](../product/policies-index.md)
 
 Companion to `halt.md`. Strong, always-on.
 
-Code: `tokenops-dev/src/tokenops/control/policies/tool_output_cap.py`
-Tests: `tokenops-dev/tests/test_tool_output_cap.py`
+Code: [`src/tokenops/control/policies/tool_output_cap.py`](../../src/tokenops/control/policies/tool_output_cap.py)
+Tests: [`tests/test_tool_output_cap.py`](../../tests/test_tool_output_cap.py)
 
 ---
 

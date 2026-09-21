@@ -205,8 +205,8 @@ def invoke(query: str) -> SearchResult:
 `instrument_app` installs the process-wide crossing hook (idempotent). You can also call
 `tokenops.init()` or `install_crossing_hook()` once at startup.
 
-`tool_freq` / `tool_output_cap` in the seed registry include `search` and `fetch`
-(`examples/config/triad.yaml`).
+The `tool_fix` registry includes `search` and `fetch`; `tool_output_cap` governs
+their payload sizes (`examples/config/triad.yaml`).
 
 ## Step 6 — Delegates: spans only (no parent cost rollup)
 
@@ -232,11 +232,12 @@ inspect (`status`, `halt_reason`, `cost_micros`).
 
 ## Governance seed (demo)
 
-`examples/config/triad.yaml` seeds:
+`examples/config/triad.yaml` seeds (see the [policy glossary](../product/policies-index.md)
+for canonical policy IDs):
 
 - **cost_budget** on `run_llm_cap` ($0.50 / run) — easier to trip than the $2 two-agent default
 - **step_cap** at 12 steps across the hoppy pipeline
-- **tool_freq** registry `[search, fetch]`
+- **tool_fix** registry `[search, fetch]`
 
 Reset / reseed:
 

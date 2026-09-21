@@ -1,9 +1,13 @@
-# context_compaction — keep the prompt lean and cache-friendly
+# Context compaction
+
+*Keep the prompt lean and cache-friendly.*
+
+**Policy ID:** [`context_compaction`](../product/policies-index.md)
 
 Companion to `halt.md`. Default; capability derived from controls.
 
-Code: `tokenops-dev/src/tokenops/control/policies/context_compaction.py`
-Tests: `tokenops-dev/tests/test_context_compaction.py`
+Code: [`src/tokenops/control/policies/context_compaction.py`](../../src/tokenops/control/policies/context_compaction.py)
+Tests: [`tests/test_context_compaction.py`](../../tests/test_context_compaction.py)
 
 ---
 

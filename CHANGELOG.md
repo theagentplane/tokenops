@@ -7,22 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Standardize built-in policy IDs and display labels through one template registry
+  and [policy glossary](docs/product/policies-index.md). Admin, Dashboard, and demo
+  traces/banners show canonical policy identities; YAML keys, policy class imports, seeded
+  `seed_<policy_id>` IDs, and user-configured instance IDs are unchanged
+  ([theagentplane/tokenops#53](https://github.com/theagentplane/tokenops/issues/53)).
+- `context_compaction` derives compaction capability from `controls.compaction_supported`
+  (set by `wrap_complete`) instead of a `has_hook` config flag. The flag is removed from
+  governance config — compaction works automatically when using `wrap_complete` (the
+  documented integration path). A one-time warning is logged when the policy degrades to
+  telemetry (no hook available).
+
 ### Fixed
 
+- Governance actions now carry optional `Action.policy_id` from the deciding
+  detector, so traces report exact policy names instead of guessing from reason
+  text. Standalone actions without an ID retain the legacy display fallback.
+- Correct the unsupported `tool_freq` catalog reference and stale `tool_reject`
+  Compose keys to `tool_fix`, without adding aliases or changing policy params.
+  Keep `trajectory_hint` explicitly known-but-disabled across config, UI, and docs;
+  existing instances can be disabled in Admin without changing their identity.
 - Carry cache-read and reasoning tokens from native SDK responses, bundled adapters,
   and flat agent steps into disjoint `Usage` buckets, avoiding double billing while
   retaining total prompt size for context-compaction trends. Flat dispatch/step
   input and output remain inclusive totals; direct `Usage` producers must exclude
   cached/reasoning subsets from input/output (#137, thanks @kevin-lozada-santos).
   Cache-write premiums and streaming usage remain outside this change.
-
-### Changed
-
-- `context_compaction` derives compaction capability from `controls.compaction_supported`
-  (set by `wrap_complete`) instead of a `has_hook` config flag. The flag is removed from
-  governance config — compaction works automatically when using `wrap_complete` (the
-  documented integration path). A one-time warning is logged when the policy degrades to
-  telemetry (no hook available).
 
 ## [0.3.0] - 2026-09-12
 
@@ -102,7 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two-tier model explicit ahead of the `LedgerBackend` rewire: this is the per-process
   Tier-1 cache, not the plane's authoritative `run_state`.
 - `Ledger.record` no longer writes a zero-delta spend row for non-priced crossings
-  (tool calls, un-rolled-up delegates) — a free crossing is a *step*, not spend. The
+  (tool calls, un-rolled-up delegates) — a free crossing is a _step_, not spend. The
   cost ledger only moves on priced events (#118).
 - **`tests/examples/` (`e2e`-marked) is now part of the default test run and CI**
   (`addopts` narrowed from `-m 'not e2e and not live'` to `-m 'not live'`). These are

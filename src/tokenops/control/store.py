@@ -59,9 +59,9 @@ def _locked(fn: _F) -> _F:
 
 
 def _known_policy_templates() -> frozenset[str]:
-    from tokenops.control.config import _TEMPLATES
+    from tokenops.control.config import policy_template_ids
 
-    return frozenset({*_TEMPLATES, "trajectory_hint"})
+    return frozenset(policy_template_ids(include_disabled=True))
 
 
 _SCHEMA = """
@@ -460,7 +460,7 @@ class Store:
                     params.setdefault("dimension", seg.dimension)
                     if seg.tag_key:
                         params.setdefault("tag_key", seg.tag_key)
-            # Not yet consumed by build_governor/_TEMPLATES — the Governor doesn't group
+            # Not yet consumed by build_governor — the Governor doesn't group
             # detectors by data_scope until the LedgerBackend rewire lands. Round-tripped
             # here now so a policy's configured scope isn't silently dropped in the interim.
             params["data_scope"] = pi.data_scope

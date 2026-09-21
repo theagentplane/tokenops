@@ -44,7 +44,7 @@ def make_fetch_tool(
     *,
     on_step: StepCallback | None = None,
 ) -> Callable[[str], core.SearchResult]:
-    """Fetch is a second tool seam (same corpus/search backend) for tool_reject demos."""
+    """Fetch is a second tool seam (same corpus/search backend) for tool_fix demos."""
 
     @boundary(
         "fetch",

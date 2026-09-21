@@ -63,6 +63,17 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
  
 **When a policy stops a run:** a stop halts spend and preserves state (cost so far, reason, snapshot). It never destroys the run. Resume is delegated and always deliberate. TokenOps provides the snapshot, and the runtime or a human decides whether to resume; never automatic.
 
+## 4. Policy names and action identity
+
+The [policy glossary](product/policies-index.md) defines canonical policy IDs, display
+labels, and module/doc naming. `tokenops.control.config.POLICY_TEMPLATES` is the public
+metadata registry used by the governor builder, Store, and UI. Display labels are
+presentation only, not alternate configuration names.
+
+For policy decisions, Governor carries `Signal.detector` on `Action.policy_id`.
+Governance events record that exact ID in `policy` rather than inferring identity from
+the reason. For manually constructed actions without `policy_id`, its determined using the reason-text.
+
 ## 5. Configuration & ops (v1 bench)
 
 | Concern | Where |

@@ -1,13 +1,13 @@
-"""step_cap — optional / opt-in. A step-count ceiling per run.
+"""step_cap — a configurable step-count ceiling per run.
 
 LLD row:
     Detect: steps(run) ≥ max_steps   (per recorded event; per run, not per period)
     Fix:    HALT. Good for predictable-trajectory workflows; in A2A the shared run sums
             both agents' steps.
 
-Not a default — step count is task-dependent, and budget is the universal backstop. Opt
-in when a workflow has a known, bounded trajectory and you want a cheap circuit breaker
-that does not depend on pricing.
+Included in the default seed; custom configs can omit it. Step count is task-dependent,
+and budget is the universal backstop. Use it when a workflow has a known, bounded
+trajectory and you want a cheap circuit breaker that does not depend on pricing.
 """
 
 from __future__ import annotations

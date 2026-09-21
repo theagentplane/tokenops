@@ -51,6 +51,12 @@ That couples attribution and governance mode to whatever the front-end chooses t
 
 ## 2. Standardize policy names
 
+**Status:** implemented — [single glossary](../product/policies-index.md), shared
+`POLICY_TEMPLATES` metadata for config/Store/UI, and exact policy IDs in governance
+traces. Supported config names and stored instance IDs are unchanged; unsupported
+`tool_freq` / `tool_reject` references now use `tool_fix`, without adding aliases.
+`trajectory_hint` remains temporarily disabled.
+
 **Area:** `src/tokenops/control/policies/*`, config YAML, Admin UI, docs
 
 ### Problem

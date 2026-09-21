@@ -21,7 +21,7 @@ this is what makes HALT sticky and idempotent across A2A.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
 from tokenops.control.core import (
@@ -84,6 +84,7 @@ class RaiseControls:
                 kind=ActionKind.HALT,
                 run_id=action.run_id,
                 reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
+                policy_id=action.policy_id,
             )
         )
 
@@ -216,7 +217,10 @@ class PreviewControls(ApplyControls):
 
 
 def policy_hint_from_reason(reason: str) -> str:
-    """Best-effort policy name for dashboard display."""
+    """Legacy display fallback for standalone actions without a policy ID.
+
+    Not an alias resolver: Governor actions carry their exact registered ID.
+    """
     r = reason.lower()
     if "worst-case" in r or "bounding to" in r or "output cap" in r:
         return "pre_call_worst_case"
@@ -237,7 +241,9 @@ def governance_events_payload(controls: ApplyControls | PreviewControls) -> list
         row: dict[str, Any] = {
             "kind": action.kind.value,
             "reason": action.reason,
-            "policy": policy_hint_from_reason(action.reason),
+            "policy": action.policy_id
+            if action.policy_id is not None
+            else policy_hint_from_reason(action.reason),
         }
         if action.inject_message:
             row["message"] = action.inject_message
@@ -336,7 +342,7 @@ class Governor:
                 policy = self._policy_by_name.get(sig.detector)
                 if policy is None:
                     continue  # a detector with no paired policy is observe-only telemetry
-                action = policy.decide(sig, self.ledger)
+                action = replace(policy.decide(sig, self.ledger), policy_id=sig.detector)
                 if action.kind is ActionKind.HALT and self.enforce:
                     # set the durable flag BEFORE applying, so the kill switch survives a
                     # swallowed raise. Idempotent — marking twice is harmless.

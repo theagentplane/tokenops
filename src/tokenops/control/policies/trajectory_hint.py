@@ -9,8 +9,10 @@ LLD row:
 Index writes are enqueued at run close and built by a background drain worker — not on the
 hot path.
 
-**Default: disabled.** Not in ``default.yaml`` or ``_TEMPLATES``; must pass ``enabled: true``
-explicitly (e.g. ``steering_trajectory`` bench preset). See ``docs/policies/trajectory_hint.md``.
+**Temporarily disabled:** ``POLICY_TEMPLATES`` retains the canonical ID, but
+``build_governor`` rejects it, including ``enabled: true``. Not in ``default.yaml``.
+The standalone builder below remains for research/tests; it does not re-enable
+configuration support. See ``docs/policies/trajectory_hint.md``.
 
 Bench learnings (Phase 1):
     - Short trajectories: ``min_index_steps`` skips inject when indexed path is too short to
