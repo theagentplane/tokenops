@@ -36,3 +36,4 @@ saved-config.yaml
 *.db
 *.db-wal
 *.db-shm
+uv.lock
