@@ -43,7 +43,9 @@ def test_boundary_emits_observation_when_governed(store):
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: Input(arguments={"name": "search", "args": {"query": q}}, messages=[]),
+        extract_input=lambda q: Input(
+            arguments={"name": "search", "args": {"query": q}}, messages=[]
+        ),
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}

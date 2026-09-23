@@ -35,7 +35,9 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: Input(arguments={"name": "search", "args": {"query": query}}, messages=[]),
+        extract_input=lambda query: Input(
+            arguments={"name": "search", "args": {"query": query}}, messages=[]
+        ),
     )
     def invoke(query: str) -> core.SearchResult:
         result = core.search(query, profile)

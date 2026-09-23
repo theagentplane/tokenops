@@ -240,7 +240,9 @@ with tab_trace:
                         "trace_id": env.trace_id,
                         "parent_envelope_id": env.parent_envelope_id,
                         "input": env.input.arguments if env.input else {},
-                        "completion": ((env.output.llm.text if env.output and env.output.llm else "") or "")[:200],
+                        "completion": (
+                            (env.output.llm.text if env.output and env.output.llm else "") or ""
+                        )[:200],
                     }
                 )
     else:

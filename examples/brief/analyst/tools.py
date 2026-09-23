@@ -17,7 +17,9 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: Input(arguments={"name": "search", "args": {"query": query}}, messages=[]),
+        extract_input=lambda query: Input(
+            arguments={"name": "search", "args": {"query": query}}, messages=[]
+        ),
     )
     def search_impl(query: str) -> dict:
         result = core.search(query, profile)
@@ -52,7 +54,9 @@ def make_fetch_tool(
     @boundary(
         "fetch",
         kind="tool",
-        extract_input=lambda query: Input(arguments={"name": "fetch", "args": {"query": query}}, messages=[]),
+        extract_input=lambda query: Input(
+            arguments={"name": "fetch", "args": {"query": query}}, messages=[]
+        ),
     )
     def fetch_impl(query: str) -> dict:
         result = core.search(query, profile)
