@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import chronicle.session as chronicle_session
 import pytest
-from chronicle import InputState, ReplayPlan, boundary, get_session
+from chronicle import Input, ReplayPlan, boundary, get_session
 from chronicle.session import SessionMode
 
 from conftest import toy_price
@@ -38,8 +38,8 @@ def test_chronicle_live_records_envelope():
 
     out = search("pricing")
     assert out["snippet"] == "pricing"
-    assert len(session.recorded_envelopes) == 1
-    assert session.recorded_envelopes[0].node_id == "search"
+    assert len(session.envelopes) == 1
+    assert session.envelopes[0].name == "search"
     chronicle_session.reset_session()
 
 
@@ -93,8 +93,8 @@ def test_boundary_tokenops_observe_when_governed(store):
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(
-            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        extract_input=lambda q: Input(
+            arguments={"name": "search", "args": {"query": q}}, messages=[]
         ),
     )
     def search(query: str) -> dict:

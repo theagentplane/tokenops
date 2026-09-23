@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-24
+
 ### Changed
 
 - Standardize built-in policy IDs and display labels through one template registry
@@ -19,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   governance config — compaction works automatically when using `wrap_complete` (the
   documented integration path). A one-time warning is logged when the policy degrades to
   telemetry (no hook available).
+- Chronicle schema 2.0: require `agent-chronicle>=0.5.0,<0.6`. The crossing hooks take `Input` (was `InputState`) and read `input.arguments`; `session.envelopes` replaces the `recorded_envelopes` patch (#149).
 
 ### Fixed
 

@@ -58,9 +58,9 @@ def test_wrap_complete_observes_via_crossing_hook_once():
 
     assert resp.content == "hello"
     assert len(calls) == 1
-    assert len(session.recorded_envelopes) == 1
-    assert session.recorded_envelopes[0].boundary_kind == "llm"
-    assert session.recorded_envelopes[0].node_id == "research.chat"
+    assert len(session.envelopes) == 1
+    assert session.envelopes[0].kind == "llm"
+    assert session.envelopes[0].name == "research.chat"
     llm_steps = [s for s in ledger.window("r-w4") if s.node_type == "llm"]
     assert len(llm_steps) == 1  # no double-billing
     assert llm_steps[0].boundary_id == "research.chat"
@@ -92,5 +92,5 @@ def test_wrap_complete_no_ledger_without_governance_scope():
     # No run_scope / governance binding — crossing hook no-ops for TokenOps ingest
     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
 
-    assert len(session.recorded_envelopes) == 1
+    assert len(session.envelopes) == 1
     assert ledger.step_count("r-bare") == 0

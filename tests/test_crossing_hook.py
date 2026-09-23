@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import chronicle.session as chronicle_session
-from chronicle import InputState, boundary, get_session
+from chronicle import Input, boundary, get_session
 from chronicle.session import ChronicleSession
 
 from conftest import toy_price
@@ -48,8 +48,8 @@ def test_on_crossing_noop_when_unbound():
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(
-            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        extract_input=lambda q: Input(
+            arguments={"name": "search", "args": {"query": q}}, messages=[]
         ),
     )
     def search(query: str) -> dict:
@@ -81,8 +81,8 @@ def test_on_crossing_observes_when_governed(tmp_path):
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: InputState(
-            messages=[], graph_state={"name": "search", "args": {"query": q}}
+        extract_input=lambda q: Input(
+            arguments={"name": "search", "args": {"query": q}}, messages=[]
         ),
     )
     def search(query: str) -> dict:

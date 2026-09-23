@@ -224,8 +224,8 @@ with tab_trace:
             env_rows.append(
                 {
                     "sequence": env.sequence,
-                    "boundary_id": env.node_id,
-                    "kind": env.boundary_kind,
+                    "boundary_id": env.name,
+                    "kind": env.kind,
                     "parent_envelope": (env.parent_envelope_id or "—")[:12],
                     "invocation": env.invocation_index,
                 }
@@ -233,14 +233,16 @@ with tab_trace:
         st.dataframe(pd.DataFrame(env_rows), use_container_width=True)
         with st.expander("Envelope detail"):
             for env in result.envelopes:
-                st.markdown(f"**{env.node_id}** (#{env.sequence})")
+                st.markdown(f"**{env.name}** (#{env.sequence})")
                 st.json(
                     {
                         "envelope_id": env.envelope_id,
                         "trace_id": env.trace_id,
                         "parent_envelope_id": env.parent_envelope_id,
-                        "input": env.input_state.graph_state if env.input_state else {},
-                        "completion": (env.action_result.completion or "")[:200],
+                        "input": env.input.arguments if env.input else {},
+                        "completion": (
+                            (env.output.llm.text if env.output and env.output.llm else "") or ""
+                        )[:200],
                     }
                 )
     else:

@@ -189,14 +189,12 @@ without changing the agent loop:
 ![boundary + crossing hook](assets/05-boundary-crossing.svg)
 
 ```python
-from chronicle import InputState, boundary
+from chronicle import Input, boundary
 
 @boundary(
     "search",
     kind="tool",
-    extract_input=lambda query: InputState(
-        messages=[], graph_state={"name": "search", "args": {"query": query}}
-    ),
+    extract_input=lambda query: Input(arguments={"name": "search", "args": {"query": query}}, messages=[]),
 )
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)

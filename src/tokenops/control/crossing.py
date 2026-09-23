@@ -15,7 +15,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Any
 
-from chronicle.envelope.schema import Envelope, InputState
+from chronicle import Input
 from chronicle.session import ChronicleSession, get_session
 
 # When wrap_complete / wrap_stream already run pre_call + admit, skip boundary pre_call
@@ -40,12 +40,10 @@ def _service_name() -> str:
     return span.service if span else "unknown"
 
 
-def _input_state_to_dict(input_state: InputState) -> dict[str, object]:
-    d: dict[str, object] = dict(input_state.graph_state)
-    if input_state.messages:
-        d["messages"] = input_state.messages
-    if input_state.system_prompt:
-        d["system_prompt"] = input_state.system_prompt
+def _input_state_to_dict(input: Input) -> dict[str, object]:
+    d: dict[str, object] = dict(input.arguments)
+    if input.messages:
+        d["messages"] = [m.model_dump() for m in input.messages]
     return d
 
 
@@ -59,7 +57,7 @@ def _estimate_input_tokens(state: dict[str, object]) -> int:
 def on_enter(
     boundary_id: str,
     kind: str,
-    input_state: InputState,
+    input: Input,
 ) -> dict[str, Any] | None:
     """LLM-kind pre_call: may Halt, or return kwargs patches (max_output / model)."""
     del boundary_id  # used for tracing only; attribution comes from run scope
@@ -79,7 +77,7 @@ def on_enter(
     if callable(begin):
         begin()
 
-    state = _input_state_to_dict(input_state)
+    state = _input_state_to_dict(input)
     provider = str(state.get("provider") or gov_ctx.provider or "")
     model = str(state.get("model") or gov_ctx.model or "")
     raw_cap = state.get("max_output_tokens")
@@ -117,9 +115,9 @@ def on_enter(
     return patch or None
 
 
-def on_leave(boundary_id: str, kind: str, input_state: InputState) -> None:
+def on_leave(boundary_id: str, kind: str, input: Input) -> None:
     """Release inflight admit from :func:`on_enter` (success or failure)."""
-    del boundary_id, kind, input_state
+    del boundary_id, kind, input
     from tokenops.control.context import current_governance
 
     seg = _inflight_seg.get()
@@ -136,7 +134,7 @@ def on_leave(boundary_id: str, kind: str, input_state: InputState) -> None:
 def on_crossing(
     boundary_id: str,
     kind: str,
-    input_state: InputState,
+    input: Input,
     result: Any,
 ) -> None:
     """Project crossing → Observation when registration + governance are bound."""
@@ -146,7 +144,7 @@ def on_crossing(
     if current_governance() is None or current_registration() is None:
         return
     gov = current_governance()
-    state = _input_state_to_dict(input_state)
+    state = _input_state_to_dict(input)
     # Prefer provider/model from the crossing (e.g. wrap_llm dispatch args) so
     # MUTATE model overrides price correctly; fall back to bound governance.
     provider = str(state.get("provider") or (gov.provider if gov else "") or "")
@@ -173,18 +171,6 @@ def on_crossing(
     emit_observation(obs)
 
 
-def _ensure_recorded_envelopes_alias() -> None:
-    """Expose read-only ``recorded_envelopes`` (upstream keeps a private list)."""
-    if hasattr(ChronicleSession, "recorded_envelopes"):
-        return
-
-    @property  # type: ignore[misc]
-    def recorded_envelopes(self) -> list[Envelope]:
-        return list(self._recorded_envelopes)
-
-    ChronicleSession.recorded_envelopes = recorded_envelopes  # type: ignore[attr-defined]
-
-
 def _attach(session: ChronicleSession) -> ChronicleSession:
     session.on_crossing = on_crossing
     session.on_enter = on_enter
@@ -203,7 +189,6 @@ def install_crossing_hook() -> None:
     import chronicle as chronicle_pkg
     import chronicle.session as session_mod
 
-    _ensure_recorded_envelopes_alias()
     _attach(get_session())
 
     current = session_mod.reset_session

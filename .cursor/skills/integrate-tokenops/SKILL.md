@@ -224,12 +224,11 @@ Model calls are covered by `wrap_complete`. Tool calls need a Chronicle
 boundary, which the crossing hook turns into a ledger observation:
 
 ```python
-from chronicle import InputState, boundary
+from chronicle import Input, boundary
 from tokenops.control import install_crossing_hook
 
 @boundary("search", kind="tool",
-          extract_input=lambda q: InputState(
-              messages=[], graph_state={"name": "search", "args": {"query": q}}))
+          extract_input=lambda q: Input(arguments={"name": "search", "args": {"query": q}}, messages=[]))
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
 

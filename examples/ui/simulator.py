@@ -264,8 +264,8 @@ def _envelope_row(env: Envelope, *, service: str) -> dict[str, Any]:
         "envelope_id": env.envelope_id[:8] + "…",
         "trace_id": env.trace_id[:8] + "…",
         "parent": (env.parent_envelope_id or "")[:8] + ("…" if env.parent_envelope_id else ""),
-        "boundary_id": env.node_id,
-        "kind": env.boundary_kind,
+        "boundary_id": env.name,
+        "kind": env.kind,
         "sequence": env.sequence,
         "invocation": env.invocation_index,
         "service": service,
@@ -515,13 +515,13 @@ def run_simulation(
             )
 
     assert reg is not None
-    for env in session.recorded_envelopes:
-        svc = "research" if env.node_id == "search" else "research"
+    for env in session.envelopes:
+        svc = "research" if env.name == "search" else "research"
         log.emit(
             "chronicle",
-            f"{env.boundary_kind} envelope",
+            f"{env.kind} envelope",
             agent=svc,
-            boundary_id=env.node_id,
+            boundary_id=env.name,
             envelope_id=env.envelope_id,
             parent_envelope_id=env.parent_envelope_id,
             sequence=env.sequence,
@@ -546,7 +546,7 @@ def run_simulation(
         steps=steps,
         token_usage=token_usage,
         events=log.events,
-        envelopes=list(session.recorded_envelopes),
+        envelopes=list(session.envelopes),
         research_window=research_window,
         summarize_window=summarize_window,
         research_cost_micros=research_gov.ledger.cost_micros(run_id),
@@ -590,7 +590,7 @@ def envelope_rows(envelopes: list[Envelope]) -> list[dict[str, Any]]:
     """Flat rows for span/envelope tables."""
     rows = []
     for env in envelopes:
-        svc = "research" if env.node_id == "search" else "unknown"
+        svc = "research" if env.name == "search" else "unknown"
         rows.append(_envelope_row(env, service=svc))
     return rows
 

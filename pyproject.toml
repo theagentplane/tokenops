@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tokenops"
-version = "0.3.0"
+version = "0.4.0"
 description = "TokenOps control plane and SDK for run-aware agent token governance"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,7 +34,7 @@ classifiers = [
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-  "agent-chronicle>=0.3.0",
+  "agent-chronicle>=0.5.0,<0.6",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",

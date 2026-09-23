@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 from dataclasses import replace
 
-from chronicle import InputState, boundary
+from chronicle import Input, boundary
 
 from examples.agents.research import prompts
 from examples.agents.research.tools import core
@@ -35,8 +35,8 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: InputState(
-            messages=[], graph_state={"name": "search", "args": {"query": query}}
+        extract_input=lambda query: Input(
+            arguments={"name": "search", "args": {"query": query}}, messages=[]
         ),
     )
     def invoke(query: str) -> core.SearchResult:
