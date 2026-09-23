@@ -50,7 +50,7 @@ __all__ = [
 #: Cost in micro-US-dollars. ``$1.00 == 1_000_000``. Integer math avoids float drift.
 Micros = int
 
-#: Chronicle boundary_kind, LLD vocabulary. Not "model"/"delegation" — these literals.
+#: Chronicle kind, LLD vocabulary. Not "model"/"delegation" — these literals.
 NodeType = Literal["llm", "tool", "delegate"]
 
 

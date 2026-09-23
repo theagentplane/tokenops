@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Chronicle schema 2.0: require `agent-chronicle>=0.5.0,<0.6`. The crossing hooks take `Input` (was `InputState`) and read `input.arguments`; `session.envelopes` replaces the `recorded_envelopes` patch (#149).
+
 - `context_compaction` derives compaction capability from `controls.compaction_supported`
   (set by `wrap_complete`) instead of a `has_hook` config flag. The flag is removed from
   governance config — compaction works automatically when using `wrap_complete` (the

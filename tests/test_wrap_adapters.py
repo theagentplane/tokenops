@@ -56,8 +56,8 @@ def test_openai_shaped_dispatch_with_wrap_complete_and_chronicle():
             out = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "goal"}])
 
     assert out.content == "plan: ok"
-    assert len(session.recorded_envelopes) == 1
-    assert session.recorded_envelopes[0].boundary_kind == "llm"
+    assert len(session.envelopes) == 1
+    assert session.envelopes[0].kind == "llm"
     assert len([s for s in ledger.window("r-oai") if s.node_type == "llm"]) == 1
 
 
@@ -103,7 +103,7 @@ def test_langchain_governed_chat_model_with_wrap_complete():
             result = llm.invoke([HumanMessage(content="write it")])
 
     assert result.content == "lc answer"
-    assert len(session.recorded_envelopes) == 1
-    assert session.recorded_envelopes[0].node_id == "writer.chat"
+    assert len(session.envelopes) == 1
+    assert session.envelopes[0].name == "writer.chat"
     llm_steps = [s for s in ledger.window("r-lc") if s.node_type == "llm"]
     assert len(llm_steps) == 1  # GovernedChatModel → wrap_complete → wrap_llm, once
