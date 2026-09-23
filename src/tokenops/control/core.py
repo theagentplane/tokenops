@@ -220,7 +220,12 @@ class ActionKind(str, Enum):
 @dataclass(frozen=True, kw_only=True)
 class Action:
     """The decision applied to a run. One flat dataclass for every kind so the OUT
-    connector stays a single polymorphic ``apply(action)``; unused payloads are ``None``."""
+    connector stays a single polymorphic ``apply(action)``; unused payloads are ``None``.
+
+    ``policy_id`` is the deciding template's canonical ID, not a configured instance ID.
+    The Governor sets it from the routed signal; standalone actions may omit it.
+    Attribution does not change decision equality or hashing.
+    """
 
     kind: ActionKind
     run_id: str
@@ -235,6 +240,7 @@ class Action:
     compact: bool = False
     # REJECT / QUEUE payload
     retry_after_s: float | None = None
+    policy_id: str | None = field(default=None, compare=False)
 
 
 class Halt(BaseException):

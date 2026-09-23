@@ -1,9 +1,13 @@
-# output_runaway — heals, never halts
+# Output runaway
+
+*Heals, never halts.*
+
+**Policy ID:** [`output_runaway`](../product/policies-index.md)
 
 Companion to `halt.md`. Default.
 
-Code: `tokenops-dev/src/tokenops/control/policies/output_runaway.py`
-Tests: `tokenops-dev/tests/test_output_runaway.py`
+Code: [`src/tokenops/control/policies/output_runaway.py`](../../src/tokenops/control/policies/output_runaway.py)
+Tests: [`tests/test_output_runaway.py`](../../tests/test_output_runaway.py)
 
 ---
 

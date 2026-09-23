@@ -1,9 +1,13 @@
-# tool_fix — cheap defensive check for hallucinated tool calls
+# Tool fix
+
+*Cheap defensive check for hallucinated tool calls.*
+
+**Policy ID:** [`tool_fix`](../product/policies-index.md)
 
 Companion to `halt.md`.
 
-Code: `tokenops-dev/src/tokenops/control/policies/tool_fix.py`
-Tests: `tokenops-dev/tests/test_tool_fix.py`
+Code: [`src/tokenops/control/policies/tool_fix.py`](../../src/tokenops/control/policies/tool_fix.py)
+Tests: [`tests/test_tool_fix.py`](../../tests/test_tool_fix.py)
 
 ---
 

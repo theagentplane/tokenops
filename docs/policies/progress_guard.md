@@ -1,9 +1,13 @@
-# progress_guard — the last-resort unstick
+# Progress guard
+
+*The last-resort unstick.*
+
+**Policy ID:** [`progress_guard`](../product/policies-index.md)
 
 Companion to `halt.md`. Default.
 
-Code: `tokenops-dev/src/tokenops/control/policies/progress_guard.py`
-Tests: `tokenops-dev/tests/test_progress_guard.py`
+Code: [`src/tokenops/control/policies/progress_guard.py`](../../src/tokenops/control/policies/progress_guard.py)
+Tests: [`tests/test_progress_guard.py`](../../tests/test_progress_guard.py)
 
 ---
 

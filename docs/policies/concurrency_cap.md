@@ -1,9 +1,13 @@
-# concurrency_cap — infra shield (not a cost lever)
+# Concurrency cap
+
+*Infra shield (not a cost lever).*
+
+**Policy ID:** [`concurrency_cap`](../product/policies-index.md)
 
 Companion to `halt.md`.
 
-Code: `tokenops-dev/src/tokenops/control/policies/concurrency_cap.py`
-Tests: `tokenops-dev/tests/test_concurrency_cap.py`
+Code: [`src/tokenops/control/policies/concurrency_cap.py`](../../src/tokenops/control/policies/concurrency_cap.py)
+Tests: [`tests/test_concurrency_cap.py`](../../tests/test_concurrency_cap.py)
 
 ---
 

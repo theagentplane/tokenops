@@ -86,6 +86,9 @@ class PolicyInstance:
     """One configured policy = a template + params, optionally scoped to an agent and
     attached to a budget and/or segment.
 
+    ``template`` is the canonical policy ID (the YAML key); ``id`` identifies this
+    stored configuration, such as ``seed_cost_budget`` or a user-chosen ID.
+
     ``data_scope`` says which tier its detector reads: ``local`` (Tier-1
     ``LocalRunState`` cache, no round trip) or ``global`` (the plane's authoritative
     `run_state`/spend via `precheck`, needed for anything that must be correct across
@@ -93,7 +96,7 @@ class PolicyInstance:
     call needs at most one `precheck` regardless of how many `global` policies it has."""
 
     id: str
-    template: str  # a key of control.config._TEMPLATES
+    template: str  # a key of control.config.POLICY_TEMPLATES
     params: dict[str, Any] = field(default_factory=dict)
     agent: str | None = None  # None = applies to every agent
     budget_id: str | None = None

@@ -3,14 +3,9 @@
 The Account (ledger) + Enforce (policies) half of the control plane. Consumes
 attributed boundary crossings, records them, and decides: steer or stop.
 
-Ten policies (delegation_cap dropped — fan-out is concurrency_cap, spend is
-cost_budget / pre_call_worst_case), evaluated by moment:
-  pre_call : concurrency_cap, tool_fix, context_compaction, cost_guard, pre_call_worst_case
-  stream   : output_runaway
-  observe  : cost_budget, step_cap, tool_output_cap, progress_guard
-
-Source of truth: docs/policies/ and docs/governance-policy.md. ``core.py`` is the
-canonical vocabulary.
+Built-in IDs and display labels live in ``config.POLICY_TEMPLATES``; see the single
+glossary at ``docs/product/policies-index.md`` and behavior docs at ``docs/policies/``.
+``core.py`` is the canonical runtime vocabulary.
 """
 
 from tokenops.control.attribution import (

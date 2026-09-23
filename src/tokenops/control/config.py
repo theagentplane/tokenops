@@ -29,10 +29,12 @@ parameter raises at build time — never silently skipped.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from tokenops.control.core import Detector, Policy
 from tokenops.control.engine import AgentControls, ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import Budget, Ledger, PriceFn
 from tokenops.control.ledger_backend import LedgerBackend
@@ -71,48 +73,137 @@ class _Ctx:
             ) from None
 
 
-# Each adapter: (params, ctx) -> (Detector, Policy). Keeps build() signatures local to the
-# policy module while the config stays uniform.
-_TEMPLATES = {
-    "cost_budget": lambda p, c: cost_budget.build(c.budget(p["budget"])),
-    "pre_call_worst_case": lambda p, c: pre_call_worst_case.build(
-        c.budget(p["budget"]), c.price, default_max_output=p.get("default_max_output", 1024)
-    ),
-    "step_cap": lambda p, c: step_cap.build(p["max_steps"]),
-    "time_budget": lambda p, c: time_budget.build(p["max_seconds"]),
-    "concurrency_cap": lambda p, c: concurrency_cap.build(
-        p["max_concurrent"],
-        dimension=p.get("dimension", "run"),
-        tag_key=p.get("tag_key"),
-        mode=p.get("mode", "reject"),
-        retry_after_s=p.get("retry_after_s", 1.0),
-    ),
-    "tool_fix": lambda p, c: tool_fix.build(p["registry"], schema=p.get("schema"), k=p.get("k", 3)),
-    "tool_output_cap": lambda p, c: tool_output_cap.build(p.get("cap_tokens", 8000)),
-    "progress_guard": lambda p, c: progress_guard.build(
-        window=p.get("window", 6),
-        repeats=p.get("repeats", 3),
-        max_corrections=p.get("max_corrections", 2),
-        simhash_threshold=p.get("simhash_threshold", 4),
-    ),
-    "cost_guard": lambda p, c: cost_guard.build(
-        c.budget(p["budget"]),
-        threshold=p.get("threshold", 0.8),
-        mode=p.get("mode", "minimize"),
-        downgrade_to=p.get("downgrade_to"),
-        velocity_micros_per_step=p.get("velocity_micros_per_step"),
-        velocity_m=p.get("velocity_m", 5),
-    ),
-    "context_compaction": lambda p, c: context_compaction.build(
-        p["ctx_max"], window=p.get("window", 4)
-    ),
-    "output_runaway": lambda p, c: output_runaway.build(
-        n=p.get("n", 3),
-        repeats=p.get("repeats", 4),
-        domination=p.get("domination", 0.5),
-        max_retries=p.get("max_retries", 2),
-    ),
-}
+_Factory = Callable[[Mapping[str, Any], _Ctx], tuple[Detector, Policy]]
+
+
+@dataclass(frozen=True)
+class PolicyTemplate:
+    """Metadata keyed by the canonical policy ID, shared by config, Store, and UI.
+
+    ``default_params`` are Admin form examples, not implicit runtime configuration.
+    A missing ``factory`` marks a known but unavailable template; stored instances may
+    retain its ID, but ``build_governor`` must reject it.
+    """
+
+    display_name: str
+    factory: _Factory | None
+    default_params: Mapping[str, Any] = field(default_factory=dict)
+    requires_budget: bool = False
+    disabled_reason: str | None = None
+
+
+# ID = module stem = Detector.name = Policy.name = YAML key = docs/policies/<id>.md.
+# Display names are labels, never aliases accepted by the config loader.
+POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
+    {
+        "cost_budget": PolicyTemplate(
+            display_name="Cost budget",
+            factory=lambda p, c: cost_budget.build(c.budget(p["budget"])),
+            requires_budget=True,
+        ),
+        "pre_call_worst_case": PolicyTemplate(
+            display_name="Pre-call worst case",
+            factory=lambda p, c: pre_call_worst_case.build(
+                c.budget(p["budget"]), c.price, default_max_output=p.get("default_max_output", 1024)
+            ),
+            default_params={"default_max_output": 1024},
+            requires_budget=True,
+        ),
+        "step_cap": PolicyTemplate(
+            display_name="Step cap",
+            factory=lambda p, c: step_cap.build(p["max_steps"]),
+            default_params={"max_steps": 20},
+        ),
+        "time_budget": PolicyTemplate(
+            display_name="Time budget",
+            factory=lambda p, c: time_budget.build(p["max_seconds"]),
+            default_params={"max_seconds": 60.0},
+        ),
+        "concurrency_cap": PolicyTemplate(
+            display_name="Concurrency cap",
+            factory=lambda p, c: concurrency_cap.build(
+                p["max_concurrent"],
+                dimension=p.get("dimension", "run"),
+                tag_key=p.get("tag_key"),
+                mode=p.get("mode", "reject"),
+                retry_after_s=p.get("retry_after_s", 1.0),
+            ),
+            default_params={"max_concurrent": 4, "mode": "reject"},
+        ),
+        "tool_fix": PolicyTemplate(
+            display_name="Tool fix",
+            factory=lambda p, c: tool_fix.build(
+                p["registry"], schema=p.get("schema"), k=p.get("k", 3)
+            ),
+            default_params={"registry": ["search"], "k": 3},
+        ),
+        "tool_output_cap": PolicyTemplate(
+            display_name="Tool output cap",
+            factory=lambda p, c: tool_output_cap.build(p.get("cap_tokens", 8000)),
+            default_params={"cap_tokens": 8000},
+        ),
+        "progress_guard": PolicyTemplate(
+            display_name="Progress guard",
+            factory=lambda p, c: progress_guard.build(
+                window=p.get("window", 6),
+                repeats=p.get("repeats", 3),
+                max_corrections=p.get("max_corrections", 2),
+                simhash_threshold=p.get("simhash_threshold", 4),
+            ),
+            default_params={"window": 6, "repeats": 3, "max_corrections": 2},
+        ),
+        "cost_guard": PolicyTemplate(
+            display_name="Cost guard",
+            factory=lambda p, c: cost_guard.build(
+                c.budget(p["budget"]),
+                threshold=p.get("threshold", 0.8),
+                mode=p.get("mode", "minimize"),
+                downgrade_to=p.get("downgrade_to"),
+                velocity_micros_per_step=p.get("velocity_micros_per_step"),
+                velocity_m=p.get("velocity_m", 5),
+            ),
+            default_params={"threshold": 0.8, "mode": "minimize"},
+            requires_budget=True,
+        ),
+        "context_compaction": PolicyTemplate(
+            display_name="Context compaction",
+            factory=lambda p, c: context_compaction.build(p["ctx_max"], window=p.get("window", 4)),
+            default_params={"ctx_max": 100000},
+        ),
+        "output_runaway": PolicyTemplate(
+            display_name="Output runaway",
+            factory=lambda p, c: output_runaway.build(
+                n=p.get("n", 3),
+                repeats=p.get("repeats", 4),
+                domination=p.get("domination", 0.5),
+                max_retries=p.get("max_retries", 2),
+            ),
+            default_params={"repeats": 4, "max_retries": 2},
+        ),
+        # Re-enable only with persistent plane-side trajectory routes and quality gates.
+        # The standalone policy module remains available for research/tests.
+        "trajectory_hint": PolicyTemplate(
+            display_name="Trajectory hint",
+            factory=None,
+            disabled_reason=(
+                "trajectory_hint is temporarily disabled (remote-only control-plane work); "
+                "remove it from your governance config. See "
+                "docs/policies/trajectory_hint.md and config.build_governor for details."
+            ),
+        ),
+    }
+)
+
+
+def policy_template_ids(*, include_disabled: bool = False) -> tuple[str, ...]:
+    """Canonical built-in IDs, sorted for display; never include spelling aliases."""
+    return tuple(
+        sorted(
+            name
+            for name, template in POLICY_TEMPLATES.items()
+            if include_disabled or template.factory is not None
+        )
+    )
 
 
 def parse_budgets(specs) -> dict[str, Budget]:
@@ -154,30 +245,17 @@ def build_governor(
     ctx = _Ctx(budgets=budgets, price=price)
 
     for name, params in (gov_cfg.get("policies") or {}).items():
-        if name not in _TEMPLATES and name != "trajectory_hint":
-            raise ValueError(f"unknown policy {name!r}; known: {sorted(_TEMPLATES)}")
-        if name == "trajectory_hint":
-            # TEMPORARILY DISABLED as part of the remote-only control-plane work
-            # (scratch/remote-only-control-plane-plan.md, Part 9). trajectory_hint is the
-            # only cross-run policy: it needs a persistent index that HttpStore currently
-            # no-ops, and its Phase-1 quality gates are known-insufficient
-            # (docs/policies/trajectory_hint.md). Rather than ship it silently inert
-            # against the HTTP plane, refuse to build it. The policy + trajectory/*
-            # package are left intact — re-enable once the plane grows real
-            # trajectory snapshot/index routes and a quality gate. See TokenOps #113/#114
-            # tracking and docs/policies/trajectory_hint.md "Phase 2".
-            #
-            # Original wiring, restore when re-enabling:
-            #   if store is None:
-            #       raise ValueError("trajectory_hint requires store=... in build_governor")
-            #   from tokenops.control.policies.trajectory_hint import build as build_trajectory_hint
-            #   detector, policy = build_trajectory_hint(store, **(params or {}))
+        template = POLICY_TEMPLATES.get(name)
+        if template is None:
+            raise ValueError(f"unknown policy {name!r}; known: {list(policy_template_ids())}")
+        if template.factory is None:
+            raise ValueError(template.disabled_reason or f"policy {name!r} is unavailable")
+        detector, policy = template.factory(params or {}, ctx)
+        if detector.name != name or policy.name != name:
             raise ValueError(
-                "trajectory_hint is temporarily disabled (remote-only control-plane work); "
-                "remove it from your governance config. See "
-                "docs/policies/trajectory_hint.md and config.build_governor for details."
+                f"policy template {name!r} built detector/policy names "
+                f"{detector.name!r}/{policy.name!r}; both must match the config key"
             )
-        detector, policy = _TEMPLATES[name](params or {}, ctx)
         governor.register(detector, policy)
 
     return governor

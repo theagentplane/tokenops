@@ -3,9 +3,9 @@
 Companion to the policies LLD. Covers what HALT actually *does* to a running agent,
 why it does not interrupt an in-flight call, and exactly how someone resumes the work.
 
-Code: `tokenops-dev/src/tokenops/control/engine.py` (Governor, RaiseControls),
-`tokenops-dev/src/tokenops/control/ledger.py` (halted flag, window),
-`tokenops-dev/src/tokenops/control/policies/cost_budget.py` (the canonical HALT producer).
+Code: [`src/tokenops/control/engine.py`](../src/tokenops/control/engine.py) (Governor, RaiseControls),
+[`src/tokenops/control/ledger.py`](../src/tokenops/control/ledger.py) (halted flag, window),
+[`src/tokenops/control/policies/cost_budget.py`](../src/tokenops/control/policies/cost_budget.py) (the canonical HALT producer).
 
 ---
 

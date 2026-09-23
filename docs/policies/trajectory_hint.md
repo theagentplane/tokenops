@@ -1,20 +1,27 @@
-# trajectory_hint — warm-start INJECT from prior successful runs
+# Trajectory hint
+
+*Warm-start INJECT from prior successful runs.*
+
+**Policy ID:** [`trajectory_hint`](../product/policies-index.md)
 
 > **⛔ TEMPORARILY DISABLED (remote-only control-plane work).**
 > `config.build_governor` now *refuses* a config that contains `trajectory_hint`.
 > It is the only cross-run policy — it needs a persistent index the HTTP plane does
 > not yet serve (`HttpStore` no-ops the three trajectory methods), and its Phase-1
 > quality gates are known-insufficient (see Learnings below). The policy code and the
-> `tokenops.control.trajectory/*` package are left intact. Re-enable once the plane
-> grows real trajectory snapshot/index routes **and** a quality gate: restore the
-> build branch in `config.build_governor`, the `steering_trajectory` bench preset, and
-> the skipped tests (`test_trajectory_hint*.py`).
+> `tokenops.control.trajectory/*` package are left intact. Re-enabling requires real
+> trajectory snapshot/index routes **and** a quality gate, plus coordinated changes
+> to `config.POLICY_TEMPLATES`, the governor build path, the `steering_trajectory`
+> bench preset, and the skipped tests (`test_trajectory_hint*.py`).
 
-Companion to `halt.md`. **Opt-in — disabled by default.**
+Companion to `halt.md`. **Temporarily disabled — cannot be enabled through configuration.**
 
-Code: ``src/tokenops/control/policies/trajectory_hint.py``
-Tests: ``tests/test_trajectory_hint.py``
-Bench: ``benchmarking/browseruse/run_trajectory_hint_bench.py``
+Code: [`src/tokenops/control/policies/trajectory_hint.py`](../../src/tokenops/control/policies/trajectory_hint.py)
+Tests: [`tests/test_trajectory_hint.py`](../../tests/test_trajectory_hint.py)
+Bench: [`benchmarking/browseruse/run_trajectory_hint_bench.py`](../../benchmarking/browseruse/run_trajectory_hint_bench.py)
+
+The sections below describe the retained Phase 1 design and historical experiments,
+not a currently supported configuration.
 
 ---
 
@@ -27,8 +34,8 @@ compressed playbook — tool order, cost, pitfalls — as a final user turn. Nev
 Index rows are built **in the background** after run close (enqueue on the response path,
 compress in a daemon drain worker).
 
-**Not in ``default.yaml``.** ``build()`` defaults ``enabled: false``; enable only when you
-have a Store and accept Phase 1 limitations below.
+**Not in ``default.yaml``.** The configuration below is a historical reference, not a
+supported opt-in: ``build_governor`` rejects ``trajectory_hint`` even with ``enabled: false``.
 
 ## Detect (formula)
 
@@ -78,11 +85,14 @@ trajectories rarely benefit from hint overhead.
 | ``sequence_plus_pitfalls`` | ≤ ``sequence_plus_pitfalls_max_steps`` (12) | path + brief pitfalls |
 | ``full`` | > 12 | path + step summary + pitfalls |
 
-## Config (all required when enabled)
+## Historical config (currently rejected)
+
+Omit `trajectory_hint` from `governance.policies` in shipped configurations.
+This reference block is rejected even with `enabled: false`; it is not an enablement recipe.
 
 ```yaml
 trajectory_hint:
-  enabled: false              # opt-in — must be true to activate
+  enabled: false              # historical opt-in flag; config currently rejected
   scope_dims: [intent, agent]
   max_age_days: 30            # mandatory
   max_entries_per_scope: 500
@@ -95,10 +105,10 @@ trajectory_hint:
   hint_max_chars: 1600
 ```
 
-Requires ``store=`` in ``build_governor``.
+Before disablement, this configuration required ``store=`` in ``build_governor``.
 
-Enable for browser-use benches via ``tokenops_config_steering_trajectory`` (sets
-``enabled: true``).
+The ``tokenops_config_steering_trajectory`` benchmark preset is also temporarily disabled
+and raises ``NotImplementedError``; use ``steering`` for live benchmarks.
 
 ## Learnings (live bench, Phase 1)
 
@@ -144,12 +154,14 @@ thrashing, not speed.
 
 ### Bench hygiene — rate limits
 
-Back-to-back browser runs exhaust OpenAI TPM (429s). Use
-``run_trajectory_hint_bench.py --pause-seconds 90`` (or 120 for heavy scenarios). Default is
-90s between all phases (seed → matrix → cost).
+Historical runs used ``run_trajectory_hint_bench.py --pause-seconds 90`` (or 120 for heavy
+scenarios) to avoid OpenAI TPM limits (429s). The default is 90s between all phases
+(seed → matrix → cost). This bench cannot exercise hints while ``trajectory_hint`` is disabled.
 
 ## Status
 
-✅ Phase 1 implemented (lookup, inject, background index, ``min_index_steps``, tiered hint).
+⛔ Temporarily disabled in ``build_governor`` and the browser-use benchmark preset.
+
+✅ Phase 1 implementation retained (lookup, inject, background index, ``min_index_steps``, tiered hint).
 
 ⏳ Phase 2 deferred: quality gate, constraint-aware indexing, reliable cost savings proof.

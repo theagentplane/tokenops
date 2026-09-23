@@ -7,8 +7,10 @@ from typing import Any, Literal
 
 from examples.app_config import AgentServerConfig
 from examples.ui.simulator import SimulationResult, run_simulation
+from tokenops.control.engine import halt_detector_from_events
 from tokenops.control.models import BudgetSpec, GovernanceMode, PolicyInstance
 from tokenops.control.store import Store
+from tokenops.ui.policy_labels import policy_label
 
 ChipId = Literal["cost_cap", "cost_guard"]
 
@@ -36,7 +38,7 @@ CHIPS: tuple[DemoChip, ...] = (
         prompt="Compare five enterprise SaaS pricing pages in full detail.",
         label="Compare five enterprise SaaS pricing pages in full detail.",
         budget_micros=100,
-        blurb="Hard stop — pre_call worst-case blocks the next LLM call.",
+        blurb=f"Hard stop — {policy_label('pre_call_worst_case')} blocks the next LLM call.",
     ),
     DemoChip(
         id="cost_guard",
@@ -98,6 +100,9 @@ def _cost_guard_event(events: list[dict[str, Any]]) -> dict[str, Any] | None:
     for ev in events:
         if ev.get("policy") == "cost_guard":
             return ev
+    for ev in events:
+        if ev.get("policy") not in (None, "", "—"):
+            continue
         reason = str(ev.get("reason", "")).lower()
         if "minimizing" in reason or "cost_guard" in reason or "budget pressure" in reason:
             return ev
@@ -126,14 +131,18 @@ def live_governance_banner(
 
     if status == "halted":
         reason = meta.get("halt_reason") or "budget exceeded"
+        policy_id = halt_detector_from_events(events)
+        label = policy_label(policy_id) if policy_id else "budget cap"
         return (
-            f"**Governance · budget cap** — run **halted** at "
-            f"**${cost / 1_000_000:.4f}**. `{reason}`"
+            f"**Governance · {label}** — run **halted** at **${cost / 1_000_000:.4f}**. `{reason}`"
         )
 
     guard = _cost_guard_event(events)
     if guard:
-        return f"**Governance · cost guard** — {guard.get('reason', 'minimize at 80% budget')}"
+        return (
+            f"**Governance · {policy_label('cost_guard')}** — "
+            f"{guard.get('reason', 'minimize at 80% budget')}"
+        )
 
     return f"**Governance** — run **{status}** · ${cost / 1_000_000:.4f} total"
 
@@ -145,11 +154,19 @@ def governance_banner(result: SimulationResult) -> str:
         None,
     )
     if result.status == "halted" and result.halt_reason:
+        policy_id = halt_detector_from_events(
+            [
+                {"kind": event.detail.get("action"), "policy": event.detail.get("policy")}
+                for event in result.events
+                if event.category == "action"
+            ]
+        )
+        label = policy_label(policy_id) if policy_id else "cost cap"
         return (
-            f"**Governance · cost cap** — run **halted** at "
+            f"**Governance · {label}** — run **halted** at "
             f"**${total / 1_000_000:.4f}** spend. `{result.halt_reason}`"
         )
     if cap_ev:
         reason = cap_ev.detail.get("reason", "minimize at 80% budget")
-        return f"**Governance · cost guard** — {reason}"
+        return f"**Governance · {policy_label('cost_guard')}** — {reason}"
     return f"**Governance** — run **{result.status}** · ${total / 1_000_000:.4f} total"

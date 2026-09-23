@@ -6,6 +6,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from tokenops.ui.policy_labels import policy_label
 from tokenops.ui.run_detail import render_run_detail
 from tokenops.ui.store_client import get_store
 from tokenops.ui.theme import GOLD, MUTED, page_shell
@@ -77,6 +78,7 @@ with st.expander("Active governance (read-only)", expanded=False):
         st.dataframe(
             [
                 {
+                    "policy": policy_label(name),
                     "template": name,
                     "budget": params.get("budget", "—"),
                     "params": {k: v for k, v in params.items() if k != "budget"},

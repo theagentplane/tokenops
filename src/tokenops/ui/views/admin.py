@@ -10,9 +10,10 @@ import json
 
 import streamlit as st
 
-from tokenops.control.config import _TEMPLATES
+from tokenops.control.config import POLICY_TEMPLATES, policy_template_ids
 from tokenops.control.models import BudgetSpec, PolicyInstance, Segment
 from tokenops.control.store import new_id
+from tokenops.ui.policy_labels import policy_label
 from tokenops.ui.store_client import get_store
 from tokenops.ui.theme import page_shell
 
@@ -22,20 +23,6 @@ store = get_store()
 
 DIMENSIONS = ["run", "user", "agent", "tenant", "tag"]
 # Policy agent scope: empty = all agents; otherwise free-text agent name.
-
-# Template-specific param hints for the policy form
-_TEMPLATE_DEFAULTS: dict[str, str] = {
-    "step_cap": '{"max_steps": 20}',
-    "cost_budget": "{}",
-    "pre_call_worst_case": '{"default_max_output": 1024}',
-    "concurrency_cap": '{"max_concurrent": 4, "mode": "reject"}',
-    "tool_fix": '{"registry": ["search"], "k": 3}',
-    "tool_output_cap": '{"cap_tokens": 8000}',
-    "progress_guard": '{"window": 6, "repeats": 3, "max_corrections": 2}',
-    "cost_guard": '{"threshold": 0.8, "mode": "minimize"}',
-    "context_compaction": '{"ctx_max": 100000}',
-    "output_runaway": '{"repeats": 4, "max_retries": 2}',
-}
 
 seg_tab, budget_tab, policy_tab = st.tabs(["Segments", "Budgets", "Policies"])
 
@@ -154,6 +141,8 @@ with budget_tab:
 # ---- Policies ------------------------------------------------------------- #
 with policy_tab:
     st.caption(
+        "The **Template** id is the canonical policy name used in YAML; display labels are not "
+        "aliases. **Instance id** identifies your stored configuration, not a new policy type. "
         "One row per **template** is effective (duplicates: last row wins). "
         "Budget-linked policies need a **Budget** selected — that wires `cost_budget`, "
         "`pre_call_worst_case`, and `cost_guard` to the same spend cap."
@@ -165,27 +154,40 @@ with policy_tab:
     pol_prefill = store.get_policy_instance(edit_pol) if edit_pol != "(new)" else None
     _pol_key = edit_pol
 
-    default_template = pol_prefill.template if pol_prefill else sorted(_TEMPLATES)[0]
+    template_options = list(policy_template_ids())
+    if pol_prefill and pol_prefill.template not in template_options:
+        template_options.append(pol_prefill.template)
+    default_template = pol_prefill.template if pol_prefill else template_options[0]
+    template = st.selectbox(
+        "Template",
+        template_options,
+        index=template_options.index(default_template),
+        format_func=policy_label,
+        key=f"policy_template_{_pol_key}",
+    )
+    template_spec = POLICY_TEMPLATES.get(template)
+    if template_spec is None:
+        st.error(f"Unknown policy template {template!r}; select a supported template.")
+        st.stop()
+    if template_spec.factory is None:
+        st.warning(template_spec.disabled_reason)
+
     with st.form("policy"):
         pid = st.text_input(
             "Instance id",
             value=pol_prefill.id if pol_prefill else new_id("pi"),
             key=f"policy_id_{_pol_key}",
         )
-        template = st.selectbox(
-            "Template",
-            sorted(_TEMPLATES),
-            index=sorted(_TEMPLATES).index(default_template),
-        )
-        default_params = (
-            json.dumps(pol_prefill.params)
-            if pol_prefill
-            else _TEMPLATE_DEFAULTS.get(template, "{}")
+        default_params = json.dumps(
+            pol_prefill.params
+            if pol_prefill and template == pol_prefill.template
+            else dict(template_spec.default_params)
         )
         params_raw = st.text_area(
             "Params (JSON)",
             value=default_params,
-            help="Budget-linked templates: leave `{}` here — pick the Budget below.",
+            key=f"policy_params_{_pol_key}_{template}",
+            help="Budget-linked templates: pick the Budget below instead of adding it to Params.",
         )
         agent_val = pol_prefill.agent if pol_prefill else None
         agent = st.text_input(
@@ -199,7 +201,12 @@ with policy_tab:
             if pol_prefill and pol_prefill.budget_id in budget_options
             else "(none)"
         )
-        budget_id = st.selectbox("Budget", budget_options, index=budget_options.index(bud_default))
+        budget_id = st.selectbox(
+            "Budget",
+            budget_options,
+            index=budget_options.index(bud_default),
+            help="This template requires a budget." if template_spec.requires_budget else None,
+        )
         seg_default = (
             pol_prefill.segment_id
             if pol_prefill and pol_prefill.segment_id in segment_options
@@ -214,6 +221,11 @@ with policy_tab:
         delete = col2.form_submit_button("Delete", disabled=edit_pol == "(new)")
         if save:
             try:
+                if template_spec.factory is None and enabled:
+                    raise ValueError(
+                        f"{template} is temporarily disabled; disable this instance or "
+                        "select an available template."
+                    )
                 params = json.loads(params_raw or "{}")
                 store.upsert_policy_instance(
                     PolicyInstance(
@@ -226,7 +238,7 @@ with policy_tab:
                         enabled=enabled,
                     )
                 )
-                st.success(f"Saved {template} instance {pid!r}")
+                st.success(f"Saved {policy_label(template)} instance {pid!r}")
                 st.rerun()
             except (ValueError, json.JSONDecodeError) as exc:
                 st.error(str(exc))
@@ -238,6 +250,7 @@ with policy_tab:
     rows = [
         {
             "id": p.id,
+            "policy": policy_label(p.template),
             "template": p.template,
             "agent": p.agent or "(all)",
             "budget": p.budget_id or "—",
@@ -265,6 +278,7 @@ with st.expander("Which policies use a budget?"):
 | `pre_call_worst_case` | **Yes** — blocks call if worst-case would exceed limit | Before each LLM (`pre_call`) |
 | `cost_guard` | **Yes** — nudge at 80% of limit | After each crossing |
 | `step_cap` | No — uses `max_steps` param | After each crossing |
+| `time_budget` | No — uses `max_seconds` param | After each crossing |
 | `concurrency_cap` | No | Before each LLM |
 | `tool_fix` | No | After tool crossings |
 | `tool_output_cap` | No | After tool crossings |

@@ -409,6 +409,9 @@ def test_it_context_compaction_records_tokens_in_ledger_event():
     assert llm_step.get("node_type") == "llm"
     comp = llm_step.get("compaction")
     assert comp is not None, "compaction metadata missing from step event"
+    assert any(
+        action.policy_id == "context_compaction" and action.compact for action in controls.event_log
+    )
     assert comp["tokens_before"] > 0
     assert comp["tokens_after"] > 0
     assert comp["tokens_saved"] >= 0

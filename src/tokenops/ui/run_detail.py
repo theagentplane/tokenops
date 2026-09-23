@@ -7,6 +7,7 @@ import streamlit as st
 
 from tokenops.control.models import RunRecord
 from tokenops.control.store import Store
+from tokenops.ui.policy_labels import policy_label
 
 
 def _usd(micros: int) -> float:
@@ -69,7 +70,7 @@ def render_run_detail(store: Store, run: RunRecord) -> None:
     for ev in events:
         rows.append(
             {
-                "policy": ev.get("policy", "—"),
+                "policy": policy_label(str(ev.get("policy") or "—")),
                 "kind": ev.get("kind", ""),
                 "reason": ev.get("reason", ""),
                 "steering": (ev.get("message") or "")[:120],
@@ -79,7 +80,7 @@ def render_run_detail(store: Store, run: RunRecord) -> None:
     df = pd.DataFrame(rows)
 
     # Tight gold/black highlight for the governance mechanisms the demo is meant to show.
-    highlight_policies = {"pre_call_worst_case", "cost_guard"}
+    highlight_policies = {policy_label("pre_call_worst_case"), policy_label("cost_guard")}
 
     def _style_row(row: pd.Series) -> list[str]:
         policy = str(row.get("policy") or "")
@@ -103,7 +104,7 @@ def render_run_detail(store: Store, run: RunRecord) -> None:
     if halts:
         with st.expander("Halt detail", expanded=True):
             for ev in halts:
-                st.markdown(f"**{ev.get('policy', '—')}** · `halt`")
+                st.markdown(f"**{policy_label(str(ev.get('policy') or '—'))}** · `halt`")
                 st.code(ev.get("reason", ""))
 
     steer = [ev for ev in events if ev.get("kind") in ("inject", "mutate")]
@@ -112,7 +113,9 @@ def render_run_detail(store: Store, run: RunRecord) -> None:
             "Steering detail", expanded=any(ev.get("kind") == "inject" for ev in steer)
         ):
             for ev in steer:
-                st.markdown(f"**{ev.get('policy', '—')}** · `{ev.get('kind')}`")
+                st.markdown(
+                    f"**{policy_label(str(ev.get('policy') or '—'))}** · `{ev.get('kind')}`"
+                )
                 st.caption(ev.get("reason", ""))
                 if ev.get("message"):
                     st.code(ev["message"])

@@ -45,7 +45,7 @@ SCENARIOS = [
         "chip": "Compare five enterprise SaaS pricing pages in full detail.",
         "expect": "budget cap",
         "banner_title": "Scenario 2 · Governance ON — Budget Cap",
-        "banner_sub": "Enforce mode — pre_call worst-case halts the run",
+        "banner_sub": "Enforce mode — pre_call_worst_case halts the run",
     },
     {
         "id": "03_governance_on_cost_guard",
@@ -89,9 +89,9 @@ CODE_SNIPPETS = [
         "name": "04_governor_setup",
         "title": "Governor setup — budgets, ledger, policy registration",
         "file": "src/tokenops/control/config.py",
-        "start": 113,
-        "end": 147,
-        "highlight": {126, 129, 130, 133, 144, 145, 147},
+        "start": 240,
+        "end": 261,
+        "highlight": {240, 243, 244, 248, 253, 259},
     },
 ]
 
@@ -111,7 +111,7 @@ def _code_html(snippet: dict) -> str:
         body.append(
             f'<div class="{cls}">'
             f'<span class="ln">{lineno}</span>'
-            f'<code>{html.escape(text) or " "}</code></div>'
+            f"<code>{html.escape(text) or ' '}</code></div>"
         )
     rel = snippet["file"]
     return f"""<!DOCTYPE html>
@@ -130,7 +130,7 @@ def _code_html(snippet: dict) -> str:
 <body><div class="frame">
   <div class="title">{html.escape(snippet["title"])}</div>
   <div class="path">{html.escape(rel)}</div>
-  <div class="code">{''.join(body)}</div>
+  <div class="code">{"".join(body)}</div>
 </div></body></html>"""
 
 
