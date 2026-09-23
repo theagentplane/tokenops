@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-24
+
 ### Changed
 
 - Standardize built-in policy IDs and display labels through one template registry
