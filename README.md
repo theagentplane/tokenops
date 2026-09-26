@@ -323,7 +323,6 @@ tests/                     # unit + e2e
   [LinkedIn](https://www.linkedin.com/posts/microsoft-developers_who-spent-all-the-tokens-tokenops-gives-activity-7499191980715982848-224b) and [X](https://x.com/msdev/status/2093425027500978292).
 - **[Who spent all the tokens? Real-time, run-scoped cost control for AI agents](https://commandline.microsoft.com/tokenops-real-time-run-scoped-cost-control-ai-agents/)**: *Command Line*, a Microsoft publication.
 - **[FinOps for AI Agents: Who Spent All the Tokens?](https://www.youtube.com/watch?v=GJX19pNhmSw)**: talk at the **AI Engineer World's Fair**, San Francisco.
-- **Selected to participate in the [GitHub Secure Open Source Fund](https://github.com/open-source/github-secure-open-source-fund)** (Session 5), GitHub Security Lab's open source security program.
 
 ## 🛟 Support
 
