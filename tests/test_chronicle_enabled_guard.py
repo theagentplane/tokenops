@@ -5,9 +5,9 @@ import pytest
 from tokenops.control.run import tokenops_run
 from tokenops.control.store import Store
 
+
 @pytest.fixture
 def store(tmp_path):
-    from tokenops.control.store import Store
     from tokenops.control.governance_cache import clear_governance_config_cache
     clear_governance_config_cache()
     s = Store(str(tmp_path / "test.db"))
