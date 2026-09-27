@@ -256,7 +256,14 @@ class Halt(BaseException):
         super().__init__(action.reason)
         self.action = action
 
-
+class GovernanceUnavailable(RuntimeError):
+    """Raised when governance cannot be enforced.
+    
+    Unlike :class:`Halt` (a ``BaseException``), this is an ordinary ``RuntimeError``.
+    It fires at the start of a run — before any agent code runs — so nothing can
+    swallow it by accident.
+    """
+    pass
 # =========================================================================== #
 # Read-only ledger view (Attribute -> Enforce)                                 #
 # =========================================================================== #

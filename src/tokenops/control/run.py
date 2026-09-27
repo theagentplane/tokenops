@@ -30,7 +30,7 @@ from tokenops.control.context import (
 from tokenops.control.context import (
     clear as clear_run_context,
 )
-from tokenops.control.core import Attribution
+from tokenops.control.core import Attribution, GovernanceUnavailable
 from tokenops.control.crossing import install_crossing_hook
 from tokenops.control.engine import ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import PriceFn
@@ -173,7 +173,15 @@ def tokenops_run(
     Optional ``store=`` remains for tests; prefer ``client=`` / ``from_env``.
     """
     install_crossing_hook()
+    # control/run.py, top of tokenops_run(), next to install_crossing_hook() (run.py:175)
+    import chronicle
 
+    if not chronicle.is_enabled():
+        raise GovernanceUnavailable(
+            "CHRONICLE_ENABLED is off. TokenOps records spend through Chronicle's on_crossing "
+            "hook, so no spend would be recorded and budgets would not be enforced. "
+            "Unset CHRONICLE_ENABLED to run governed."
+        )
     hdrs, body, svc, resolved_intent, resolved_dims, resolved_mode, prov, mdl = _resolve_ambient(
         headers=headers,
         payload=payload,
