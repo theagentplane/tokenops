@@ -6,6 +6,7 @@ the control plane process.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import httpx
@@ -20,6 +21,19 @@ from tokenops.control.models import (
     Segment,
     parse_governance_mode,
 )
+
+
+def _ttl(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a non-negative number") from exc
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative number")
+    return value
 
 
 class HttpStore:
@@ -91,7 +105,15 @@ class HttpStore:
             return None
 
     def governance_config_for(self, agent: str) -> dict:
-        return self._request("GET", f"/v1/governance/{agent}").json()
+        from tokenops.control.governance_cache import get_cached_governance_config
+
+        return get_cached_governance_config(
+            self.path,
+            agent,
+            lambda: self._request("GET", f"/v1/governance/{agent}").json(),
+            soft_ttl_s=_ttl("TOKENOPS_GOVERNANCE_SOFT_TTL_S", 60.0),
+            hard_ttl_s=_ttl("TOKENOPS_GOVERNANCE_HARD_TTL_S", 600.0),
+        )
 
     def create_run(self, rec: RunRecord) -> RunRecord:
         payload = {

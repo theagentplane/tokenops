@@ -190,6 +190,19 @@ def test_fail_closed_controls_preserve_policy_id():
     assert stopped.value.action.policy_id == "progress_guard"
 
 
+def test_raise_controls_persist_unsupported_action_escalation():
+    controls = RaiseControls()
+    with pytest.raises(Halt):
+        controls.apply(Action(kind=ActionKind.MUTATE, run_id="r", policy_id="cost_guard"))
+    assert governance_events_payload(controls) == [
+        {
+            "kind": "halt",
+            "reason": "mutate unsupported by RaiseControls; failing closed",
+            "policy": "cost_guard",
+        }
+    ]
+
+
 def test_custom_policy_keeps_its_registered_name():
     class CustomDetector(Detector):
         name = "my_custom_policy"

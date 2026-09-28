@@ -37,6 +37,15 @@ TokenOps governs the **resource axis**: the tokens and compute a *run* consumes,
 | Enforce | circuit breaker (only stop) + active steering |
  
 Every call is tagged with `run / user / agent / tenant / tags`. Budgets and policies attach along `global → tenant → user → agent → run`; one call matches many, most specific wins, any breach trips.
+
+## Connector capability trap
+
+`RaiseControls` is for brownfield callbacks that can only stop execution. If a
+policy asks it to MUTATE, INJECT, RETRY, REJECT, QUEUE, or CANCEL, it deliberately
+escalates the request to HALT rather than silently dropping it. The governance event
+records that escalation with the original policy ID and a reason such as
+`mutate unsupported by RaiseControls; failing closed`. Use `wrap_complete` or
+`wrap_stream` with `ApplyControls` when a run must apply corrective actions.
  
 ## 3. Policies
  
