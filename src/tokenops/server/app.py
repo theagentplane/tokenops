@@ -7,7 +7,7 @@ import os
 from fastapi import FastAPI
 
 from tokenops import __version__
-from tokenops.control.http import mount_run_registration
+from tokenops.control.http import mount_export, mount_run_registration
 from tokenops.control.store import Store
 
 
@@ -32,6 +32,7 @@ def create_app(store: Store | None = None) -> FastAPI:
         return {"status": "ok", "service": "tokenops-control-plane"}
 
     mount_run_registration(app, store)
+    mount_export(app, store)
 
     # Placeholder for future plane APIs (observe, governance admin over HTTP, etc.).
     # Agents keep using ControlPlaneClient; expand the plane surface here.
