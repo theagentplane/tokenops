@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi.testclient import TestClient
-
 from examples.a2a.server import create_a2a_app
+from fastapi.testclient import TestClient
 
 
 def test_handler_error_returns_generic_500_and_logs_detail(caplog):
