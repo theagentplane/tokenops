@@ -18,7 +18,20 @@ permissions:
   contents: read
 
 jobs:
+  # Build the SBOM with the same reusable workflow that runs on every PR, in a job
+  # with read-only permissions. A failure here stops the release before any tag,
+  # GitHub Release or PyPI upload is created.
+  sbom:
+    permissions:
+      contents: read
+    # Reusable workflows are resolved from the calling commit, not the workspace, so
+    # the workspace-tampering risk behind zizmor's self-repository audit does not
+    # apply; `./` is the long-standing form, kept because release.yml cannot be
+    # exercised in a PR and the newer `$/` syntax has not been tried here.
+    uses: ./.github/workflows/sbom.yml # zizmor: ignore[self-repository]
+
   release:
+    needs: sbom
     runs-on: ubuntu-latest
     permissions:
       contents: write  # create tag + GitHub Release
@@ -72,6 +85,30 @@ jobs:
           pip install "twine>=6"
           twine check dist/*
 
+      - name: Download SBOM
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sbom-cyclonedx
+          path: sbom/
+
+      - name: Verify SBOM matches this release
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          python - <<'PY'
+          import json, os
+
+          doc = json.load(open("sbom/sbom.cdx.json"))
+          root = doc["metadata"]["component"]
+          want = os.environ["VERSION"]
+          assert root["name"] == "agent-tokenops", root["name"]
+          assert root["version"] == want, f"SBOM is for {root['version']}, releasing {want}"
+          assert doc["components"], "SBOM has no components"
+          print(f"SBOM ok: {root['name']} {want}, {len(doc['components'])} components")
+          PY
+          # Kept out of dist/ so the PyPI upload only ever sees the wheel and sdist.
+          mv sbom/sbom.cdx.json "agent-tokenops-${VERSION}.cdx.json"
+
       - name: Create tag and GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,7 +136,7 @@ jobs:
             exit 1
           fi
 
-          gh release create "${TAG}" dist/* \
+          gh release create "${TAG}" dist/* "agent-tokenops-${VERSION}.cdx.json" \
             --title "agent-tokenops ${VERSION}" \
             --generate-notes \
             --target "$GITHUB_SHA"

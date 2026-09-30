@@ -56,9 +56,10 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
      `pyproject.toml`
 4. The workflow will, in one run:
    1. Require the tag to match `pyproject.toml` version
-   2. Build sdist/wheel and `twine check`
+   2. Build a CycloneDX SBOM of a clean install of the wheel (the `sbom` job, same
+      steps as the per-PR `sbom` check), then build sdist/wheel and `twine check`
    3. Create and push the git tag
-   4. Create the GitHub Release (attaches dist artifacts)
+   4. Create the GitHub Release (attaches the dist artifacts and `agent-tokenops-X.Y.Z.cdx.json`)
    5. Upload to PyPI (may wait on `pypi` environment approval)
 5. Verify:
    ```bash
