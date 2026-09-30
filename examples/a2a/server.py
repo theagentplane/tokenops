@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
@@ -9,6 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from examples.a2a.cards import agent_card
+
+_log = logging.getLogger(__name__)
 
 Handler = Callable[[dict[str, Any], Mapping[str, str]], Awaitable[dict[str, Any] | Response]]
 
@@ -40,8 +43,11 @@ def create_a2a_app(
             if isinstance(result, Response):
                 return result
             return JSONResponse(result)
-        except Exception as exc:
-            return JSONResponse({"error": str(exc)}, status_code=500)
+        except Exception:
+            # Log the detail here; never echo exception text to the caller (it can
+            # carry paths, SQL or hostnames).
+            _log.exception("a2a handler failed")
+            return JSONResponse({"error": "internal error"}, status_code=500)
 
     return app
 
