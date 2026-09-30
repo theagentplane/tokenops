@@ -9,6 +9,7 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call: # reused by release.yml so the released SBOM is built by these exact steps
 
 permissions:
   contents: read
