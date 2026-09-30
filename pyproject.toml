@@ -55,6 +55,7 @@ dev = [
   "mypy>=1.13",
   "pre-commit>=4.0",
   "types-PyYAML>=6.0",
+  "zizmor>=1.30",
 ]
 # The verified-fake contract suite + e2e run against a real control plane in-process.
 # Not in `dev` because the 0.2.0 line is not on PyPI yet — the tests that need it
