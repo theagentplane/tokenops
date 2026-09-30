@@ -12,11 +12,15 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.4
+    rev: v0.15.22
     hooks:
+      # Same scope as CI (`ruff check/format src tests examples`); benchmarking/ and
+      # scripts/ are not linted there and would be reformatted on the newer ruff.
       - id: ruff
         args: ["--fix"]
+        files: ^(src|tests|examples)/
       - id: ruff-format
+        files: ^(src|tests|examples)/
 
   # Match CI / `make lint`: project mypy config from pyproject.toml.
   - repo: local
