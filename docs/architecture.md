@@ -85,6 +85,7 @@ UI: POST /v1/tasks  (task only; no run_id)
   │
   └─ client.update_run(status, halt_reason, cost_micros, steps)
 ```
+**Chronicle must be enabled.** TokenOps records spend through Chronicle's `on_crossing` hook. If Chronicle is disabled (`CHRONICLE_ENABLED=0`), no spend is recorded and budgets are never enforced. `tokenops_run()` raises `GovernanceUnavailable` at entry when `chronicle.is_enabled()` returns false.
 
 The **Ledger** splits state by lifetime:
 
