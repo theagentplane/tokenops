@@ -65,6 +65,7 @@ class AgentControls(Protocol):
     def apply(self, action: Action) -> None: ...
 
 
+@dataclass
 class RaiseControls:
     """Brownfield OUT connector. Drops into a vanilla agent with no logic change.
 
@@ -74,19 +75,22 @@ class RaiseControls:
     they **fail closed** — escalate to HALT rather than silently vanish.
     """
 
+    event_log: list[Action] = field(default_factory=list)
+
     def apply(self, action: Action) -> None:
         if action.kind is ActionKind.ALLOW:
             return
         if action.kind is ActionKind.HALT:
+            self.event_log.append(action)
             raise Halt(action)
-        raise Halt(
-            Action(
-                kind=ActionKind.HALT,
-                run_id=action.run_id,
-                reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
-                policy_id=action.policy_id,
-            )
+        escalated = Action(
+            kind=ActionKind.HALT,
+            run_id=action.run_id,
+            reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
+            policy_id=action.policy_id,
         )
+        self.event_log.append(escalated)
+        raise Halt(escalated)
 
 
 @dataclass
@@ -231,7 +235,9 @@ def policy_hint_from_reason(reason: str) -> str:
     return "—"
 
 
-def governance_events_payload(controls: ApplyControls | PreviewControls) -> list[dict[str, Any]]:
+def governance_events_payload(
+    controls: ApplyControls | PreviewControls | RaiseControls,
+) -> list[dict[str, Any]]:
     """Serialize non-ALLOW governance actions for persistence and the dashboard."""
     actions = controls.actions if isinstance(controls, PreviewControls) else controls.event_log
     out: list[dict[str, Any]] = []

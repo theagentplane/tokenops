@@ -7,6 +7,7 @@ import pytest
 from tokenops.control.client import ControlPlaneClient
 from tokenops.control.governance_cache import (
     clear_governance_config_cache,
+    get_cached_governance_config,
     governance_config_cache_size,
 )
 from tokenops.control.models import PolicyInstance
@@ -117,3 +118,32 @@ def test_client_governance_config_for_uses_cache(tmp_path, monkeypatch):
     assert a["governance"]["policies"]["step_cap"]["max_steps"] == 2
     assert b == a
     store.close()
+
+
+def test_http_ttls_refresh_lazily_and_fail_closed_after_hard_expiry():
+    now = [0.0]
+    calls = {"n": 0}
+
+    def loader():
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise RuntimeError("plane unavailable")
+        return {"version": calls["n"]}
+
+    kwargs = dict(
+        store_path="http://plane",
+        agent="planner",
+        loader=loader,
+        soft_ttl_s=10.0,
+        hard_ttl_s=20.0,
+        clock=lambda: now[0],
+    )
+    assert get_cached_governance_config(**kwargs) == {"version": 1}
+    now[0] = 5.0
+    assert get_cached_governance_config(**kwargs) == {"version": 1}
+    assert calls["n"] == 1
+    now[0] = 25.0
+    assert get_cached_governance_config(**kwargs) == {"version": 2}
+    now[0] = 50.0
+    with pytest.raises(RuntimeError, match="plane unavailable"):
+        get_cached_governance_config(**kwargs)
