@@ -135,51 +135,11 @@ run is out, even from another process.
 
 ## 🐳 Quickdeploy
 
-> [!TIP]
-> Every agent needs a control plane running — TokenOps has no ledger of its own.
-> A single-process agent still needs one, just not the multi-process sharing this
-> section is about. `python -m tokenops.server` powers the dashboard too.
-
-One command, plane + dashboard:
-
-```bash
-git clone https://github.com/theagentplane/tokenops && cd tokenops
-docker compose --profile ui up --build
-```
-
-Plane: `localhost:7700/health` · Dashboard: `localhost:8501`. Plane only:
-`docker compose up --build`. Details: [`docs/control-plane-deploy.md`](docs/control-plane-deploy.md).
-
-<details>
-<summary><b>Without Docker</b> (make)</summary>
-
-```bash
-git clone https://github.com/theagentplane/tokenops && cd tokenops
-make install
-make run          # control plane :7700 + Admin/Dashboard :8501
-```
-
-Then open `localhost:8501` to see spend and governance per agent.
-
-</details>
-
-<details>
-<summary><b>Multi-agent benches</b>: watch one budget span several agents</summary>
-
-Each is a real multi-agent stack sharing one run ledger. One target starts the
-plane, the agents, and the Admin UI.
-
-| Bench | Agents | Run |
-|---|---|---|
-| Two-agent | Research to Summarize | `make demo` |
-| Triad | Planner to Researcher to Writer | `make demo-triad` |
-| Brief | Scout to Analyst to Editor (LangChain) | `make demo-brief` |
-| Bench UI | Chat + Simulator only | `make bench-ui` |
-
-`cp .env.example .env` first if you want them to call real models. See
-[`examples/README.md`](examples/README.md) for the bench profiles.
-
-</details>
+> [!NOTE]
+> TokenOps no longer ships its own control plane or UI. Governance, the ledger and the run
+> list live in the AgentPlane [control plane](https://github.com/theagentplane/control-plane);
+> run it from there (see its deployment docs). This section and the examples are rewritten
+> against it as part of [#162](https://github.com/theagentplane/tokenops/issues/162).
 
 <details>
 <summary><b>Pointing several processes at one plane</b></summary>
@@ -274,14 +234,7 @@ budget by construction. `TOKENOPS_URL` also accepts the alias
 |--------|------|
 | `make install` | Editable install with dev + examples extras |
 | `make dist` / `check-dist` | Build sdist+wheel / `twine check` |
-| `make control-plane` | Standalone plane (`python -m tokenops.server`) on `:7700` |
-| `make ui` | Admin + Dashboard on `:8501` |
-| `make run` | Plane + Admin/Dashboard |
 | `make demo-quick` | `python -m tokenops.demo`: no API keys, no server |
-| `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
-| `make bench-ui` | Chat + Simulator |
-| `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
-| `make stop` | Kill listeners on `:7700` / `:8501` |
 | `make sync-skills` | Regenerate the editor copies of the integration skill |
 
 </details>
@@ -293,13 +246,10 @@ Only `src/tokenops/` is the installable package. Demos and benches stay under `e
 
 ```
 src/tokenops/              # installable package
-├── server/                # control plane (:7700, POST /v1/runs)
 ├── control/               # SDK: ledger, policies, wrap_complete, crossing hook
 ├── providers/             # OpenAI / Anthropic complete dispatch
-├── config/                # default.yaml governance seed
-└── ui/                    # Admin + Dashboard (Streamlit)
-examples/                  # A2A benches (two-agent, triad, brief) + Chat/Simulator
-benchmarking/              # MetaGPT / browser-use live harness
+└── config/                # default.yaml governance seed
+examples/                  # A2A agent stacks (rewritten in #162)
 docs/                      # architecture, policies, guides, product
 tests/                     # unit + e2e
 ```

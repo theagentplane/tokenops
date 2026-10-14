@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed (breaking)
+
+Part of the 1.0 rework ([#162](https://github.com/theagentplane/tokenops/issues/162)). These
+duplicated the AgentPlane control plane, which is now the plane and the UI.
+
+- `tokenops.server` (the own FastAPI plane, `python -m tokenops.server`). Run the
+  control-plane package instead.
+- `tokenops.ui` (Streamlit Admin and Dashboard) and the `streamlit` dependency. Migration:
+  use the TokenOps tab of the control plane web page. `policy_label` moved to
+  `tokenops.control.policy_labels`.
+- `benchmarking/`, the demo/asset `scripts/` (only `scripts/sync-skills.py` stays), the
+  `docker-compose*.yml` files, the `Dockerfile`, `.streamlit/`, `docs/notes/` and the binary
+  deck under `docs/product/`.
+- The example launchers (`examples/run*.py`), `examples/ui/` and the matching `make` targets
+  (`control-plane`, `ui`, `run`, `demo*`, `bench-ui`, `db-*`, `stop*`); the examples are
+  rewritten against the real control plane in a later pull request.
+
+Still present and removed with the Chronicle 1.0 and control-plane client work: the SQLite
+store, run models, ledger backends and `http_store` (they are wired into the governors).
+
 ## [0.4.1] - 2026-10-01
 
 No functional changes to the library.

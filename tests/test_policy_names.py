@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -17,8 +16,8 @@ from tokenops.control import config as config_module
 from tokenops.control.config import POLICY_TEMPLATES, policy_template_ids
 from tokenops.control.models import PolicyInstance
 from tokenops.control.policies import tool_output_cap, trajectory_hint
+from tokenops.control.policy_labels import policy_label
 from tokenops.control.store import Store
-from tokenops.ui.policy_labels import policy_label
 
 ROOT = Path(__file__).resolve().parents[1]
 YAML_CONFIGS = sorted(
@@ -256,28 +255,6 @@ def test_time_budget_is_available_without_being_seeded(tmp_path):
         assert governor._detectors[0].max_seconds == 2.0
     finally:
         store.close()
-
-
-def test_demo_capture_points_at_canonical_policy_registration():
-    script = ast.parse((ROOT / "scripts/capture_demo_media.py").read_text(encoding="utf-8"))
-    assignment = next(
-        node
-        for node in script.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "CODE_SNIPPETS" for target in node.targets
-        )
-    )
-    snippets = ast.literal_eval(assignment.value)
-    snippet = next(item for item in snippets if item["name"] == "04_governor_setup")
-    source = (ROOT / snippet["file"]).read_text(encoding="utf-8").splitlines()
-    assert source[snippet["start"] - 1].strip() == 'gov_cfg = config.get("governance", config)'
-    assert source[snippet["end"] - 1].strip() == "return governor"
-    captured = "\n".join(source[snippet["start"] - 1 : snippet["end"]])
-    assert "template = POLICY_TEMPLATES.get(name)" in captured
-    assert "detector, policy = template.factory(params or {}, ctx)" in captured
-    assert "governor.register(detector, policy)" in captured
-    assert all(snippet["start"] <= line <= snippet["end"] for line in snippet["highlight"])
 
 
 @pytest.mark.parametrize("name", ["custom_policy", "tool_freq", "historical-unknown"])

@@ -1,4 +1,4 @@
-"""HTTP tests for the standalone control-plane FastAPI app."""
+"""HTTP tests for run-registration mounting on an agent app."""
 
 from __future__ import annotations
 
@@ -11,54 +11,6 @@ from fastapi.testclient import TestClient
 from tokenops.control.client import should_mount_run_registration
 from tokenops.control.http import mount_run_registration
 from tokenops.control.store import Store
-from tokenops.server.app import create_app
-
-
-@pytest.fixture
-def plane_client(tmp_path, monkeypatch):
-    db = str(tmp_path / "plane.db")
-    monkeypatch.setenv("TOKENOPS_DB", db)
-    store = Store(db)
-    app = create_app(store=store)
-    with TestClient(app) as client:
-        yield client, store, db
-    store.close()
-
-
-def test_health(plane_client):
-    client, _, _ = plane_client
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
-
-
-def test_post_v1_runs(plane_client):
-    client, store, _ = plane_client
-    resp = client.post(
-        "/v1/runs",
-        json={
-            "intent": "frontier",
-            "user_dims": {"Country": "US", "user_id": "bob"},
-            "mode": "enforce",
-        },
-    )
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["status"] == "registered"
-    assert body["mode"] == "enforce"
-    run_id = body["run_id"]
-
-    reg = store.resolve_run(run_id)
-    assert reg.intent == "frontier"
-    assert reg.user_dims["Country"] == "US"
-
-
-def test_post_v1_runs_conflict(plane_client):
-    client, _, _ = plane_client
-    payload = {"run_id": "r-dup", "intent": "a", "user_dims": {}}
-    assert client.post("/v1/runs", json=payload).status_code == 201
-    conflict = client.post("/v1/runs", json={**payload, "intent": "b"})
-    assert conflict.status_code == 409
 
 
 def test_should_mount_run_registration_is_always_false(monkeypatch):
@@ -87,8 +39,7 @@ def test_agent_skips_mount_when_should_mount_is_false(tmp_path):
 
 
 def test_mount_run_registration_still_works_when_called_directly(tmp_path):
-    """mount_run_registration() itself is unconditional — a standalone deployment
-    (src/tokenops/server) can still call it directly without going through
+    """mount_run_registration() itself is unconditional — a caller can still call it directly without going through
     should_mount_run_registration()."""
     store = Store(str(tmp_path / "e.db"))
     app = FastAPI()

@@ -5,23 +5,16 @@
 | Path | Role |
 |------|------|
 | `src/tokenops/control/` | SDK: governor, ledger, policies, client, attribution, wraps |
-| `src/tokenops/server/` | Standalone control plane (`POST /v1/runs`, `/health`) |
-| `src/tokenops/ui/` | Admin + Dashboard (plane product UI) |
 | `src/tokenops/config/` | Governance YAML loader + `default.yaml` seed |
 | `src/tokenops/providers/` | LLM `complete` helpers |
-| `examples/` | A2A benches (two-agent, triad, brief) + Chat/Simulator |
-| `benchmarking/` | MetaGPT / browser-use live harness |
+| `examples/` | A2A agent stacks (rewritten in #162) |
 
 ## Make targets
 
 | Target | Role |
 |--------|------|
-| `make control-plane` | `python -m tokenops.server` |
-| `make ui` | Admin + Dashboard |
-| `make run` | Plane + Admin/Dashboard |
-| `make demo` / `demo-triad` / `demo-brief` | Runnable A2A stacks |
-| `make bench-ui` | Chat + Simulator |
-| `make db-reset` | Clear SQLite + reseed from `TOKENOPS_CONFIG` |
+| `make lint` / `format` / `test` | ruff, mypy, pytest |
+| `make demo-quick` | `python -m tokenops.demo` (no keys, no server) |
 
 ## Request path (SDK)
 
