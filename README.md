@@ -194,7 +194,7 @@ export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
 
 PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
 `pip install "agent-tokenops[examples]"` for the LangChain benches,
-`".[dev,examples]"` from source. Releases: [`RELEASING.md`](RELEASING.md).
+`".[examples]" --group dev` from source. Releases: [`RELEASING.md`](RELEASING.md).
 
 </details>
 

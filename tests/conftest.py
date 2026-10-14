@@ -126,7 +126,7 @@ def plane_app_factory():
     """Build a real control_plane.app over a throwaway SQLite file.
 
     Skips the whole test when ``agentplane-control-plane`` (>= 0.2.0) is not installed
-    — it is not a hard dev dep (not on PyPI yet); ``pip install -e ".[dev,contract]"``
+    — it is not a hard dev dep (not on PyPI yet); ``pip install -e ".[contract]" --group dev``
     to run these. Yields a callable; every app it makes is torn down (connections
     closed before the temp dir is removed — open SQLite handles block unlink on Windows).
     """

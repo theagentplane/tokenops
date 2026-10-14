@@ -14,7 +14,7 @@ Runnable A2A test benches and demos (same repo as the TokenOps core library).
 From the repo root:
 
 ```bash
-make install   # pip install -e ".[dev,examples]"
+make install   # pip install -e ".[examples]" --group dev
 cp .env.example .env   # optional API keys
 TOKENOPS_CONFIG=examples/config/default.yaml make db-reset
 make demo          # plane :7700 + agents + Admin UI

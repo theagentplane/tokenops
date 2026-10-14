@@ -1,0 +1,36 @@
+name: Bug report
+description: A TokenOps governor, policy or control-plane client behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps or a code snippet. If it involves a fixture, attach or paste the relevant policy configuration.
+      placeholder: |
+        1. Configure a policy (for example `cost_budget` with a low cap)
+        2. Run the governed agent
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TokenOps version
+      description: Output of `pip show agent-tokenops` (or the commit SHA).
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.11"
+    validations:
+      required: true

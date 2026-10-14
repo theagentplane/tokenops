@@ -12,7 +12,7 @@ Requires Python 3.10+.
 ```bash
 git clone https://github.com/theagentplane/tokenops.git
 cd tokenops
-make install          # pip install -e ".[dev,examples]"
+make install          # pip install -e ".[examples]" --group dev
 cp .env.example .env  # optional API keys for live demos
 ```
 
@@ -84,6 +84,20 @@ the full structure and a checklist; in Claude Code, `/raise-issue` applies it.
 
 Typos, broken links, and formatting fixes can skip step 1 and go straight to a
 pull request.
+
+### Change size
+
+Keep a pull request under about **400 lines** (added plus removed, not counting generated
+files, lockfiles, golden test data, or pure moves, renames and deletions). Above that, plan
+first: split the work into components that are each reviewable on their own, pass CI and land
+in order, and open one pull request per component. A larger change is fine for boilerplate or
+mechanical work, but say why in the description. The `PR size` workflow adds a `size/large`
+label and a comment as a reminder; it never blocks a merge.
+
+### Sign-off (DCO)
+
+Every commit needs a `Signed-off-by:` trailer: `git commit -s`. The `dco` check fails the
+pull request otherwise. Architecture decisions go in [`docs/adr/`](docs/adr/README.md).
 
 ## Discussions vs issues
 

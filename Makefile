@@ -15,7 +15,7 @@ export TOKENOPS_CONFIG ?= src/tokenops/config/default.yaml
 
 install:
 	$(PYTHON) -m pip install --upgrade pip setuptools wheel
-	$(PYTHON) -m pip install -e ".[dev,examples]"
+	$(PYTHON) -m pip install -e ".[examples]" --group dev
 
 lint:
 	$(PYTHON) -m ruff check src tests examples

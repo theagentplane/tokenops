@@ -72,6 +72,6 @@ make db-reset      # clear + reseed
 ## Example e2e (offline, mocked LLM — part of the default run)
 
 ```bash
-pip install -e ".[dev,examples]"
+pip install -e ".[examples]" --group dev
 python -m pytest -q -m e2e   # just this slice, e.g. while iterating on it
 ```
