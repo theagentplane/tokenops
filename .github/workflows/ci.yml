@@ -59,10 +59,8 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          # The contract and end-to-end tests run against a real control plane. Until the
-          # 1.0 line is the pinned dependency, install it straight from the repository so
-          # those tests run in CI instead of silently skipping.
-          python -m pip install "agentplane-control-plane @ git+https://github.com/theagentplane/control-plane@main"
+          # The contract and end-to-end tests run against a real control plane (the
+          # `contract` extra, pinned below 1.0 until the 1.0 rework lands).
           python -m pip install -e ".[contract]" --group dev
       - name: Mypy
         # Match the matrix interpreter: with python_version=3.10, mypy cannot parse

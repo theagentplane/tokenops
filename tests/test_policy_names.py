@@ -69,7 +69,7 @@ def test_template_key_matches_runtime_names_and_modules(policy_id):
 
 @pytest.mark.parametrize("path", YAML_CONFIGS, ids=lambda path: str(path.relative_to(ROOT)))
 def test_core_and_example_yaml_use_only_canonical_policy_keys(path):
-    document = yaml.safe_load(path.read_text())
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(document, dict)
     if "governance" in document:
         governance = document["governance"]
@@ -209,7 +209,11 @@ def test_template_adapter_cannot_register_a_different_policy_name(monkeypatch):
 
 def test_glossary_labels_and_links_match_the_registry():
     index = ROOT / "docs/product/policies-index.md"
-    glossary = index.read_text().split("## Canonical policy IDs\n", 1)[1].split("\n## ", 1)[0]
+    glossary = (
+        index.read_text(encoding="utf-8")
+        .split("## Canonical policy IDs\n", 1)[1]
+        .split("\n## ", 1)[0]
+    )
     rows = re.findall(
         r"^\| `(\w+)` \| ([^|]+) \| ([^|]+) \| \[([^\]]+)\]\(([^)]+)\) \|$",
         glossary,
@@ -224,7 +228,9 @@ def test_glossary_labels_and_links_match_the_registry():
         assert link_text == f"{policy_id}.md"
         doc = (index.parent / target).resolve()
         assert doc == ROOT / f"docs/policies/{policy_id}.md"
-        assert doc.read_text().splitlines()[0].startswith(f"# {template.display_name}")
+        assert (
+            doc.read_text(encoding="utf-8").splitlines()[0].startswith(f"# {template.display_name}")
+        )
         if template.factory is None:
             assert availability == "Temporarily disabled"
         else:
@@ -253,7 +259,7 @@ def test_time_budget_is_available_without_being_seeded(tmp_path):
 
 
 def test_demo_capture_points_at_canonical_policy_registration():
-    script = ast.parse((ROOT / "scripts/capture_demo_media.py").read_text())
+    script = ast.parse((ROOT / "scripts/capture_demo_media.py").read_text(encoding="utf-8"))
     assignment = next(
         node
         for node in script.body
@@ -264,7 +270,7 @@ def test_demo_capture_points_at_canonical_policy_registration():
     )
     snippets = ast.literal_eval(assignment.value)
     snippet = next(item for item in snippets if item["name"] == "04_governor_setup")
-    source = (ROOT / snippet["file"]).read_text().splitlines()
+    source = (ROOT / snippet["file"]).read_text(encoding="utf-8").splitlines()
     assert source[snippet["start"] - 1].strip() == 'gov_cfg = config.get("governance", config)'
     assert source[snippet["end"] - 1].strip() == "return governor"
     captured = "\n".join(source[snippet["start"] - 1 : snippet["end"]])
