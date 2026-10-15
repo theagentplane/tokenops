@@ -34,7 +34,7 @@ classifiers = [
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-  "agent-chronicle>=1.0,<2",
+  "agent-chronicle>=1.1,<2",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",

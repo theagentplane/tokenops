@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires `agent-chronicle>=1.1,<2` and reads the active span with the public
+  `chronicle.current_session()` instead of a private Chronicle module path
+  (control/chronicle_trace_utils.py).
+
 ### Added
 
 - `tokenops.repositories.ControlPlaneClient`: a small `httpx` client for control plane 1.0

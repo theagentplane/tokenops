@@ -5,9 +5,8 @@ caller's ``traceparent`` and joins that trace; the entry hop starts a new one. T
 the single place that reads the active Chronicle span, so the rest of ``tokenops.control``
 never touches Chronicle's session.
 
-Chronicle 1.0 has no public accessor for the active session (only ``chronicle.span`` /
-``chronicle.record``, which open one). ``current_session`` is imported from its context
-module until one is exposed.
+``chronicle.current_session`` (Chronicle 1.1) reads the active session without opening one;
+``chronicle.span`` opens one from inbound headers when none is active.
 """
 
 from __future__ import annotations
@@ -17,7 +16,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import chronicle
-from chronicle.framework.context.session_context_utils import current_session
 
 
 @dataclass(frozen=True)
@@ -32,7 +30,7 @@ class TraceSpan:
 @contextmanager
 def chronicle_span(headers: Mapping[str, str] | None, *, service: str) -> Iterator[TraceSpan]:
     """Yield the active Chronicle span, opening one (from ``headers``) when none is active."""
-    active = current_session()
+    active = chronicle.current_session()
     if active is not None:
         yield TraceSpan(active.trace_id, active.span_id, active.parent_envelope_id)
         return
