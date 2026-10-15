@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0). Leave empty to use v{version} from pyproject.toml."
+        description: "Release tag (e.g. v1.0.0). Leave empty to use v{version} from src/tokenops/_version.py."
         required: false
         type: string
 
@@ -49,13 +49,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Resolve tag and verify against pyproject
+      - name: Resolve tag and verify against _version.py
         id: meta
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          version="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          version="$(sed -nE 's/^__version__ = "([^"]+)"$/\1/p' src/tokenops/_version.py | head -n1)"
           if [ -n "${INPUT_TAG}" ]; then
             tag="${INPUT_TAG}"
           else
@@ -67,9 +67,9 @@ jobs:
             *) tag="v${tag}" ;;
           esac
           tag_version="${tag#v}"
-          echo "tag: $tag | pyproject version: $version | sha: $GITHUB_SHA"
+          echo "tag: $tag | _version.py: $version | sha: $GITHUB_SHA"
           if [ "$tag_version" != "$version" ]; then
-            echo "::error::Tag $tag does not match pyproject version $version. Bump version (and __version__) and merge before releasing."
+            echo "::error::Tag $tag does not match src/tokenops/_version.py ($version). Bump the version and merge before releasing."
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"

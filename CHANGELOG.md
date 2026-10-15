@@ -7,136 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [1.0.0] - 2026-10-15
 
-- End-to-end tests (`tests/e2e`) against a real control plane 1.x in process: a governed agent
-  trips its budget and the halt is on the trace attributes and in the halted-trace list; two
-  agents share one budget and the second is stopped by the first; a halted trace is replayed
-  with Chronicle, reproducing the halt with the original cap and passing with the fix.
-- `context_compaction` savings are recorded as envelope metadata
-  (`tokenops.compaction_tokens_before`, `_tokens_after`, `_tokens_saved`) by `wrap_complete`
-  and `wrap_stream`, because the control plane stores no per-policy statistics (control-plane
-  ADR 0009). They were previously stored on the 0.2 plane's step event.
-- Which state each policy reads, in process or from the plane, is documented in
-  `tokenops.control.policies` and ADR 0004.
-- A contract test that every enabled policy template is in the control plane's allow-list.
-  It currently flags `time_budget`, which the plane does not know (marked `xfail`).
+TokenOps 1.0 is the **governors only**: policies, budgets and halts, attached to
+[Chronicle](https://github.com/theagentplane/chronicle) 1.x and the AgentPlane
+[control plane](https://github.com/theagentplane/control-plane) 1.x. It stops carrying its own
+server, store, UI and run model. A run is a Chronicle trace; the only identifier is `trace_id`.
+Delivered as the series in [#162](https://github.com/theagentplane/tokenops/issues/162).
+**Every entry is classified; the per-consumer migration is in
+[docs/migration-0.4-to-1.0.md](docs/migration-0.4-to-1.0.md).**
 
-### Changed
-
-- Requires `agent-chronicle>=1.1,<2` and reads the active span with the public
-  `chronicle.current_session()` instead of a private Chronicle module path
-  (control/chronicle_trace_utils.py).
-
-### Added
-
-- Asynchronous ledger writes ([#162](https://github.com/theagentplane/tokenops/issues/162),
-  ADR 0003). With a control plane, `tokenops_run` sends `spent_add` and `complete` events from
-  a background `LedgerEventWriter` (one per client, shared by every hop of the process) so the
-  post-call write no longer blocks the agent. `admit` and halt writes stay synchronous, and a
-  read of shared state first waits (bounded) for this process's own queued writes. A batch is
-  retried only on a failed connect, never on an unknown outcome; a full queue or an
-  unreachable plane drops and counts events (`LedgerEventWriter.stats`). Pass
-  `tokenops_run(async_writes=False)` for a synchronous write per crossing, and call
-  `tokenops.flush_ledger_writes()` before a short-lived process exits (also done at exit).
-
-### Added
-
-- `tokenops.repositories.ControlPlaneClient`: a small `httpx` client for control plane 1.0
-  ([#162](https://github.com/theagentplane/tokenops/issues/162)): governance with `ETag` /
-  `If-None-Match` (the last known configuration is returned, flagged `stale`, when the plane is
-  unreachable and one was already fetched), `precheck`, `events:batch`, halt get/set/clear and
-  the trace list. Writes are attempted once and never retried (ADR 0002). The governors now run
-  on it (see "Changed (breaking)").
-- `tests/contract`: contract tests against a real control plane 1.x, run in the CI matrix; the
-  same ledger scenarios run against an in-memory fake (`tests/fake_plane.py`) so it cannot drift.
+Requires `agent-chronicle>=1.1,<2`, `agentplane-primitives==0.2.*` and a control plane `>=1.0`
+(only where you run one).
 
 ### Changed (breaking)
 
-- **The governors run on control plane 1.0** ([#162](https://github.com/theagentplane/tokenops/issues/162)).
-  - `tokenops_run` takes `client=` (a `tokenops.repositories.ControlPlaneClient`, default from
-    `CONTROL_PLANE_URL` / `CONTROL_PLANE_API_KEY`) or `config=` (a governance dict, run in
-    process with no plane). `store=` is gone. Nothing is registered with the plane: a hop joins
-    the Chronicle trace and builds its attribution in memory from its own `intent`,
-    `user_dims` and `mode`, so a downstream hop no longer inherits the entry hop's intent.
-  - Governance is pulled with an `ETag`. Failure behaviour is explicit: an unreachable plane
-    with a configuration already fetched uses that one (logged at WARNING); unreachable with
-    none, or no plane and no `config=`, raises, so a hop never runs ungoverned. A failed ledger
-    write raises to the caller and is never retried.
-  - Budget dimension `run` is now `trace` and the segment key `run:<id>` is `trace:<id>`
-    (config, `Budget`, `segment_key`, `concurrency_cap`). Update `dimension: run` in your
-    governance YAML.
-  - The ledger writes only `spent_add`, `admit`, `complete`, `halt_mark` and `halt_clear`
-    (no `step`, no idempotency key). The step window stays in process (control-plane ADR 0009),
-    so per-policy statistics such as `context_compaction` savings are visible on the
-    `Observation`, not stored by the plane.
-  - `python -m tokenops.demo` runs in process; it no longer launches a plane.
-
-- Chronicle 1.0 integration ([#162](https://github.com/theagentplane/tokenops/issues/162)):
-  requires `agent-chronicle>=1.0,<2` (pulls `agentplane-primitives==0.2.*`); 0.5 is no longer
-  supported. The governor attaches as one `chronicle.Hook` registered on
-  `chronicle.default_hooks` (`tokenops.control.crossing.TokenOpsHook`); there is no
-  `reset_session` patching and no per-session `on_crossing`/`on_enter`/`on_leave`.
-  - `on_enter`, `on_leave` and `on_crossing` now take a `chronicle.CallInfo` (and the live
-    result for `on_crossing`) instead of `(boundary_id, kind, input[, result])`.
-  - `Throttled` is now a `chronicle.AbortCall` so Chronicle always propagates it; `Halt` stays
-    a `BaseException`, which the hook failure policy never swallows.
-  - `wrap_complete` / `wrap_stream` pass `provider=` to `wrap_llm`, as Chronicle 1.0 needs it
-    for usage and provider on LLM boundaries.
-  - Migration: register no hooks yourself; call `tokenops.control.install_crossing_hook()` (done
-    for you by `tokenops_run`). Tests that read `session.envelopes` should read envelopes from
-    a `chronicle.FunctionHook(record=...)` registered on `default_hooks`.
-- `run_id` is gone: the only identifier is `trace_id` (a run is a Chronicle trace). Every
-  `run_id` attribute, parameter, keyword, ledger event key and `source_run_id` is now
-  `trace_id` / `source_trace_id`. The embedded SQLite schema uses `trace_id` columns; delete
-  any local `tokenops.db`. Until the control-plane 1.0 client lands, the HTTP edge translates
-  to the control plane 0.2 wire name `run_id` (`http.py`, `http_store.py`,
-  `ledger_backend.py`, `client.py`); that translation is deleted with it.
-- The `X-TokenOps-Run-Id` and `X-TokenOps-Parent-Span-Id` headers are removed, with
+- **A run is a trace.** `run_id` is `trace_id` everywhere (attributes, parameters, ledger event
+  keys, `source_run_id`). *Consumers:* rename it.
+- **The TokenOps headers are removed**: `X-TokenOps-Run-Id` and `X-TokenOps-Parent-Span-Id`,
   `TRACE_ID_HEADER`, `PARENT_SPAN_ID_HEADER`, `header_trace_id`, `header_parent_span_id` and
-  `tokenops.control.propagate` (`propagation_headers`, `merge_propagation_headers`). A hop
-  joins the run through the W3C `traceparent` that Chronicle propagates (`ChronicleMiddleware`,
-  `instrument_httpx`, `inject_hosts`). `tokenops_run` opens a Chronicle span from the inbound
-  headers when none is active and joins the run registered for that trace id, else registers it
-  (`begin_downstream_run` / `begin_entry_run` / `begin_entry_task_run` take `trace_id=` instead
-  of `headers=`). Migration: stop sending the TokenOps headers; configure Chronicle's
-  `inject_hosts` for peers.
-- Known gap: a failure inside the TokenOps hook that is not a `Halt` or `AbortCall` is logged
-  and ignored by Chronicle's default hook policy (fail-open). Set
-  `chronicle.configure(hooks_fail_call_on_error=True)` to make it fail the call; the default
-  stays Chronicle's.
+  `tokenops.control.propagate`. Hops share a run through the W3C `traceparent` that Chronicle
+  sends. *Consumers:* configure `chronicle.configure(inject_hosts=[...])` and
+  `chronicle.instrument_httpx()`.
+- **No run registration.** `tokenops_run` joins the Chronicle trace and builds attribution in
+  memory from the hop's own `intent`, `user_dims` and `mode`; a downstream hop no longer
+  inherits the entry hop's intent. `begin_entry_run`, `begin_downstream_run`,
+  `begin_entry_task_run`, `mount_run_registration` and `post_run` are removed.
+- **`tokenops_run(client=..., config=...)`**: `client=` is a
+  `tokenops.repositories.ControlPlaneClient` (default from `CONTROL_PLANE_URL` and
+  `CONTROL_PLANE_API_KEY`), `config=` is a governance dict run in process with no plane.
+  `store=` is gone. *Consumers:* replace `TOKENOPS_URL` with `CONTROL_PLANE_URL`.
+- **Configuration lives in the control plane.** Governance is pulled with an `ETag`; there is no
+  local seed. The budget dimension `run` is `trace` and the segment key `run:<id>` is
+  `trace:<id>` (config, `Budget`, `segment_key`, `concurrency_cap`). *Consumers:* change
+  `dimension: run` to `dimension: trace` in governance YAML.
+- **Chronicle 1.x hooks.** The governor is one `chronicle.Hook` on `chronicle.default_hooks`
+  (`TokenOpsHook`); there is no `reset_session` patching. `on_enter`, `on_leave` and
+  `on_crossing` take a `chronicle.CallInfo`. `Throttled` is a `chronicle.AbortCall`; `Halt` stays
+  a `BaseException`. `wrap_complete` and `wrap_stream` pass `provider=` to `wrap_llm`.
+- **The ledger writes only** `spent_add`, `admit`, `complete`, `halt_mark` and `halt_clear`: no
+  `step` event and no idempotency key (control-plane ADR 0007 and 0009). The step window stays in
+  process, so `step_cap` and `progress_guard` see this process's steps for the trace
+  ([ADR 0004](docs/adr/0004-policy-state-lives-in-process-except-shared-spend.md)).
+- **Failure behaviour is explicit.** A configuration fetched earlier is used when the plane is
+  unreachable (WARNING `tokenops.governance_stale`); with none, or no plane and no `config=`,
+  `tokenops_run` raises, so a hop never runs ungoverned. A failed synchronous ledger write
+  raises and is never retried
+  ([ADR 0002](docs/adr/0002-ledger-writes-are-attempted-once.md)).
+- **Ledger writes are asynchronous by default.** With a plane, `spent_add` and `complete` are
+  queued and sent from a background `LedgerEventWriter`; `admit` and halt writes stay
+  synchronous and reads wait (bounded) for this process's own queued writes. A batch is retried
+  only on a failed connect, never on an unknown outcome, and a full queue or unreachable plane
+  drops and counts events (`LedgerEventWriter.stats`), so an outage can understate spend
+  ([ADR 0003](docs/adr/0003-ledger-spend-writes-are-asynchronous.md)). *Consumers:*
+  `tokenops_run(async_writes=False)` restores a synchronous write per crossing; call
+  `tokenops.flush_ledger_writes()` before a short-lived process exits (also done at exit).
+- `agent-chronicle` is `>=1.1,<2` and the active span is read with the public
+  `chronicle.current_session()`.
+- `python -m tokenops.demo` runs in process; it no longer launches a control plane.
 
 ### Removed (breaking)
 
-- The SQLite store (`tokenops.control.store`), `http_store`, the 0.2 `LedgerBackend` /
-  `HttpLedgerBackend`, the old `tokenops.control.client.ControlPlaneClient`
-  (`from_env`/`register_run`/`require_store`), `tokenops.control.dev_plane`,
-  `governance_cache`, run registration (`begin_entry_run`, `begin_downstream_run`,
-  `begin_entry_task_run`, `mount_run_registration`, `post_run`), `RunRecord`, `Segment`,
-  `BudgetSpec`, `PolicyInstance` and the `contract` extra's `<1.0` pin. Use
-  `tokenops.repositories.ControlPlaneClient`; configuration lives in the control plane.
+- `tokenops.server` (the own FastAPI plane), `tokenops.ui` (Streamlit), the `streamlit` and
+  `uvicorn` dependencies, `Dockerfile`, `docker-compose*.yml`, `benchmarking/`, the demo and
+  asset scripts (only `scripts/sync-skills.py` stays), the example launchers and `examples/ui`,
+  and the matching `make` targets. *Consumers:* run the control plane and use its web page.
+- The SQLite `Store`, `HttpStore`, the 0.2 `LedgerBackend` / `HttpLedgerBackend`, the old
+  `tokenops.control.client.ControlPlaneClient`, `dev_plane`, `governance_cache`, `RunRecord`,
+  `Segment`, `BudgetSpec` and `PolicyInstance`. Delete any local `tokenops.db`.
 - `tokenops.control.trajectory` and the `trajectory_hint` implementation. The template stays
-  known and disabled (it already could not be built); its cross-run index lived in the SQLite
-  store and is decided with the policies rework.
-- `uvicorn` from the runtime dependencies.
+  known and disabled (it could not be built before either); re-homing it is undecided.
+- The `contract` extra no longer accepts control plane 0.x (`agentplane-control-plane>=1.0`).
 
-Part of the 1.0 rework ([#162](https://github.com/theagentplane/tokenops/issues/162)). These
-duplicated the AgentPlane control plane, which is now the plane and the UI.
+### Added
 
-- `tokenops.server` (the own FastAPI plane, `python -m tokenops.server`). Run the
-  control-plane package instead.
-- `tokenops.ui` (Streamlit Admin and Dashboard) and the `streamlit` dependency. Migration:
-  use the TokenOps tab of the control plane web page. `policy_label` moved to
-  `tokenops.control.policy_labels`.
-- `benchmarking/`, the demo/asset `scripts/` (only `scripts/sync-skills.py` stays), the
-  `docker-compose*.yml` files, the `Dockerfile`, `.streamlit/`, `docs/notes/` and the binary
-  deck under `docs/product/`.
-- The example launchers (`examples/run*.py`), `examples/ui/` and the matching `make` targets
-  (`control-plane`, `ui`, `run`, `demo*`, `bench-ui`, `db-*`, `stop*`); the examples are
-  rewritten against the real control plane in a later pull request.
+- `tokenops.repositories.ControlPlaneClient`: a small `httpx` client for control plane 1.0:
+  governance with `ETag` / `If-None-Match`, `precheck`, `events:batch`, halt get, set and clear,
+  and the trace list.
+- `LedgerEventWriter`, one per client and shared by every hop of a process.
+- `context_compaction` savings are recorded as envelope metadata
+  (`tokenops.compaction_tokens_before`, `_after`, `_saved`), because the plane stores no
+  per-policy statistics.
+- `tests/contract` and `tests/e2e` against a real control plane 1.x: a governed agent trips its
+  budget and the halt is on the trace; two agents share one budget; a halted trace is replayed
+  with the fix. A fake plane (`tests/fake_plane.py`) is verified by the same contract suite.
+- Conventions: `AGENTS.md`, `docs/adr/` (ADRs 0001 to 0004), CODEOWNERS, DCO and PR-size
+  checks, CodeQL, dependabot, Windows and Python 3.13 in the CI matrix, a build and wheel check,
+  PEP 735 dependency groups for the dev tooling, and a `py.typed` marker.
+- The documentation is rewritten for 1.0, with a migration note.
 
-Still present and removed with the Chronicle 1.0 and control-plane client work: the SQLite
-store, run models, ledger backends and `http_store` (they are wired into the governors).
+### Known limits
+
+- `wrap_complete` and `wrap_stream` are still TokenOps wrappers around `chronicle.wrap_llm`
+  ([#173](https://github.com/theagentplane/tokenops/issues/173)).
+- The control plane's template allow-list does not include `time_budget`, so that policy cannot
+  be written to the plane yet (flagged by an `xfail` contract test).
+- The control plane on SQLite can answer a TokenOps agent and Chronicle writing at once with
+  `database is locked` ([control-plane#28](https://github.com/theagentplane/control-plane/issues/28)).
+- `src/tokenops/` is not yet split into the framework, repositories, capabilities and interfaces
+  layers, and `mypy --strict` is not enforced.
+- The example servers are not yet re-verified against a control plane 1.x.
 
 ## [0.4.1] - 2026-10-01
 

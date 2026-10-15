@@ -95,6 +95,7 @@ jobs:
           import glob, zipfile
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
           assert any(n.endswith("tokenops/config/default.yaml") for n in names), "default.yaml missing"
+          assert any(n.endswith("tokenops/py.typed") for n in names), "py.typed missing"
           assert not any(n.startswith(("tests/", "benchmarking/", "examples/")) for n in names), "non-package files shipped"
           print(f"ok: {len(names)} files")
           PY

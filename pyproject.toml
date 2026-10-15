@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tokenops"
-version = "0.4.1"
-description = "TokenOps control plane and SDK for run-aware agent token governance"
+dynamic = ["version"]
+description = "Run-aware token governance for agents: budgets, policies and halts on Chronicle and the AgentPlane control plane"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -24,17 +24,20 @@ keywords = [
   "cost-control",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
   "agent-chronicle>=1.1,<2",
+  "agentplane-primitives==0.2.*",
   "openai>=1.0",
   "anthropic>=0.40",
   "pyyaml>=6.0",
@@ -128,10 +131,13 @@ follow_imports = "skip"
 [tool.setuptools.package-dir]
 "" = "src"
 
+[tool.setuptools.dynamic]
+version = { attr = "tokenops._version.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tokenops*"]
 
 # Ship the default governance YAML with the wheel (loader resolves via Path(__file__)).
 [tool.setuptools.package-data]
-tokenops = ["config/*.yaml"]
+tokenops = ["config/*.yaml", "py.typed"]

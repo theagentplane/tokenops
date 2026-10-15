@@ -48,14 +48,14 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 
 1. Move the `CHANGELOG.md` `[Unreleased]` items under a new version heading with
    today's date; start a fresh empty `[Unreleased]`.
-2. Bump `version` in `pyproject.toml` **and** `__version__` in
-   `src/tokenops/__init__.py` following SemVer. Commit and merge to `main`.
+2. Bump `__version__` in `src/tokenops/_version.py` (the only place the version
+   lives; `pyproject.toml` reads it) following SemVer. Commit and merge to `main`.
 3. In GitHub: **Actions → Release → Run workflow**
    - Branch: `main` (the commit that has the version bump)
    - Tag (optional): e.g. `v0.1.0` — leave empty to use `v{version}` from
-     `pyproject.toml`
+     `src/tokenops/_version.py`
 4. The workflow will, in one run:
-   1. Require the tag to match `pyproject.toml` version
+   1. Require the tag to match `src/tokenops/_version.py`
    2. Build a CycloneDX SBOM of a clean install of the wheel (the `sbom` job, same
       steps as the per-PR `sbom` check), then build sdist/wheel and `twine check`
    3. Create and push the git tag
@@ -76,7 +76,7 @@ that metadata is read from `pyproject.toml` at build time. The git tag
 If you passed tag `v0.1.1` but `pyproject.toml` still says `0.1.0`, the workflow
 refuses to continue. Empty tag input defaults to `v` + the pyproject version.
 
-Also keep `tokenops.__version__` in sync so runtime version matches pip.
+`tokenops.__version__` is read from the same file, so the runtime version matches pip.
 
 ## Versioning notes
 
