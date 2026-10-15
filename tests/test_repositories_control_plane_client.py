@@ -238,3 +238,10 @@ def test_from_env(monkeypatch):
     client = ControlPlaneClient.from_env()
     assert client.base_url == "http://plane:8000"
     client.close()
+
+
+def test_non_json_error_body_still_raises_a_control_plane_error():
+    client = _client(lambda r: httpx.Response(502, text="<html>bad gateway</html>"))
+    with pytest.raises(ControlPlaneUnavailable) as caught:
+        client.precheck(PrecheckRequest(trace_id="t"))
+    assert caught.value.status_code == 502

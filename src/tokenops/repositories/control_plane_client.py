@@ -205,16 +205,21 @@ def _copy(config: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(config)
 
 
+def _error_detail(response: httpx.Response) -> str:
+    """The plane's ``detail`` message as a suffix, or ``""`` when the body is not JSON."""
+    try:
+        body = response.json()
+    except ValueError:
+        return ""  # a proxy or gateway error page, not the plane's JSON error body
+    if isinstance(body, dict) and body.get("detail"):
+        return f": {body['detail']}"
+    return ""
+
+
 def _raise_for_status(response: httpx.Response) -> None:
     if response.is_success:
         return
-    detail = ""
-    try:
-        body = response.json()
-        if isinstance(body, dict) and body.get("detail"):
-            detail = f": {body['detail']}"
-    except ValueError:
-        pass
+    detail = _error_detail(response)
     kind = ControlPlaneUnavailable if response.status_code >= 500 else ControlPlaneError
     raise kind(
         f"control plane answered {response.status_code}{detail}", status_code=response.status_code
