@@ -6,7 +6,6 @@ from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage
 from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.brief.messages import analyze_request, edit_request
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, TRACE_ID_HEADER
 from tokenops.control.models import GovernanceMode
 
 
@@ -84,10 +83,6 @@ async def delegate_analyst(
         bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
-    if trace_id:
-        headers[TRACE_ID_HEADER] = trace_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(analyst_url, payload, headers=headers or None)
     return (
         parse_findings(data.get("findings", [])),
@@ -109,10 +104,6 @@ async def delegate_editor(
 ) -> tuple[str, TokenUsage, list[StepEvent], int]:
     payload = edit_request(topic, findings, sections=sections, angles=angles)
     headers: dict[str, str] = {}
-    if trace_id:
-        headers[TRACE_ID_HEADER] = trace_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(editor_url, payload, headers=headers or None)
     brief = str(data.get("brief") or data.get("answer") or data.get("summary", ""))
     return (

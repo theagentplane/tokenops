@@ -18,8 +18,6 @@ from tokenops.control.attribution import (
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
-    PARENT_SPAN_ID_HEADER,
-    TRACE_ID_HEADER,
     GovernanceContext,
     SpanContext,
 )
@@ -80,7 +78,6 @@ from tokenops.control.http import (
 )
 from tokenops.control.instrument import instrument_app
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
-from tokenops.control.propagate import merge_propagation_headers, propagation_headers
 from tokenops.control.request_context import (
     RequestContext,
     bind_request_context,
@@ -152,8 +149,6 @@ __all__ = [
     "clear_request_context",
     "current_request_context",
     "instrument_app",
-    "TRACE_ID_HEADER",
-    "PARENT_SPAN_ID_HEADER",
     "SpanContext",
     "GovernanceContext",
     "observation_from_crossing",
@@ -170,6 +165,4 @@ __all__ = [
     "should_mount_run_registration",
     "clear_governance_config_cache",
     # HTTP propagation (auto trace_id / parent span)
-    "propagation_headers",
-    "merge_propagation_headers",
 ]

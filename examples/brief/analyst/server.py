@@ -42,7 +42,7 @@ def build_app():
             angles = parse_angles(payload.get("angles", []))
             parse_sections(payload.get("sections", []))
             corpus_profile = bench_corpus_profile(payload)
-            parent_span = headers.get("X-TokenOps-Parent-Span-Id") or payload.get("parent_run")
+            parent_span = payload.get("parent_run")
 
             client.create_run(
                 RunRecord(

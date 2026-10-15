@@ -17,7 +17,6 @@ from tokenops import (
     tokenops_run,
 )
 from tokenops.control.context import (
-    TRACE_ID_HEADER,
     clear,
     current_governance,
     current_registration,
@@ -107,23 +106,24 @@ def test_tokenops_run_without_user_passed_store(live_plane_url):
     clear()
 
 
-def test_tokenops_run_joins_when_trace_id_present(store):
+def test_tokenops_run_joins_the_inbound_trace(store):
     clear()
     client = ControlPlaneClient(store=store)
-    out = client.register_run(intent="shared", mode="enforce", trace_id="join-me")
-    assert out["trace_id"] == "join-me"
+    trace = "a" * 32
+    out = client.register_run(intent="shared", mode="enforce", trace_id=trace)
+    assert out["trace_id"] == trace
 
     with tokenops_run(
         client=client,
-        headers={TRACE_ID_HEADER: "join-me"},
+        headers={"traceparent": f"00-{trace}-{'b' * 16}-01"},
         payload={"task": "hop"},
         service="researcher",
     ) as bound:
-        assert bound.registration.trace_id == "join-me"
+        assert bound.registration.trace_id == trace
         assert bound.registration.intent == "shared"
         assert bound.span.service == "researcher"
         assert current_governance() is not None
-        assert client.resolve_run("join-me").intent == "shared"
+        assert client.resolve_run(trace).intent == "shared"
     clear()
 
 

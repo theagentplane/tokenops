@@ -42,7 +42,7 @@ def build_app():
             findings = parse_findings(payload.get("findings", []))
             sections = parse_sections(payload.get("sections", []))
             angles = parse_angles(payload.get("angles", []))
-            parent_span = headers.get("X-TokenOps-Parent-Span-Id") or payload.get("parent_run")
+            parent_span = payload.get("parent_run")
 
             client.create_run(
                 RunRecord(

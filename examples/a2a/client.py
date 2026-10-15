@@ -4,7 +4,6 @@ from examples.a2a import messages
 from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage, summarize_request
 from examples.a2a.server import fetch_agent_card, fetch_agent_card_sync, post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, TRACE_ID_HEADER
 from tokenops.control.models import GovernanceMode
 
 
@@ -48,7 +47,7 @@ def submit_task_sync_with_meta(
 ) -> tuple[RunResult, dict[str, object]]:
     """POST a task to the research entry agent (UI path).
 
-    Research registers the run when ``X-TokenOps-Trace-Id`` is absent — clients should
+    Research registers the run when no inbound ``traceparent`` joins an existing trace — clients should
     not call ``/v1/runs`` themselves for the default Chat / bench flow.
     """
     payload = messages.task_request(
@@ -99,10 +98,6 @@ async def delegate_summarize(
     """Delegate to summarize. Headers come from ambient context when omitted."""
     payload = summarize_request(task=task, findings=findings)
     headers: dict[str, str] = {}
-    if trace_id:
-        headers[TRACE_ID_HEADER] = trace_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(summarize_url, payload, headers=headers or None)
     return (
         str(data.get("summary", "")),

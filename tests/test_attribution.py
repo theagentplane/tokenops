@@ -10,7 +10,7 @@ from tokenops.control.attribution import (
     begin_entry_run,
     require_registration,
 )
-from tokenops.control.context import TRACE_ID_HEADER, clear, current_registration, current_span
+from tokenops.control.context import clear, current_registration, current_span
 from tokenops.control.integration import step_to_observation
 from tokenops.control.models import (
     RunAlreadyRegisteredError,
@@ -51,7 +51,6 @@ def test_begin_entry_run_binds_context(store):
     clear()
     bound = begin_entry_run(
         store,
-        headers={},
         payload={"intent": "demo", "user_dims": {"IsFortune500": "true"}},
         service="research",
         trace_id="run-a",
@@ -62,12 +61,12 @@ def test_begin_entry_run_binds_context(store):
     clear()
 
 
-def test_begin_downstream_soft_registers_when_header_missing(store, caplog):
+def test_begin_downstream_soft_registers_when_trace_id_missing(store, caplog):
     clear()
     import logging
 
     with caplog.at_level(logging.WARNING, logger="tokenops.attribution"):
-        bound = begin_downstream_run(store, headers={}, service="summarize")
+        bound = begin_downstream_run(store, trace_id=None, service="summarize")
     assert bound.registration.intent == "unattributed"
     assert bound.registration.user_dims.get("tokenops_soft_run") == "1"
     assert bound.span.service == "summarize"
@@ -80,7 +79,8 @@ def test_begin_downstream_resolves_registration(store):
     clear()
     bound = begin_downstream_run(
         store,
-        headers={TRACE_ID_HEADER: "run-a", "X-TokenOps-Parent-Span-Id": "span-parent"},
+        trace_id="run-a",
+        parent_span_id="span-parent",
         service="summarize",
     )
     assert bound.registration.intent == "x"

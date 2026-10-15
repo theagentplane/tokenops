@@ -7,7 +7,6 @@ from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.triad.messages import research_request, write_request
 from tokenops.control.client import ControlPlaneClient
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, TRACE_ID_HEADER
 from tokenops.control.models import GovernanceMode
 
 
@@ -62,8 +61,8 @@ def submit_goal_sync_with_meta(
 ) -> tuple[RunResult, dict[str, object]]:
     """POST the goal to the Planner entry agent (UI path).
 
-    The Planner registers the run on the control plane when ``X-TokenOps-Trace-Id``
-    is absent — clients should not call ``/v1/runs`` themselves for the triad UI.
+    The Planner registers the run on the control plane when no inbound ``traceparent`` joins one;
+    clients should not call ``/v1/runs`` themselves for the triad UI.
     """
     payload = task_request(task=goal, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
@@ -104,10 +103,6 @@ async def delegate_researcher(
         bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
-    if trace_id:
-        headers[TRACE_ID_HEADER] = trace_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     # post_task merges ambient propagation (trace_id + current span as parent).
     data = await post_task(researcher_url, payload, headers=headers or None)
     return (
@@ -131,10 +126,6 @@ async def delegate_writer(
     """Delegate to writer. Headers come from ambient context when omitted."""
     payload = write_request(task, findings, outline=outline, questions=questions)
     headers: dict[str, str] = {}
-    if trace_id:
-        headers[TRACE_ID_HEADER] = trace_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(writer_url, payload, headers=headers or None)
     answer = str(data.get("answer") or data.get("summary", ""))
     return (

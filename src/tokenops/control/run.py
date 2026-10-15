@@ -15,10 +15,10 @@ from dataclasses import dataclass
 
 from tokenops.control.attribution import (
     _build_attribution,
-    begin_downstream_run,
     begin_entry_task_run,
     merge_registration_dims,
 )
+from tokenops.control.chronicle_trace_utils import chronicle_span
 from tokenops.control.client import ControlPlaneClient
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
@@ -187,14 +187,12 @@ def tokenops_run(
     client_obj = _obtain_client(store=store, client=client)
     store_obj = store if store is not None else client_obj.require_store()
 
-    from tokenops.control.context import header_trace_id
-
-    if header_trace_id(hdrs):
-        bound: BoundRun = begin_downstream_run(store_obj, headers=hdrs, service=svc)
-    else:
-        bound = begin_entry_task_run(
+    with chronicle_span(hdrs, service=svc) as trace:
+        bound: BoundRun = begin_entry_task_run(
             store_obj,
-            headers=hdrs,
+            trace_id=trace.trace_id,
+            parent_span_id=trace.parent_id,
+            span_id=trace.span_id,
             payload=body,
             service=svc,
             intent=resolved_intent,
@@ -204,81 +202,81 @@ def tokenops_run(
             scrape_payload_dims=False,
         )
 
-    reg = bound.registration
-    attr = _build_attribution(reg, service=svc)
+        reg = bound.registration
+        attr = _build_attribution(reg, service=svc)
 
-    # Mode: explicit override → registration → enforce.
-    if resolved_mode is not None and resolved_mode != "":
-        gov_mode = (
-            resolved_mode
-            if isinstance(resolved_mode, GovernanceMode)
-            else parse_governance_mode(resolved_mode)
-        )
-    else:
-        gov_mode = reg.mode
-
-    if governor is None:
-        price_fn = price if price is not None else build_price_book()
-        # §10: cached config (via Store / client); fresh Governor each run — no clone.
-        # Ledger construction follows client_obj (not the local store= param): an
-        # embedded test client built from an explicit store=, whether passed to
-        # tokenops_run() directly or already embedded in a client= the caller built,
-        # keeps using that Store. Everything else (from_env(), always remote — there
-        # is no local ledger to fall back to, tokenops#118) uses the plane's
-        # LedgerBackend (precheck/events:batch) — never store_obj, which in that case
-        # is registration/dashboard HTTP only (HttpStore).
-        if client_obj.embedded:
-            config = store_obj.governance_config_for(svc)
-            ledger_store, ledger_backend = store_obj, None
-        else:
-            config = client_obj.governance_config_for(svc)
-            ledger_store, ledger_backend = None, client_obj.backend
-        if controls is not None:
-            enforce = gov_mode is not GovernanceMode.PREVIEW
-            gov = build_governor(
-                config,
-                price_fn,
-                controls,
-                store=ledger_store,
-                backend=ledger_backend,
-                enforce=enforce,
+        # Mode: explicit override → registration → enforce.
+        if resolved_mode is not None and resolved_mode != "":
+            gov_mode = (
+                resolved_mode
+                if isinstance(resolved_mode, GovernanceMode)
+                else parse_governance_mode(resolved_mode)
             )
-            ctrl = controls
         else:
-            gov, ctrl = build_governance_stack(
-                config,
-                price_fn,
-                store=ledger_store,
-                backend=ledger_backend,
-                mode=gov_mode,
-            )
-    else:
-        gov = governor
-        ctrl = controls if controls is not None else gov.controls  # type: ignore[assignment]
+            gov_mode = reg.mode
 
-    if open_ledger_run:
-        gov.ledger.open_run(reg.trace_id)
-
-    # begin_* binds registration before run_scope; run_scope.reset restores that
-    # bind on exit — clear hop leftovers so ambient context does not leak.
-    try:
-        with run_scope(reg, bound.span):
-            with _governance_scope(gov, attr, provider=prov or "", model=mdl or ""):
-                yield TokenOpsBound(
-                    registration=reg,
-                    span=bound.span,
-                    attr=attr,
-                    governor=gov,
-                    controls=ctrl,
-                    client=client_obj,
-                    store=store_obj,
+        if governor is None:
+            price_fn = price if price is not None else build_price_book()
+            # §10: cached config (via Store / client); fresh Governor each run — no clone.
+            # Ledger construction follows client_obj (not the local store= param): an
+            # embedded test client built from an explicit store=, whether passed to
+            # tokenops_run() directly or already embedded in a client= the caller built,
+            # keeps using that Store. Everything else (from_env(), always remote — there
+            # is no local ledger to fall back to, tokenops#118) uses the plane's
+            # LedgerBackend (precheck/events:batch) — never store_obj, which in that case
+            # is registration/dashboard HTTP only (HttpStore).
+            if client_obj.embedded:
+                config = store_obj.governance_config_for(svc)
+                ledger_store, ledger_backend = store_obj, None
+            else:
+                config = client_obj.governance_config_for(svc)
+                ledger_store, ledger_backend = None, client_obj.backend
+            if controls is not None:
+                enforce = gov_mode is not GovernanceMode.PREVIEW
+                gov = build_governor(
+                    config,
+                    price_fn,
+                    controls,
+                    store=ledger_store,
+                    backend=ledger_backend,
+                    enforce=enforce,
                 )
-    finally:
-        clear_run_context()
+                ctrl = controls
+            else:
+                gov, ctrl = build_governance_stack(
+                    config,
+                    price_fn,
+                    store=ledger_store,
+                    backend=ledger_backend,
+                    mode=gov_mode,
+                )
+        else:
+            gov = governor
+            ctrl = controls if controls is not None else gov.controls  # type: ignore[assignment]
+
         if open_ledger_run:
-            # Drop this process's LocalRunState so a long-lived / shared-governor process
-            # does not leak per-run window state.
-            gov.ledger.close_run(reg.trace_id)
+            gov.ledger.open_run(reg.trace_id)
+
+        # begin_* binds registration before run_scope; run_scope.reset restores that
+        # bind on exit — clear hop leftovers so ambient context does not leak.
+        try:
+            with run_scope(reg, bound.span):
+                with _governance_scope(gov, attr, provider=prov or "", model=mdl or ""):
+                    yield TokenOpsBound(
+                        registration=reg,
+                        span=bound.span,
+                        attr=attr,
+                        governor=gov,
+                        controls=ctrl,
+                        client=client_obj,
+                        store=store_obj,
+                    )
+        finally:
+            clear_run_context()
+            if open_ledger_run:
+                # Drop this process's LocalRunState so a long-lived / shared-governor process
+                # does not leak per-run window state.
+                gov.ledger.close_run(reg.trace_id)
 
 
 # Preferred alternate name from design notes §5.

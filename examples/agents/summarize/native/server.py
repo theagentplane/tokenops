@@ -37,7 +37,7 @@ def build_app():
 
             task = str(payload.get("task", ""))
             findings = parse_findings(payload.get("findings", []))
-            parent_span = headers.get("X-TokenOps-Parent-Span-Id") or payload.get("parent_run")
+            parent_span = payload.get("parent_run")
 
             client.create_run(
                 RunRecord(
