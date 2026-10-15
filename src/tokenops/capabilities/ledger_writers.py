@@ -15,20 +15,15 @@ from tokenops.repositories import ControlPlaneClient, LedgerEventWriter
 _LOCK = threading.Lock()
 # Keeps the client referenced so its id() cannot be reused while its writer is alive.
 _WRITERS: dict[int, tuple[ControlPlaneClient, LedgerEventWriter]] = {}
-_ATEXIT_REGISTERED = False
 
 
 def writer_for(client: ControlPlaneClient) -> LedgerEventWriter:
     """The shared writer for ``client`` (created on first use)."""
-    global _ATEXIT_REGISTERED
     with _LOCK:
         entry = _WRITERS.get(id(client))
         if entry is None:
             entry = (client, LedgerEventWriter(client))
             _WRITERS[id(client)] = entry
-            if not _ATEXIT_REGISTERED:
-                atexit.register(flush_ledger_writes)
-                _ATEXIT_REGISTERED = True
         return entry[1]
 
 
@@ -37,3 +32,8 @@ def flush_ledger_writes(timeout: float = 5.0) -> bool:
     with _LOCK:
         writers = [w for _, w in _WRITERS.values()]
     return all([w.flush(timeout) for w in writers])
+
+
+# Registered once at import; a no-op until a writer exists, so a short script does not lose
+# its last spend.
+atexit.register(flush_ledger_writes)
