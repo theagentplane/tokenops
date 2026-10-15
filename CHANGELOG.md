@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trips its budget and the halt is on the trace attributes and in the halted-trace list; two
   agents share one budget and the second is stopped by the first; a halted trace is replayed
   with Chronicle, reproducing the halt with the original cap and passing with the fix.
+- `context_compaction` savings are recorded as envelope metadata
+  (`tokenops.compaction_tokens_before`, `_tokens_after`, `_tokens_saved`) by `wrap_complete`
+  and `wrap_stream`, because the control plane stores no per-policy statistics (control-plane
+  ADR 0009). They were previously stored on the 0.2 plane's step event.
+- Which state each policy reads, in process or from the plane, is documented in
+  `tokenops.control.policies` and ADR 0004.
+- A contract test that every enabled policy template is in the control plane's allow-list.
+  It currently flags `time_budget`, which the plane does not know (marked `xfail`).
 
 ### Changed
 
