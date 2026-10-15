@@ -35,7 +35,7 @@ def test_store_policy_halts_governed_complete(tmp_path):
             agent="research",
         )
     )
-    reg = s.register_run(RunRegistration(run_id="run-1", intent="demo"))
+    reg = s.register_run(RunRegistration(trace_id="run-1", intent="demo"))
     cfg = s.governance_config_for("research")
 
     gov = build_governor(cfg, build_price_book(), ApplyControls())

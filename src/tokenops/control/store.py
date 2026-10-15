@@ -79,14 +79,14 @@ CREATE TABLE IF NOT EXISTS policy_instances (
   data_scope TEXT NOT NULL DEFAULT 'local'
 );
 CREATE TABLE IF NOT EXISTS runs (
-  run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, status TEXT NOT NULL,
+  trace_id TEXT PRIMARY KEY, agent TEXT NOT NULL, status TEXT NOT NULL,
   parent_run TEXT, halt_reason TEXT, detector TEXT,
   cost_micros INTEGER NOT NULL DEFAULT 0, steps INTEGER NOT NULL DEFAULT 0,
   started_at REAL NOT NULL DEFAULT 0, ended_at REAL,
   task TEXT, dims TEXT NOT NULL DEFAULT '{}'
 );
 CREATE TABLE IF NOT EXISTS run_registrations (
-  run_id TEXT PRIMARY KEY,
+  trace_id TEXT PRIMARY KEY,
   intent TEXT NOT NULL DEFAULT '',
   user_dims TEXT NOT NULL DEFAULT '{}',
   registered_at REAL NOT NULL DEFAULT 0
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS ledger_inflight (
   count INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS ledger_halt (
-  run_id TEXT PRIMARY KEY,
+  trace_id TEXT PRIMARY KEY,
   halted INTEGER NOT NULL DEFAULT 0,
   halt_reason TEXT
 );
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS trajectory_index (
   input_hash TEXT NOT NULL,
   input_simhash INTEGER NOT NULL,
   input_preview TEXT NOT NULL,
-  source_run_id TEXT NOT NULL,
+  source_trace_id TEXT NOT NULL,
   step_summary TEXT NOT NULL,
   tool_sequence TEXT NOT NULL,
   cost_micros INTEGER NOT NULL,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS trajectory_index (
 CREATE INDEX IF NOT EXISTS idx_traj_scope_hash ON trajectory_index(scope_key, input_hash);
 CREATE INDEX IF NOT EXISTS idx_traj_scope_time ON trajectory_index(scope_key, indexed_at DESC);
 CREATE TABLE IF NOT EXISTS trajectory_build_queue (
-  run_id TEXT PRIMARY KEY,
+  trace_id TEXT PRIMARY KEY,
   scope_key TEXT NOT NULL,
   input_hash TEXT NOT NULL,
   input_simhash INTEGER NOT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS trajectory_build_queue (
   attempts INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS run_trajectory_snapshots (
-  run_id TEXT PRIMARY KEY,
+  trace_id TEXT PRIMARY KEY,
   window_json TEXT NOT NULL,
   saved_at REAL NOT NULL
 );
@@ -379,11 +379,11 @@ class Store:
 
     @_locked
     def register_run(self, reg: RunRegistration) -> RunRegistration:
-        if self.get_run_registration(reg.run_id) is not None:
-            raise RunAlreadyRegisteredError(f"run {reg.run_id!r} is already registered")
+        if self.get_run_registration(reg.trace_id) is not None:
+            raise RunAlreadyRegisteredError(f"run {reg.trace_id!r} is already registered")
         self._db.execute(
-            "INSERT INTO run_registrations(run_id, intent, user_dims, mode, registered_at) VALUES (?,?,?,?,?)",
-            (reg.run_id, reg.intent, json.dumps(reg.user_dims), reg.mode.value, time.time()),
+            "INSERT INTO run_registrations(trace_id, intent, user_dims, mode, registered_at) VALUES (?,?,?,?,?)",
+            (reg.trace_id, reg.intent, json.dumps(reg.user_dims), reg.mode.value, time.time()),
         )
         self._db.commit()
         # Dashboard reads ``runs``; registration alone must make the run visible.
@@ -391,7 +391,7 @@ class Store:
         agent = reg.intent or "agent"
         self.create_run(
             RunRecord(
-                run_id=reg.run_id,
+                trace_id=reg.trace_id,
                 agent=agent,
                 status="running",
                 dims=dict(reg.user_dims),
@@ -401,16 +401,16 @@ class Store:
         return reg
 
     @_locked
-    def resolve_run(self, run_id: str) -> RunRegistration:
-        reg = self.get_run_registration(run_id)
+    def resolve_run(self, trace_id: str) -> RunRegistration:
+        reg = self.get_run_registration(trace_id)
         if reg is None:
-            raise RunNotRegisteredError(f"run {run_id!r} is not registered")
+            raise RunNotRegisteredError(f"run {trace_id!r} is not registered")
         return reg
 
     @_locked
-    def get_run_registration(self, run_id: str) -> RunRegistration | None:
+    def get_run_registration(self, trace_id: str) -> RunRegistration | None:
         row = self._db.execute(
-            "SELECT * FROM run_registrations WHERE run_id=?", (run_id,)
+            "SELECT * FROM run_registrations WHERE trace_id=?", (trace_id,)
         ).fetchone()
         return _registration(row) if row else None
 
@@ -474,11 +474,11 @@ class Store:
         if not rec.started_at:
             rec.started_at = time.time()
         self._db.execute(
-            "REPLACE INTO runs(run_id, agent, status, parent_run, parent_span, halt_reason, detector, "
+            "REPLACE INTO runs(trace_id, agent, status, parent_run, parent_span, halt_reason, detector, "
             "cost_micros, steps, started_at, ended_at, task, dims) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                rec.run_id,
+                rec.trace_id,
                 rec.agent,
                 rec.status,
                 rec.parent_run,
@@ -497,18 +497,18 @@ class Store:
         return rec
 
     @_locked
-    def update_run(self, run_id: str, **fields) -> None:
+    def update_run(self, trace_id: str, **fields) -> None:
         if not fields:
             return
         if "governance_events" in fields and not isinstance(fields["governance_events"], str):
             fields["governance_events"] = json.dumps(fields["governance_events"])
         cols = ", ".join(f"{k}=?" for k in fields)
-        self._db.execute(f"UPDATE runs SET {cols} WHERE run_id=?", (*fields.values(), run_id))
+        self._db.execute(f"UPDATE runs SET {cols} WHERE trace_id=?", (*fields.values(), trace_id))
         self._db.commit()
 
     @_locked
-    def get_run(self, run_id: str) -> RunRecord | None:
-        row = self._db.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
+    def get_run(self, trace_id: str) -> RunRecord | None:
+        row = self._db.execute("SELECT * FROM runs WHERE trace_id=?", (trace_id,)).fetchone()
         return self._run_with_ledger_cost(row) if row else None
 
     @_locked
@@ -525,7 +525,7 @@ class Store:
         spent_row = self._db.execute(
             "SELECT spent_micros FROM ledger_spent "
             "WHERE budget_id=? AND segment_key=? AND period=?",
-            (RUN_TOTAL_BUDGET.budget_id, f"run:{rec.run_id}", LIFETIME),
+            (RUN_TOTAL_BUDGET.budget_id, f"run:{rec.trace_id}", LIFETIME),
         ).fetchone()
         if spent_row is not None:
             rec.cost_micros = int(spent_row[0])
@@ -611,57 +611,57 @@ class Store:
         return int(row[0]) if row else 0
 
     @_locked
-    def ledger_mark_halted(self, run_id: str, reason: str = "") -> None:
+    def ledger_mark_halted(self, trace_id: str, reason: str = "") -> None:
         self._db.execute(
-            "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 1, ?) "
-            "ON CONFLICT(run_id) DO UPDATE SET halted=1, "
+            "INSERT INTO ledger_halt(trace_id, halted, halt_reason) VALUES (?, 1, ?) "
+            "ON CONFLICT(trace_id) DO UPDATE SET halted=1, "
             "halt_reason=COALESCE(excluded.halt_reason, ledger_halt.halt_reason)",
-            (run_id, reason or None),
+            (trace_id, reason or None),
         )
         # Keep dashboard row in sync when present; ignore missing runs rows.
         self._db.execute(
-            "UPDATE runs SET status='halted', halt_reason=? WHERE run_id=?",
-            (reason or None, run_id),
+            "UPDATE runs SET status='halted', halt_reason=? WHERE trace_id=?",
+            (reason or None, trace_id),
         )
         self._db.commit()
 
     @_locked
-    def ledger_is_halted(self, run_id: str) -> bool:
+    def ledger_is_halted(self, trace_id: str) -> bool:
         row = self._db.execute(
-            "SELECT halted FROM ledger_halt WHERE run_id=?",
-            (run_id,),
+            "SELECT halted FROM ledger_halt WHERE trace_id=?",
+            (trace_id,),
         ).fetchone()
         return bool(row and row[0])
 
     @_locked
-    def ledger_halt_reason(self, run_id: str) -> str | None:
+    def ledger_halt_reason(self, trace_id: str) -> str | None:
         row = self._db.execute(
-            "SELECT halt_reason FROM ledger_halt WHERE run_id=?",
-            (run_id,),
+            "SELECT halt_reason FROM ledger_halt WHERE trace_id=?",
+            (trace_id,),
         ).fetchone()
         return row[0] if row else None
 
     @_locked
-    def ledger_clear_halt(self, run_id: str) -> None:
+    def ledger_clear_halt(self, trace_id: str) -> None:
         self._db.execute(
-            "INSERT INTO ledger_halt(run_id, halted, halt_reason) VALUES (?, 0, NULL) "
-            "ON CONFLICT(run_id) DO UPDATE SET halted=0, halt_reason=NULL",
-            (run_id,),
+            "INSERT INTO ledger_halt(trace_id, halted, halt_reason) VALUES (?, 0, NULL) "
+            "ON CONFLICT(trace_id) DO UPDATE SET halted=0, halt_reason=NULL",
+            (trace_id,),
         )
         # Clear halt_reason only — do not invent a completed/running status.
         self._db.execute(
-            "UPDATE runs SET halt_reason=NULL WHERE run_id=?",
-            (run_id,),
+            "UPDATE runs SET halt_reason=NULL WHERE trace_id=?",
+            (trace_id,),
         )
         self._db.commit()
 
     # ---- trajectory hint index -------------------------------------------- #
 
     @_locked
-    def save_trajectory_snapshot(self, run_id: str, window_json: str) -> None:
+    def save_trajectory_snapshot(self, trace_id: str, window_json: str) -> None:
         self._db.execute(
-            "REPLACE INTO run_trajectory_snapshots(run_id, window_json, saved_at) VALUES (?,?,?)",
-            (run_id, window_json, time.time()),
+            "REPLACE INTO run_trajectory_snapshots(trace_id, window_json, saved_at) VALUES (?,?,?)",
+            (trace_id, window_json, time.time()),
         )
         self._db.commit()
 
@@ -669,7 +669,7 @@ class Store:
     def enqueue_trajectory_build(
         self,
         *,
-        run_id: str,
+        trace_id: str,
         scope_key: str,
         input_hash: str,
         input_simhash: int,
@@ -680,11 +680,11 @@ class Store:
     ) -> None:
         self._db.execute(
             "REPLACE INTO trajectory_build_queue("
-            "run_id, scope_key, input_hash, input_simhash, input_preview, task_text, "
+            "trace_id, scope_key, input_hash, input_simhash, input_preview, task_text, "
             "cost_micros, step_count, enqueued_at, attempts"
             ") VALUES (?,?,?,?,?,?,?,?,?,0)",
             (
-                run_id,
+                trace_id,
                 scope_key,
                 input_hash,
                 input_simhash,
@@ -714,14 +714,16 @@ class Store:
         ).fetchall()
         done = 0
         for row in rows:
-            run_id = row["run_id"]
+            trace_id = row["trace_id"]
             try:
                 snap = self._db.execute(
-                    "SELECT window_json FROM run_trajectory_snapshots WHERE run_id=?",
-                    (run_id,),
+                    "SELECT window_json FROM run_trajectory_snapshots WHERE trace_id=?",
+                    (trace_id,),
                 ).fetchone()
                 if not snap:
-                    self._db.execute("DELETE FROM trajectory_build_queue WHERE run_id=?", (run_id,))
+                    self._db.execute(
+                        "DELETE FROM trajectory_build_queue WHERE trace_id=?", (trace_id,)
+                    )
                     self._db.commit()
                     continue
                 steps = window_from_json(snap["window_json"])
@@ -731,7 +733,7 @@ class Store:
                     input_hash=row["input_hash"],
                     input_simhash=int(row["input_simhash"]),
                     input_preview=row["input_preview"],
-                    source_run_id=run_id,
+                    source_trace_id=trace_id,
                     step_summary=step_summary,
                     tool_sequence=tool_sequence,
                     cost_micros=int(row["cost_micros"]),
@@ -739,13 +741,13 @@ class Store:
                     max_age_days=max_age_days,
                     max_entries_per_scope=max_entries_per_scope,
                 )
-                self._db.execute("DELETE FROM trajectory_build_queue WHERE run_id=?", (run_id,))
+                self._db.execute("DELETE FROM trajectory_build_queue WHERE trace_id=?", (trace_id,))
                 self._db.commit()
                 done += 1
             except Exception:
                 self._db.execute(
-                    "UPDATE trajectory_build_queue SET attempts = attempts + 1 WHERE run_id=?",
-                    (run_id,),
+                    "UPDATE trajectory_build_queue SET attempts = attempts + 1 WHERE trace_id=?",
+                    (trace_id,),
                 )
                 self._db.commit()
         return done
@@ -758,7 +760,7 @@ class Store:
         input_hash: str,
         input_simhash: int,
         input_preview: str,
-        source_run_id: str,
+        source_trace_id: str,
         step_summary: str,
         tool_sequence: str,
         cost_micros: int,
@@ -771,7 +773,7 @@ class Store:
         row_id = new_id("traj")
         self._db.execute(
             "INSERT INTO trajectory_index("
-            "id, scope_key, input_hash, input_simhash, input_preview, source_run_id, "
+            "id, scope_key, input_hash, input_simhash, input_preview, source_trace_id, "
             "step_summary, tool_sequence, cost_micros, step_count, quality_score, indexed_at"
             ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (
@@ -780,7 +782,7 @@ class Store:
                 input_hash,
                 input_simhash,
                 input_preview,
-                source_run_id,
+                source_trace_id,
                 step_summary,
                 tool_sequence,
                 cost_micros,
@@ -866,7 +868,7 @@ class Store:
     @staticmethod
     def _trajectory_hit_row(row: sqlite3.Row, *, match: str) -> dict[str, Any]:
         return {
-            "source_run_id": row["source_run_id"],
+            "source_trace_id": row["source_trace_id"],
             "step_count": int(row["step_count"]),
             "cost_micros": int(row["cost_micros"]),
             "tool_sequence": row["tool_sequence"],
@@ -875,10 +877,10 @@ class Store:
         }
 
     @_locked
-    def get_trajectory_index_by_run(self, source_run_id: str) -> dict[str, Any] | None:
+    def get_trajectory_index_by_run(self, source_trace_id: str) -> dict[str, Any] | None:
         row = self._db.execute(
-            "SELECT * FROM trajectory_index WHERE source_run_id=? ORDER BY indexed_at DESC LIMIT 1",
-            (source_run_id,),
+            "SELECT * FROM trajectory_index WHERE source_trace_id=? ORDER BY indexed_at DESC LIMIT 1",
+            (source_trace_id,),
         ).fetchone()
         return dict(row) if row else None
 
@@ -888,7 +890,7 @@ class Store:
 
 def _registration(r: sqlite3.Row) -> RunRegistration:
     return RunRegistration(
-        run_id=r["run_id"],
+        trace_id=r["trace_id"],
         intent=r["intent"] or "",
         user_dims=json.loads(r["user_dims"] or "{}"),
         mode=parse_governance_mode(r["mode"] if "mode" in r.keys() else None),
@@ -945,7 +947,7 @@ def _run(r: sqlite3.Row) -> RunRecord:
     except json.JSONDecodeError:
         governance_events = []
     return RunRecord(
-        run_id=r["run_id"],
+        trace_id=r["trace_id"],
         agent=r["agent"],
         status=r["status"],
         parent_run=r["parent_run"],

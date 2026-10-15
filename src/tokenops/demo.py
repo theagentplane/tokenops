@@ -117,13 +117,13 @@ def run_governed() -> tuple[int, int, str]:
             dispatch=fake_llm,
             service="demo",
         )
-        ledger, run_id = bound.governor.ledger, bound.attr.run_id
+        ledger, trace_id = bound.governor.ledger, bound.attr.trace_id
         for i in range(1, MAX_CALLS + 1):
             try:
                 governed("openai", "gpt-4o", [{"role": "user", "content": f"question {i}"}])
             except Halt as halt:
-                return ledger.cost_micros(run_id), i, str(halt)
-        return ledger.cost_micros(run_id), MAX_CALLS, "never halted"
+                return ledger.cost_micros(trace_id), i, str(halt)
+        return ledger.cost_micros(trace_id), MAX_CALLS, "never halted"
 
 
 def _seed_governance(url: str) -> None:

@@ -39,7 +39,7 @@ class StepCapDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"step cap reached: {step.step} >= {self.max_steps}",
                 evidence={"steps": step.step, "max_steps": self.max_steps},
             )
@@ -50,7 +50,7 @@ class StepCapPolicy(Policy):
     name = "step_cap"
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
-        return Action(kind=ActionKind.HALT, run_id=signal.run_id, reason=signal.reason)
+        return Action(kind=ActionKind.HALT, trace_id=signal.trace_id, reason=signal.reason)
 
 
 def build(max_steps: int) -> tuple[Detector, Policy]:

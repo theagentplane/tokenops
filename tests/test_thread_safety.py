@@ -26,9 +26,9 @@ def _clear_cache():
     clear_governance_config_cache()
 
 
-def _llm_obs(run_id: str, ts: float, *, input_tokens: int = 100) -> Observation:
+def _llm_obs(trace_id: str, ts: float, *, input_tokens: int = 100) -> Observation:
     return Observation(
-        attr=make_attr(run_id=run_id),
+        attr=make_attr(trace_id=trace_id),
         node_type="llm",
         boundary_id="chat",
         ts=ts,
@@ -38,7 +38,7 @@ def _llm_obs(run_id: str, ts: float, *, input_tokens: int = 100) -> Observation:
     )
 
 
-def test_concurrent_record_two_run_ids_no_lost_updates():
+def test_concurrent_record_two_trace_ids_no_lost_updates():
     ledger = Ledger(price=toy_price)
     ledger.open_run("run-a")
     ledger.open_run("run-b")
@@ -46,9 +46,9 @@ def test_concurrent_record_two_run_ids_no_lost_updates():
     # 100 input tokens → 1000 micros each (toy_price)
     per_call = 1000
 
-    def worker(run_id: str) -> None:
+    def worker(trace_id: str) -> None:
         for i in range(n):
-            ledger.record(_llm_obs(run_id, float(i), input_tokens=100))
+            ledger.record(_llm_obs(trace_id, float(i), input_tokens=100))
 
     t1 = threading.Thread(target=worker, args=("run-a",))
     t2 = threading.Thread(target=worker, args=("run-b",))
@@ -65,7 +65,7 @@ def test_concurrent_record_two_run_ids_no_lost_updates():
     assert len(ledger.window("run-b")) == n
 
 
-def test_concurrent_store_backed_spend_two_run_ids(tmp_path):
+def test_concurrent_store_backed_spend_two_trace_ids(tmp_path):
     store = Store(str(tmp_path / "ledger.db"), auto_seed=False)
     try:
         # Two Ledgers / "Governors" sharing one Store (same process).
@@ -76,9 +76,9 @@ def test_concurrent_store_backed_spend_two_run_ids(tmp_path):
         n = 40
         per_call = 1000
 
-        def worker(ledger: Ledger, run_id: str) -> None:
+        def worker(ledger: Ledger, trace_id: str) -> None:
             for i in range(n):
-                ledger.record(_llm_obs(run_id, float(i)))
+                ledger.record(_llm_obs(trace_id, float(i)))
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             fa = pool.submit(worker, la, "run-a")
@@ -218,7 +218,7 @@ def test_governance_config_cache_concurrent_get_set_invalidate(tmp_path):
     store.close()
 
 
-def test_asyncio_tasks_two_run_ids_via_to_thread():
+def test_asyncio_tasks_two_trace_ids_via_to_thread():
     """Async tasks that hop to threads for Ledger.record — no lost updates."""
     ledger = Ledger(price=toy_price)
     ledger.open_run("run-a")
@@ -227,9 +227,9 @@ def test_asyncio_tasks_two_run_ids_via_to_thread():
     per_call = 1000
 
     async def main() -> None:
-        async def hammer(run_id: str) -> None:
+        async def hammer(trace_id: str) -> None:
             for i in range(n):
-                await asyncio.to_thread(ledger.record, _llm_obs(run_id, float(i)))
+                await asyncio.to_thread(ledger.record, _llm_obs(trace_id, float(i)))
 
         await asyncio.gather(hammer("run-a"), hammer("run-b"))
 

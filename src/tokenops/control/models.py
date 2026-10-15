@@ -35,24 +35,24 @@ def parse_governance_mode(value: object) -> GovernanceMode:
 
 @dataclass(frozen=True, kw_only=True)
 class RunRegistration:
-    """Frozen trace dims registered before any telemetry for a ``run_id``.
+    """Frozen trace dims registered before any telemetry for a ``trace_id``.
 
     See ``docs/run-attribution.md``. Registration is required and immutable for
     the life of the run.
     """
 
-    run_id: str
+    trace_id: str
     intent: str = ""
     user_dims: dict[str, str] = field(default_factory=dict)
     mode: GovernanceMode = GovernanceMode.ENFORCE
 
 
 class RunNotRegisteredError(LookupError):
-    """Telemetry references a ``run_id`` that was never registered."""
+    """Telemetry references a ``trace_id`` that was never registered."""
 
 
 class RunAlreadyRegisteredError(ValueError):
-    """``register_run`` was called twice for the same ``run_id``."""
+    """``register_run`` was called twice for the same ``trace_id``."""
 
 
 @dataclass
@@ -110,7 +110,7 @@ class RunRecord:
     """A persisted run for the dashboard — survives process restarts (unlike the in-memory
     ledger). Written by the server handler; read by the dashboard."""
 
-    run_id: str
+    trace_id: str
     agent: str
     status: RunStatus = "running"
     parent_run: str | None = None

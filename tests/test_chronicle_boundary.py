@@ -38,7 +38,7 @@ def test_chronicle_live_records_envelope(chronicle_envelopes):
 
 def test_boundary_tokenops_observe_when_governed(store):
     clear()
-    reg = store.register_run(RunRegistration(run_id="r1"))
+    reg = store.register_run(RunRegistration(trace_id="r1"))
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],

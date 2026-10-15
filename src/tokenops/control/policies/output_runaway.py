@@ -55,7 +55,7 @@ class OutputRunawayDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"degenerate output: ngram x{rep}, domination {dom:.0%}",
                 evidence={"ngram_repeat": rep, "domination": dom},
             )
@@ -72,22 +72,22 @@ class OutputRunawayPolicy(Policy):
         self.max_retries = max_retries
         self._retries: dict[str, int] = defaultdict(int)
 
-    def reset(self, run_id: str) -> None:
-        self._retries.pop(run_id, None)
+    def reset(self, trace_id: str) -> None:
+        self._retries.pop(trace_id, None)
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
-        n = self._retries[signal.run_id]
+        n = self._retries[signal.trace_id]
         if n < self.max_retries:
-            self._retries[signal.run_id] += 1
+            self._retries[signal.trace_id] += 1
             return Action(
                 kind=ActionKind.RETRY,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=f"retry {n + 1}/{self.max_retries}: raise frequency/presence penalties, "
                 f"tighten max_output, logit_bias on looping tokens",
             )
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             inject_message="ERROR: generation degenerated (repetition) after bounded retries; "
             "proceed without this output.",

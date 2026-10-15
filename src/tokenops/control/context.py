@@ -16,7 +16,7 @@ from tokenops.control.core import Attribution
 from tokenops.control.models import RunRegistration
 
 # HTTP headers for cross-service propagation (see docs/run-attribution.md).
-RUN_ID_HEADER = "X-TokenOps-Run-Id"
+TRACE_ID_HEADER = "X-TokenOps-Trace-Id"
 PARENT_SPAN_ID_HEADER = "X-TokenOps-Parent-Span-Id"
 
 
@@ -138,9 +138,9 @@ def run_scope(registration: RunRegistration, span: SpanContext) -> Iterator[Boun
         _span.reset(tok_span)
 
 
-def header_run_id(headers: Mapping[str, str]) -> str | None:
+def header_trace_id(headers: Mapping[str, str]) -> str | None:
     for key, value in headers.items():
-        if key.lower() == RUN_ID_HEADER.lower():
+        if key.lower() == TRACE_ID_HEADER.lower():
             v = (value or "").strip()
             return v or None
     return None

@@ -59,9 +59,9 @@ def test_governor_events_use_policy_id(policy_id, params, moment, kind, mode):
         mode=mode,
     )
     attr = make_attr()
-    governor.ledger.open_run(attr.run_id)
+    governor.ledger.open_run(attr.trace_id)
     if policy_id == "concurrency_cap":
-        governor.ledger.admit(f"run:{attr.run_id}")
+        governor.ledger.admit(f"run:{attr.trace_id}")
     if policy_id == "context_compaction":
         controls.compaction_supported = True
     if policy_id == "time_budget":
@@ -159,7 +159,7 @@ def test_explicit_policy_id_wins_over_misleading_reason():
     controls.apply(
         Action(
             kind=ActionKind.INJECT,
-            run_id="r",
+            trace_id="r",
             policy_id="tool_output_cap",
             reason="output cap",
         )
@@ -169,12 +169,12 @@ def test_explicit_policy_id_wins_over_misleading_reason():
 
 def test_actions_without_policy_id_keep_legacy_reason_fallback():
     controls = PreviewControls()
-    controls.apply(Action(kind=ActionKind.HALT, run_id="r", reason="budget 'cap' exhausted"))
+    controls.apply(Action(kind=ActionKind.HALT, trace_id="r", reason="budget 'cap' exhausted"))
     assert governance_events_payload(controls)[0]["policy"] == "cost_budget"
 
 
 def test_policy_attribution_preserves_existing_action_equality_and_hashing():
-    original = Action(kind=ActionKind.HALT, run_id="r", reason="step cap reached")
+    original = Action(kind=ActionKind.HALT, trace_id="r", reason="step cap reached")
     attributed = replace(original, policy_id="step_cap")
     assert original.policy_id is None
     assert attributed.policy_id == "step_cap"
@@ -185,7 +185,7 @@ def test_policy_attribution_preserves_existing_action_equality_and_hashing():
 def test_fail_closed_controls_preserve_policy_id():
     with pytest.raises(Halt) as stopped:
         RaiseControls().apply(
-            Action(kind=ActionKind.INJECT, run_id="r", policy_id="progress_guard")
+            Action(kind=ActionKind.INJECT, trace_id="r", policy_id="progress_guard")
         )
     assert stopped.value.action.policy_id == "progress_guard"
 
@@ -198,14 +198,14 @@ def test_custom_policy_keeps_its_registered_name():
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
             )
 
     class CustomPolicy(Policy):
         name = "my_custom_policy"
 
         def decide(self, signal, view):
-            return Action(kind=ActionKind.INJECT, run_id=signal.run_id)
+            return Action(kind=ActionKind.INJECT, trace_id=signal.trace_id)
 
     controls = PreviewControls()
     governor = Governor(Ledger(price=toy_price), controls)

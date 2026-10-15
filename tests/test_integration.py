@@ -27,9 +27,9 @@ def test_budget_halts_governed_complete():
         }
     }
     gov = build_governor(config, toy_price, ApplyControls())
-    attr = make_attr(run_id="live-1")
+    attr = make_attr(trace_id="live-1")
     gov.ledger.open_run("live-1")
-    reg = RunRegistration(run_id="live-1", intent="demo", user_dims={"user_id": "alice"})
+    reg = RunRegistration(trace_id="live-1", intent="demo", user_dims={"user_id": "alice"})
 
     governed = wrap_complete(
         gov,

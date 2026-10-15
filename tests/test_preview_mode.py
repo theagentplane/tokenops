@@ -45,7 +45,7 @@ def store(tmp_path):
 
 def test_preview_mode_records_actions_without_halting(store):
     reg = store.register_run(
-        RunRegistration(run_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW),
+        RunRegistration(trace_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW),
     )
     cfg = store.governance_config_for("research")
     gov, controls = build_governance_stack(
@@ -79,7 +79,7 @@ def test_preview_mode_records_actions_without_halting(store):
 
 
 def test_enforce_mode_still_halts(store):
-    reg = store.register_run(RunRegistration(run_id="enforce-run", intent="demo"))
+    reg = store.register_run(RunRegistration(trace_id="enforce-run", intent="demo"))
     cfg = store.governance_config_for("research")
     gov, controls = build_governance_stack(
         cfg,
@@ -111,7 +111,7 @@ def test_enforce_mode_still_halts(store):
 
 def test_registration_persists_mode(store):
     store.register_run(
-        RunRegistration(run_id="r-mode", intent="x", mode=GovernanceMode.PREVIEW),
+        RunRegistration(trace_id="r-mode", intent="x", mode=GovernanceMode.PREVIEW),
     )
     loaded = store.resolve_run("r-mode")
     assert loaded.mode is GovernanceMode.PREVIEW

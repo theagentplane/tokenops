@@ -187,9 +187,9 @@ def tokenops_run(
     client_obj = _obtain_client(store=store, client=client)
     store_obj = store if store is not None else client_obj.require_store()
 
-    from tokenops.control.context import header_run_id
+    from tokenops.control.context import header_trace_id
 
-    if header_run_id(hdrs):
+    if header_trace_id(hdrs):
         bound: BoundRun = begin_downstream_run(store_obj, headers=hdrs, service=svc)
     else:
         bound = begin_entry_task_run(
@@ -257,7 +257,7 @@ def tokenops_run(
         ctrl = controls if controls is not None else gov.controls  # type: ignore[assignment]
 
     if open_ledger_run:
-        gov.ledger.open_run(reg.run_id)
+        gov.ledger.open_run(reg.trace_id)
 
     # begin_* binds registration before run_scope; run_scope.reset restores that
     # bind on exit — clear hop leftovers so ambient context does not leak.
@@ -278,7 +278,7 @@ def tokenops_run(
         if open_ledger_run:
             # Drop this process's LocalRunState so a long-lived / shared-governor process
             # does not leak per-run window state.
-            gov.ledger.close_run(reg.run_id)
+            gov.ledger.close_run(reg.trace_id)
 
 
 # Preferred alternate name from design notes §5.

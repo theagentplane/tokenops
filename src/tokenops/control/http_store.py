@@ -57,7 +57,7 @@ class HttpStore:
             "POST",
             "/v1/runs",
             json={
-                "run_id": reg.run_id,
+                "run_id": reg.trace_id,
                 "intent": reg.intent,
                 "user_dims": dict(reg.user_dims),
                 "mode": reg.mode.value,
@@ -65,28 +65,28 @@ class HttpStore:
         )
         body = r.json()
         return RunRegistration(
-            run_id=str(body["run_id"]),
+            trace_id=str(body["run_id"]),
             intent=str(body.get("intent") or reg.intent),
             user_dims={str(k): str(v) for k, v in (body.get("user_dims") or reg.user_dims).items()},
             mode=parse_governance_mode(body.get("mode") or reg.mode),
         )
 
-    def resolve_run(self, run_id: str) -> RunRegistration:
-        r = self._client.get(f"/v1/runs/{run_id}/registration")
+    def resolve_run(self, trace_id: str) -> RunRegistration:
+        r = self._client.get(f"/v1/runs/{trace_id}/registration")
         if r.status_code == 404:
-            raise RunNotRegisteredError(f"run {run_id!r} is not registered")
+            raise RunNotRegisteredError(f"run {trace_id!r} is not registered")
         r.raise_for_status()
         body = r.json()
         return RunRegistration(
-            run_id=str(body["run_id"]),
+            trace_id=str(body["run_id"]),
             intent=str(body.get("intent", "")),
             user_dims={str(k): str(v) for k, v in (body.get("user_dims") or {}).items()},
             mode=parse_governance_mode(body.get("mode")),
         )
 
-    def get_run_registration(self, run_id: str) -> RunRegistration | None:
+    def get_run_registration(self, trace_id: str) -> RunRegistration | None:
         try:
-            return self.resolve_run(run_id)
+            return self.resolve_run(trace_id)
         except RunNotRegisteredError:
             return None
 
@@ -95,7 +95,7 @@ class HttpStore:
 
     def create_run(self, rec: RunRecord) -> RunRecord:
         payload = {
-            "run_id": rec.run_id,
+            "run_id": rec.trace_id,
             "agent": rec.agent,
             "status": rec.status,
             "parent_run": rec.parent_run,
@@ -113,11 +113,11 @@ class HttpStore:
         self._request("PUT", "/v1/run-records", json=payload)
         return rec
 
-    def update_run(self, run_id: str, **fields: Any) -> None:
-        self._request("PATCH", f"/v1/run-records/{run_id}", json=fields)
+    def update_run(self, trace_id: str, **fields: Any) -> None:
+        self._request("PATCH", f"/v1/run-records/{trace_id}", json=fields)
 
-    def get_run(self, run_id: str) -> RunRecord | None:
-        r = self._client.get(f"/v1/run-records/{run_id}")
+    def get_run(self, trace_id: str) -> RunRecord | None:
+        r = self._client.get(f"/v1/run-records/{trace_id}")
         if r.status_code == 404:
             return None
         r.raise_for_status()
@@ -164,20 +164,20 @@ class HttpStore:
         r = self._request("GET", "/v1/ledger/inflight", params={"segment_key": segment_key})
         return int(r.json()["count"])
 
-    def ledger_mark_halted(self, run_id: str, reason: str = "") -> None:
-        self._request("POST", "/v1/ledger/halt/mark", json={"run_id": run_id, "reason": reason})
+    def ledger_mark_halted(self, trace_id: str, reason: str = "") -> None:
+        self._request("POST", "/v1/ledger/halt/mark", json={"run_id": trace_id, "reason": reason})
 
-    def ledger_is_halted(self, run_id: str) -> bool:
-        r = self._request("GET", f"/v1/ledger/halt/{run_id}")
+    def ledger_is_halted(self, trace_id: str) -> bool:
+        r = self._request("GET", f"/v1/ledger/halt/{trace_id}")
         return bool(r.json().get("halted"))
 
-    def ledger_halt_reason(self, run_id: str) -> str | None:
-        r = self._client.get(f"/v1/ledger/halt/{run_id}")
+    def ledger_halt_reason(self, trace_id: str) -> str | None:
+        r = self._client.get(f"/v1/ledger/halt/{trace_id}")
         r.raise_for_status()
         return r.json().get("halt_reason")
 
-    def ledger_clear_halt(self, run_id: str) -> None:
-        self._request("POST", "/v1/ledger/halt/clear", json={"run_id": run_id})
+    def ledger_clear_halt(self, trace_id: str) -> None:
+        self._request("POST", "/v1/ledger/halt/clear", json={"run_id": trace_id})
 
     # Trajectory index is plane-local for now; no-ops keep policies from crashing.
     def save_trajectory_snapshot(self, *args: Any, **kwargs: Any) -> None:
@@ -209,7 +209,7 @@ class HttpStore:
 
 def _run(data: dict[str, Any]) -> RunRecord:
     return RunRecord(
-        run_id=str(data["run_id"]),
+        trace_id=str(data["run_id"]),
         agent=str(data["agent"]),
         status=data.get("status", "running"),
         parent_run=data.get("parent_run"),

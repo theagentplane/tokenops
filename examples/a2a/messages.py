@@ -15,7 +15,7 @@ def bench_corpus_profile(payload: dict[str, Any]) -> CorpusProfile:
 def task_request(
     task: str,
     *,
-    run_id: str | None = None,
+    trace_id: str | None = None,
     user: str = "ui",
     intent: str = "",
     user_dims: dict[str, str] | None = None,
@@ -29,8 +29,8 @@ def task_request(
         "user_dims": user_dims or {},
         "bench": bench or {},
     }
-    if run_id is not None:
-        msg["run_id"] = run_id
+    if trace_id is not None:
+        msg["trace_id"] = trace_id
     return msg
 
 

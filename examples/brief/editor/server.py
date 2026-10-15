@@ -33,7 +33,7 @@ def build_app():
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
         with tokenops_run(client=client) as bound:
             reg = bound.registration
-            run_id = reg.run_id
+            trace_id = reg.trace_id
             attr = bound.attr
             governor = bound.governor
             controls = bound.controls
@@ -46,7 +46,7 @@ def build_app():
 
             client.create_run(
                 RunRecord(
-                    run_id=run_id,
+                    trace_id=trace_id,
                     agent=AGENT,
                     status="running",
                     parent_span=parent_span,
@@ -91,11 +91,11 @@ def build_app():
                 status, halt_reason = "throttled", thr.action.reason
             finally:
                 client.update_run(
-                    run_id,
+                    trace_id,
                     status=status,
                     halt_reason=halt_reason,
-                    cost_micros=governor.ledger.cost_micros(run_id),
-                    steps=governor.ledger.step_count(run_id),
+                    cost_micros=governor.ledger.cost_micros(trace_id),
+                    steps=governor.ledger.step_count(trace_id),
                     ended_at=time.time(),
                 )
 
@@ -103,9 +103,9 @@ def build_app():
                 brief,
                 token_usage,
                 steps,
-                cost_micros=governor.ledger.cost_micros(run_id),
+                cost_micros=governor.ledger.cost_micros(trace_id),
             )
-            response.update(run_id=run_id, status=status)
+            response.update(trace_id=trace_id, status=status)
             if halt_reason:
                 response["halt_reason"] = halt_reason
             return response

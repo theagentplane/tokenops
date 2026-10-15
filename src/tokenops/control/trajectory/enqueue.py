@@ -57,9 +57,9 @@ def enqueue_completed_run(
     norm = normalize_input(task)
     sk = scope_key(registration, agent, scope_dims)
 
-    store.save_trajectory_snapshot(rec.run_id, window_to_json(window))
+    store.save_trajectory_snapshot(rec.trace_id, window_to_json(window))
     store.enqueue_trajectory_build(
-        run_id=rec.run_id,
+        trace_id=rec.trace_id,
         scope_key=sk,
         input_hash=input_hash(task),
         input_simhash=simhash_as_sqlite(input_simhash(task)),

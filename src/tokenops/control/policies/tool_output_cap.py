@@ -57,7 +57,7 @@ class ToolOutputCapDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"tool '{step.boundary_id}' output ~{est} tokens >= cap {self.cap_tokens}",
                 evidence={
                     "est_tokens": est,
@@ -80,7 +80,7 @@ class ToolOutputCapPolicy(Policy):
         ev = signal.evidence
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             replace_tool_result=True,  # deep: substitute the oversized payload with the descriptor
             inject_message=(

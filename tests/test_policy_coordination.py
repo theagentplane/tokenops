@@ -16,11 +16,11 @@ from tokenops.control.core import Action, ActionKind
 
 
 def mutate(**kw) -> Action:
-    return Action(kind=ActionKind.MUTATE, run_id="r", **kw)
+    return Action(kind=ActionKind.MUTATE, trace_id="r", **kw)
 
 
 def inject(message: str, **kw) -> Action:
-    return Action(kind=ActionKind.INJECT, run_id="r", inject_message=message, **kw)
+    return Action(kind=ActionKind.INJECT, trace_id="r", inject_message=message, **kw)
 
 
 class TestOutputCapOnlyTightens:

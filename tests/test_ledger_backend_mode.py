@@ -84,7 +84,7 @@ def test_budget_left_via_backend():
     spent = 100 * 10 + 10 * 30
     sk = segment_key(attr, cap)
     assert ledger.budget_left(cap.budget_id, sk) == cap.limit_micros - spent
-    assert ledger.budget_left(RUN_TOTAL_BUDGET.budget_id, f"run:{attr.run_id}") == UNLIMITED_LEFT
+    assert ledger.budget_left(RUN_TOTAL_BUDGET.budget_id, f"run:{attr.trace_id}") == UNLIMITED_LEFT
     assert ledger.budget_left("unknown-budget", sk) == 0
 
 
@@ -133,7 +133,7 @@ def test_admit_complete_share_inflight_across_ledger_instances():
     backend = FakeLedgerBackend()
     ledger_a = Ledger(backend=backend)
     ledger_b = Ledger(backend=backend)
-    sk = "agent:research"  # non-run-scoped segment key — no run_id embedded
+    sk = "agent:research"  # non-run-scoped segment key — no trace_id embedded
     ledger_a.admit(sk)
     ledger_b.admit(sk)
     assert ledger_a.inflight(sk) == 2

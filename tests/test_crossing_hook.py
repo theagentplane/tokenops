@@ -51,7 +51,7 @@ def test_on_crossing_observes_when_governed(tmp_path):
     clear()
     install_crossing_hook()
     store = Store(str(tmp_path / "hook.db"))
-    reg = store.register_run(RunRegistration(run_id="hook-1", intent="demo"))
+    reg = store.register_run(RunRegistration(trace_id="hook-1", intent="demo"))
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],

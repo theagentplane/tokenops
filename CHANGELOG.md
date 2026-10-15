@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Migration: register no hooks yourself; call `tokenops.control.install_crossing_hook()` (done
     for you by `tokenops_run`). Tests that read `session.envelopes` should read envelopes from
     a `chronicle.FunctionHook(record=...)` registered on `default_hooks`.
+- `run_id` is gone: the only identifier is `trace_id` (a run is a Chronicle trace). Every
+  `run_id` attribute, parameter, keyword, ledger event key, `source_run_id` and the
+  `X-TokenOps-Run-Id` header is now `trace_id` / `source_trace_id` / `X-TokenOps-Trace-Id`.
+  The embedded SQLite schema uses `trace_id` columns; delete any local `tokenops.db`.
+  Migration: rename `run_id=` to `trace_id=`, `attr.run_id` to `attr.trace_id`, and send the
+  new header. Until the control-plane 1.0 client lands, the HTTP edge translates to the
+  control plane 0.2 wire name `run_id` (`http.py`, `http_store.py`, `ledger_backend.py`,
+  `client.py`); that translation is deleted with it.
 - Known gap: a failure inside the TokenOps hook that is not a `Halt` or `AbortCall` is logged
   and ignored by Chronicle's default hook policy (fail-open). Set
   `chronicle.configure(hooks_fail_call_on_error=True)` to make it fail the call; the default

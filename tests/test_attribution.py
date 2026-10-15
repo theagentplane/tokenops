@@ -10,7 +10,7 @@ from tokenops.control.attribution import (
     begin_entry_run,
     require_registration,
 )
-from tokenops.control.context import RUN_ID_HEADER, clear, current_registration, current_span
+from tokenops.control.context import TRACE_ID_HEADER, clear, current_registration, current_span
 from tokenops.control.integration import step_to_observation
 from tokenops.control.models import (
     RunAlreadyRegisteredError,
@@ -29,7 +29,7 @@ def store(tmp_path):
 
 def test_register_and_resolve(store):
     reg = store.register_run(
-        RunRegistration(run_id="r1", intent="frontier", user_dims={"Country": "US"})
+        RunRegistration(trace_id="r1", intent="frontier", user_dims={"Country": "US"})
     )
     assert reg.intent == "frontier"
     resolved = store.resolve_run("r1")
@@ -37,9 +37,9 @@ def test_register_and_resolve(store):
 
 
 def test_duplicate_register_fails(store):
-    store.register_run(RunRegistration(run_id="r1"))
+    store.register_run(RunRegistration(trace_id="r1"))
     with pytest.raises(RunAlreadyRegisteredError):
-        store.register_run(RunRegistration(run_id="r1", intent="other"))
+        store.register_run(RunRegistration(trace_id="r1", intent="other"))
 
 
 def test_resolve_missing_fails_closed(store):
@@ -54,9 +54,9 @@ def test_begin_entry_run_binds_context(store):
         headers={},
         payload={"intent": "demo", "user_dims": {"IsFortune500": "true"}},
         service="research",
-        run_id="run-a",
+        trace_id="run-a",
     )
-    assert bound.registration.run_id == "run-a"
+    assert bound.registration.trace_id == "run-a"
     assert current_registration().intent == "demo"
     assert current_span().service == "research"
     clear()
@@ -71,16 +71,16 @@ def test_begin_downstream_soft_registers_when_header_missing(store, caplog):
     assert bound.registration.intent == "unattributed"
     assert bound.registration.user_dims.get("tokenops_soft_run") == "1"
     assert bound.span.service == "summarize"
-    assert any("missing_run_id" in r.message for r in caplog.records)
+    assert any("missing_trace_id" in r.message for r in caplog.records)
     clear()
 
 
 def test_begin_downstream_resolves_registration(store):
-    store.register_run(RunRegistration(run_id="run-a", intent="x", user_dims={"k": "v"}))
+    store.register_run(RunRegistration(trace_id="run-a", intent="x", user_dims={"k": "v"}))
     clear()
     bound = begin_downstream_run(
         store,
-        headers={RUN_ID_HEADER: "run-a", "X-TokenOps-Parent-Span-Id": "span-parent"},
+        headers={TRACE_ID_HEADER: "run-a", "X-TokenOps-Parent-Span-Id": "span-parent"},
         service="summarize",
     )
     assert bound.registration.intent == "x"
@@ -91,10 +91,10 @@ def test_begin_downstream_resolves_registration(store):
 
 def test_build_attribution_maps_service_and_user_dims(store):
     reg = RunRegistration(
-        run_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"}
+        trace_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"}
     )
     attr = _build_attribution(reg, service="research")
-    assert attr.run_id == "r1"
+    assert attr.trace_id == "r1"
     assert attr.agent == "research"
     assert attr.user == "alice"
     assert attr.tags["intent"] == "f500"

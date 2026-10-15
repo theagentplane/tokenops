@@ -26,14 +26,14 @@ def test_apply_mutate_sets_overrides():
     c = ApplyControls()
     c.begin_call()
     c.apply(
-        Action(kind=ActionKind.MUTATE, run_id="r", max_output_tokens=1024, downgrade_to="cheap")
+        Action(kind=ActionKind.MUTATE, trace_id="r", max_output_tokens=1024, downgrade_to="cheap")
     )
     assert c.call.max_output_tokens == 1024 and c.call.model_override == "cheap"
 
 
 def test_apply_inject_carries_message():
     c = ApplyControls()
-    c.apply(Action(kind=ActionKind.INJECT, run_id="r", inject_message="be minimal"))
+    c.apply(Action(kind=ActionKind.INJECT, trace_id="r", inject_message="be minimal"))
     assert c.carry == ["be minimal"]
 
 
@@ -49,13 +49,13 @@ def test_apply_carry_to_messages_appends_user_turns():
 def test_apply_reject_raises_throttled():
     c = ApplyControls()
     with pytest.raises(Throttled):
-        c.apply(Action(kind=ActionKind.REJECT, run_id="r", retry_after_s=1.0))
+        c.apply(Action(kind=ActionKind.REJECT, trace_id="r", retry_after_s=1.0))
 
 
 def test_apply_halt_raises():
     c = ApplyControls()
     with pytest.raises(Halt):
-        c.apply(Action(kind=ActionKind.HALT, run_id="r"))
+        c.apply(Action(kind=ActionKind.HALT, trace_id="r"))
 
 
 # ---- wrap_complete e2e --------------------------------------------------- #

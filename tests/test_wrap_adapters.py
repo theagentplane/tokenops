@@ -35,7 +35,7 @@ def test_openai_shaped_dispatch_with_wrap_complete_and_chronicle(chronicle_envel
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
     gov = Governor(ledger, controls)
-    reg = RunRegistration(run_id="r-oai", intent="t", user_dims={"user_id": "alice"})
+    reg = RunRegistration(trace_id="r-oai", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="planner")
     ledger.open_run("r-oai")
 
@@ -79,7 +79,7 @@ def test_langchain_governed_chat_model_with_wrap_complete(chronicle_envelopes):
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
     gov = Governor(ledger, controls)
-    reg = RunRegistration(run_id="r-lc", intent="t", user_dims={"user_id": "alice"})
+    reg = RunRegistration(trace_id="r-lc", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="writer")
     ledger.open_run("r-lc")
 

@@ -1,6 +1,6 @@
 """HTTP propagation helpers — inject TokenOps run/span headers from ambient context.
 
-Agent code should not manually thread ``X-TokenOps-Run-Id``. Instrumented HTTP
+Agent code should not manually thread ``X-TokenOps-Trace-Id``. Instrumented HTTP
 clients call :func:`merge_propagation_headers` so outbound calls carry the
 current run and treat the current span as the parent of the next hop (natural
 span bifurcation across agents).
@@ -12,7 +12,7 @@ from collections.abc import Mapping
 
 from tokenops.control.context import (
     PARENT_SPAN_ID_HEADER,
-    RUN_ID_HEADER,
+    TRACE_ID_HEADER,
     current_registration,
     current_span,
 )
@@ -22,8 +22,8 @@ def propagation_headers() -> dict[str, str]:
     """Headers derived from ambient registration + span (may be empty)."""
     out: dict[str, str] = {}
     reg = current_registration()
-    if reg is not None and reg.run_id:
-        out[RUN_ID_HEADER] = reg.run_id
+    if reg is not None and reg.trace_id:
+        out[TRACE_ID_HEADER] = reg.trace_id
     span = current_span()
     if span is not None and span.span_id:
         # Downstream agent opens a *new* span with this as parent.

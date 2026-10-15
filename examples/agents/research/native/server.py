@@ -42,7 +42,7 @@ def build_app():
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
         with tokenops_run(client=client) as bound:
             reg = bound.registration
-            run_id = reg.run_id
+            trace_id = reg.trace_id
             attr = bound.attr
             governor = bound.governor
             controls = bound.controls
@@ -53,7 +53,7 @@ def build_app():
 
             client.create_run(
                 RunRecord(
-                    run_id=run_id,
+                    trace_id=trace_id,
                     agent=AGENT,
                     status="running",
                     task=task,
@@ -109,14 +109,14 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{run_id}",
+                    f"run:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
                     raise Halt(
                         Action(
                             kind=ActionKind.HALT,
-                            run_id=run_id,
+                            trace_id=trace_id,
                             reason="no budget remaining; refusing to delegate",
                         )
                     )
@@ -127,7 +127,7 @@ def build_app():
                 )
                 token_usage = token_usage.merge(sum_tokens)
                 steps.extend(sum_steps)
-                # Child spend is already in the shared ledger for this run_id;
+                # Child spend is already in the shared ledger for this trace_id;
                 # do not re-bill it on the parent.
             except Halt as halt:
                 status, halt_reason = "halted", halt.action.reason
@@ -137,16 +137,16 @@ def build_app():
                 gov_events = governance_events_payload(controls)
                 detector = halt_detector_from_events(gov_events) if status == "halted" else None
                 client.update_run(
-                    run_id,
+                    trace_id,
                     status=status,
                     halt_reason=halt_reason,
                     detector=detector,
-                    cost_micros=governor.ledger.cost_micros(run_id),
-                    steps=governor.ledger.step_count(run_id),
+                    cost_micros=governor.ledger.cost_micros(trace_id),
+                    steps=governor.ledger.step_count(trace_id),
                     ended_at=time.time(),
                     governance_events=gov_events,
                 )
-                rec = store.get_run(run_id)
+                rec = store.get_run(trace_id)
                 if rec is not None:
                     gov_cfg = store.governance_config_for(AGENT).get("governance", {})
                     # trajectory_hint is temporarily disabled (see config.build_governor);
@@ -158,7 +158,7 @@ def build_app():
                         rec=rec,
                         registration=reg,
                         agent=AGENT,
-                        window=governor.ledger.window(run_id),
+                        window=governor.ledger.window(trace_id),
                         policy_params=hint_params,
                     ):
                         p = dict(hint_params or {})
@@ -173,7 +173,7 @@ def build_app():
             )
             response = task_response(result)
             response.update(
-                run_id=run_id, status=status, cost_micros=governor.ledger.cost_micros(run_id)
+                trace_id=trace_id, status=status, cost_micros=governor.ledger.cost_micros(trace_id)
             )
             if halt_reason:
                 response["halt_reason"] = halt_reason

@@ -89,14 +89,14 @@ class Usage:
 class Attribution:
     """Whose spend an event represents — the dimensions a budget/segment can match.
 
-    ``run_id`` ties every crossing into one run. ``parent_run`` links a delegated child
+    ``trace_id`` ties every crossing into one run. ``parent_run`` links a delegated child
     back to its caller so cost lineage survives an A2A hop. ``tags`` carries arbitrary
     segment matchers (corpus_profile, environment, …).
     """
 
     user: str
     agent: str
-    run_id: str
+    trace_id: str
     tenant: str | None = None
     parent_run: str | None = None
     tags: Mapping[str, str] = field(default_factory=dict)
@@ -197,7 +197,7 @@ class Signal:
 
     detector: str
     severity: Severity
-    run_id: str
+    trace_id: str
     reason: str = ""
     evidence: Mapping[str, object] = field(default_factory=dict)
 
@@ -228,7 +228,7 @@ class Action:
     """
 
     kind: ActionKind
-    run_id: str
+    trace_id: str
     reason: str = ""
     # MUTATE payloads
     downgrade_to: str | None = None
@@ -272,21 +272,21 @@ class LedgerView(Protocol):
       * ``window`` is **O(N)** — escape hatch; do not call on every ``observe``.
     """
 
-    def cost_micros(self, run_id: str) -> Micros: ...
+    def cost_micros(self, trace_id: str) -> Micros: ...
 
-    def step_count(self, run_id: str) -> int: ...
+    def step_count(self, trace_id: str) -> int: ...
 
-    def is_halted(self, run_id: str) -> bool: ...
+    def is_halted(self, trace_id: str) -> bool: ...
 
     def budget_left(self, budget_id: str, segment_key: str, period: str) -> Micros: ...
 
     def inflight(self, segment_key: str) -> int: ...
 
-    def velocity(self, run_id: str, m: int) -> float: ...
+    def velocity(self, trace_id: str, m: int) -> float: ...
 
-    def recent(self, run_id: str, n: int) -> Sequence[BoundaryStep]: ...
+    def recent(self, trace_id: str, n: int) -> Sequence[BoundaryStep]: ...
 
-    def window(self, run_id: str) -> Sequence[BoundaryStep]: ...
+    def window(self, trace_id: str) -> Sequence[BoundaryStep]: ...
 
 
 # =========================================================================== #
@@ -311,7 +311,7 @@ class Detector(ABC):
         """Inspect a completed boundary step (loops, velocity, budget, runaway).
 
         ``attr`` is the run's attribution, passed by reference by the harness — it is the
-        same object for every step in the run, so detectors get run_id and every segment
+        same object for every step in the run, so detectors get trace_id and every segment
         dimension *without* it being duplicated onto each entry of the unbounded window.
         """
         return None
@@ -320,8 +320,8 @@ class Detector(ABC):
         """Inspect on a clock, independent of events (timeouts, stalls)."""
         return None
 
-    def reset(self, run_id: str) -> None:
-        """Drop any per-run state held for ``run_id``."""
+    def reset(self, trace_id: str) -> None:
+        """Drop any per-run state held for ``trace_id``."""
         return None
 
 

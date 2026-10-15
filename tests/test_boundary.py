@@ -27,7 +27,7 @@ def _crossing_hook():
 
 def test_boundary_emits_observation_when_governed(store):
     clear()
-    reg = store.register_run(RunRegistration(run_id="r1", intent="demo"))
+    reg = store.register_run(RunRegistration(trace_id="r1", intent="demo"))
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],

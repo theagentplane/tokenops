@@ -68,7 +68,7 @@ class PreCallWorstCaseDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
                 reason=f"unknown price for {request.provider}/{request.model}; failing closed ({exc})",
                 evidence={"fail_closed": True},
             )
@@ -77,7 +77,7 @@ class PreCallWorstCaseDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
                 reason=f"worst-case {projected} >= remaining budget {left} (micros)",
                 evidence={"projected": projected, "left": left, "capped_out": capped_out},
             )
@@ -85,7 +85,7 @@ class PreCallWorstCaseDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
                 reason=f"output cap unset; bounding to {self.default_max_output} so priced cap == enforced cap",
                 evidence={"set_cap": self.default_max_output, "projected": projected, "left": left},
             )
@@ -97,13 +97,13 @@ class PreCallWorstCasePolicy(Policy):
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         if signal.severity is Severity.TRIP:
-            return Action(kind=ActionKind.HALT, run_id=signal.run_id, reason=signal.reason)
+            return Action(kind=ActionKind.HALT, trace_id=signal.trace_id, reason=signal.reason)
         # WARN → bound the output so the worst case we priced is the one enforced.
         raw_cap = signal.evidence.get("set_cap", DEFAULT_MAX_OUTPUT)
         cap = int(raw_cap) if isinstance(raw_cap, (int, float, str)) else DEFAULT_MAX_OUTPUT
         return Action(
             kind=ActionKind.MUTATE,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             max_output_tokens=cap,
         )

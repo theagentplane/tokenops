@@ -65,5 +65,5 @@ def scope_from_tags(
     scope_dims: Sequence[str],
 ) -> str:
     """Scope key when only Attribution tags are available (intent lives in tags)."""
-    reg = RunRegistration(run_id="", intent=intent, user_dims=dict(tags))
+    reg = RunRegistration(trace_id="", intent=intent, user_dims=dict(tags))
     return scope_key(reg, agent, scope_dims)

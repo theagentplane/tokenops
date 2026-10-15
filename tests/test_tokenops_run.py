@@ -17,7 +17,7 @@ from tokenops import (
     tokenops_run,
 )
 from tokenops.control.context import (
-    RUN_ID_HEADER,
+    TRACE_ID_HEADER,
     clear,
     current_governance,
     current_registration,
@@ -64,7 +64,7 @@ def test_from_env_raises_without_a_url(monkeypatch):
         ControlPlaneClient.from_env()
 
 
-def test_tokenops_run_registers_when_no_run_id(store):
+def test_tokenops_run_registers_when_no_trace_id(store):
     clear()
     with tokenops_run(
         store=store,
@@ -82,7 +82,7 @@ def test_tokenops_run_registers_when_no_run_id(store):
         assert bound.client is not None
         assert current_registration() is bound.registration
         assert current_governance() is not None
-        assert current_governance().attr.run_id == bound.registration.run_id
+        assert current_governance().attr.trace_id == bound.registration.trace_id
         assert bound.governor.controls is bound.controls
     assert current_registration() is None
     assert current_governance() is None
@@ -107,19 +107,19 @@ def test_tokenops_run_without_user_passed_store(live_plane_url):
     clear()
 
 
-def test_tokenops_run_joins_when_run_id_present(store):
+def test_tokenops_run_joins_when_trace_id_present(store):
     clear()
     client = ControlPlaneClient(store=store)
-    out = client.register_run(intent="shared", mode="enforce", run_id="join-me")
-    assert out["run_id"] == "join-me"
+    out = client.register_run(intent="shared", mode="enforce", trace_id="join-me")
+    assert out["trace_id"] == "join-me"
 
     with tokenops_run(
         client=client,
-        headers={RUN_ID_HEADER: "join-me"},
+        headers={TRACE_ID_HEADER: "join-me"},
         payload={"task": "hop"},
         service="researcher",
     ) as bound:
-        assert bound.registration.run_id == "join-me"
+        assert bound.registration.trace_id == "join-me"
         assert bound.registration.intent == "shared"
         assert bound.span.service == "researcher"
         assert current_governance() is not None
@@ -186,7 +186,7 @@ def test_instrument_app_binds_context_and_hook(live_plane_url):
     async def tasks():
         with tokenops_run() as bound:
             return {
-                "run_id": bound.registration.run_id,
+                "trace_id": bound.registration.trace_id,
                 "intent": bound.registration.intent,
                 "service": bound.span.service,
             }
@@ -197,4 +197,4 @@ def test_instrument_app_binds_context_and_hook(live_plane_url):
     body = res.json()
     assert body["intent"] == "mw_intent"
     assert body["service"] == "planner"
-    assert body["run_id"]
+    assert body["trace_id"]

@@ -52,7 +52,7 @@ def build_app():
         # Ambient RequestContext from instrument_app; agent owns intent/mode (§1).
         with tokenops_run(client=client) as bound:
             reg = bound.registration
-            run_id = reg.run_id
+            trace_id = reg.trace_id
             attr = bound.attr
             governor = bound.governor
             controls = bound.controls
@@ -62,7 +62,7 @@ def build_app():
 
             client.create_run(
                 RunRecord(
-                    run_id=run_id,
+                    trace_id=trace_id,
                     agent=AGENT,
                     status="running",
                     task=goal,
@@ -111,14 +111,14 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{run_id}",
+                    f"run:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
                     raise Halt(
                         Action(
                             kind=ActionKind.HALT,
-                            run_id=run_id,
+                            trace_id=trace_id,
                             reason="no budget remaining; refusing to delegate",
                         )
                     )
@@ -142,14 +142,14 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{run_id}",
+                    f"run:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
                     raise Halt(
                         Action(
                             kind=ActionKind.HALT,
-                            run_id=run_id,
+                            trace_id=trace_id,
                             reason="no budget remaining; refusing to delegate to writer",
                         )
                     )
@@ -171,12 +171,12 @@ def build_app():
                 gov_events = governance_events_payload(controls)
                 detector = halt_detector_from_events(gov_events) if status == "halted" else None
                 client.update_run(
-                    run_id,
+                    trace_id,
                     status=status,
                     halt_reason=halt_reason,
                     detector=detector,
-                    cost_micros=governor.ledger.cost_micros(run_id),
-                    steps=governor.ledger.step_count(run_id),
+                    cost_micros=governor.ledger.cost_micros(trace_id),
+                    steps=governor.ledger.step_count(trace_id),
                     ended_at=time.time(),
                     governance_events=gov_events,
                 )
@@ -190,9 +190,9 @@ def build_app():
                 steps=steps,
             )
             response.update(
-                run_id=run_id,
+                trace_id=trace_id,
                 status=status,
-                cost_micros=governor.ledger.cost_micros(run_id),
+                cost_micros=governor.ledger.cost_micros(trace_id),
             )
             if halt_reason:
                 response["halt_reason"] = halt_reason

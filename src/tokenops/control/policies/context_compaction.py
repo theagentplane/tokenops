@@ -48,7 +48,7 @@ class ContextCompactionDetector(Detector):
         est = request.estimated_input_tokens
         recent_llm = [
             s
-            for s in view.recent(request.attr.run_id, self.window)
+            for s in view.recent(request.attr.trace_id, self.window)
             if s.node_type == "llm" and s.usage is not None
         ]
         rising = False
@@ -68,7 +68,7 @@ class ContextCompactionDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
                 reason=f"est_input {est} vs ctx_max {self.ctx_max}"
                 + (" (rising)" if rising else ""),
                 evidence={"est_input": est, "ctx_max": self.ctx_max, "rising": rising},
@@ -105,12 +105,12 @@ class ContextCompactionPolicy(Policy):
                 ContextCompactionPolicy._telemetry_only_logged = True
             return Action(
                 kind=ActionKind.ALLOW,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=f"{signal.reason} (no assembly hook: telemetry only)",
             )
         return Action(
             kind=ActionKind.MUTATE,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             compact=True,
             inject_message="COMPACT: move volatile values below the static prefix, dedup tool "

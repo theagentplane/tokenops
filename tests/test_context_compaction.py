@@ -99,7 +99,7 @@ def test_observation_carry_compaction_when_present():
     from tokenops.control.core import Attribution, Observation
 
     obs = Observation(
-        attr=Attribution(user="u", agent="a", run_id="r"),
+        attr=Attribution(user="u", agent="a", trace_id="r"),
         node_type="llm",
         boundary_id="a.chat",
         ts=1.0,
@@ -113,7 +113,7 @@ def test_observation_no_compaction_when_none():
     from tokenops.control.core import Attribution, Observation
 
     obs = Observation(
-        attr=Attribution(user="u", agent="a", run_id="r"),
+        attr=Attribution(user="u", agent="a", trace_id="r"),
         node_type="llm",
         boundary_id="a.chat",
         ts=1.0,

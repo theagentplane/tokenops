@@ -19,7 +19,7 @@ from tokenops.control.boundary import emit_observation, observation_from_crossin
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
     PARENT_SPAN_ID_HEADER,
-    RUN_ID_HEADER,
+    TRACE_ID_HEADER,
     GovernanceContext,
     SpanContext,
 )
@@ -152,7 +152,7 @@ __all__ = [
     "clear_request_context",
     "current_request_context",
     "instrument_app",
-    "RUN_ID_HEADER",
+    "TRACE_ID_HEADER",
     "PARENT_SPAN_ID_HEADER",
     "SpanContext",
     "GovernanceContext",
@@ -169,7 +169,7 @@ __all__ = [
     "ControlPlaneClient",
     "should_mount_run_registration",
     "clear_governance_config_cache",
-    # HTTP propagation (auto run_id / parent span)
+    # HTTP propagation (auto trace_id / parent span)
     "propagation_headers",
     "merge_propagation_headers",
 ]

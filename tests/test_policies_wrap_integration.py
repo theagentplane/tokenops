@@ -43,12 +43,12 @@ from tokenops.control.policies import (
 from tokenops.providers.types import ModelResponse
 
 
-def _reg(run_id: str) -> RunRegistration:
-    return RunRegistration(run_id=run_id, intent="policy_it", user_dims={"user_id": "alice"})
+def _reg(trace_id: str) -> RunRegistration:
+    return RunRegistration(trace_id=trace_id, intent="policy_it", user_dims={"user_id": "alice"})
 
 
-def _attr(run_id: str):
-    return _build_attribution(_reg(run_id), service="research")
+def _attr(trace_id: str):
+    return _build_attribution(_reg(trace_id), service="research")
 
 
 def _dispatch(content: str = "ok", *, inp: int = 100, out: int = 20):
@@ -68,7 +68,7 @@ def _dispatch(content: str = "ok", *, inp: int = 100, out: int = 20):
     return dispatch, calls
 
 
-def _governed(gov, attr, dispatch, *, run_id: str):
+def _governed(gov, attr, dispatch, *, trace_id: str):
     """Bind run + governance and return wrap_complete (Chronicle ingest path)."""
     controls = gov.controls
     assert isinstance(controls, ApplyControls)
@@ -83,8 +83,8 @@ def _governed(gov, attr, dispatch, *, run_id: str):
     )
 
 
-def _with_scope(gov, attr, run_id: str, fn):
-    reg = _reg(run_id)
+def _with_scope(gov, attr, trace_id: str, fn):
+    reg = _reg(trace_id)
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             return fn()
@@ -104,7 +104,7 @@ def test_it_pre_call_worst_case_mutates_uncapped_output():
     gov.ledger.open_run("r-pcwc")
     dispatch, calls = _dispatch()
 
-    governed = _governed(gov, attr, dispatch, run_id="r-pcwc")
+    governed = _governed(gov, attr, dispatch, trace_id="r-pcwc")
 
     def run():
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
@@ -124,7 +124,7 @@ def test_it_pre_call_worst_case_halts_when_projected_over_budget():
     gov.ledger.open_run("r-pcwc-halt")
     dispatch, calls = _dispatch(inp=500, out=1)
 
-    governed = _governed(gov, attr, dispatch, run_id="r-pcwc-halt")
+    governed = _governed(gov, attr, dispatch, trace_id="r-pcwc-halt")
 
     def run():
         with pytest.raises(Halt):
@@ -144,7 +144,7 @@ def test_it_cost_budget_halts_after_spend_crosses_cap():
     gov.ledger.open_run("r-cb")
     # 820*10 + 45*30 = 9550 per call → 3rd observe trips
     dispatch, _ = _dispatch(inp=820, out=45)
-    governed = _governed(gov, attr, dispatch, run_id="r-cb")
+    governed = _governed(gov, attr, dispatch, trace_id="r-cb")
 
     def run():
         with pytest.raises(Halt):
@@ -165,7 +165,7 @@ def test_it_cost_guard_injects_near_threshold():
     gov.ledger.open_run("r-cg")
     # First call spends enough to cross 50% on observe → INJECT carried to next call
     dispatch, calls = _dispatch(inp=400, out=50)  # 4000+1500=5500 ≥ 50% of 10k
-    governed = _governed(gov, attr, dispatch, run_id="r-cg")
+    governed = _governed(gov, attr, dispatch, trace_id="r-cg")
 
     def run():
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": "a"}])
@@ -190,7 +190,7 @@ def test_it_step_cap_halts_at_max_steps():
     attr = _attr("r-sc")
     gov.ledger.open_run("r-sc")
     dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, run_id="r-sc")
+    governed = _governed(gov, attr, dispatch, trace_id="r-sc")
 
     def run():
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": "1"}])
@@ -211,7 +211,7 @@ def test_time_budget_halts_run():
     attr = _attr("r-tb")
     gov.ledger.open_run("r-tb")
     dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, run_id="r-tb")
+    governed = _governed(gov, attr, dispatch, trace_id="r-tb")
 
     def run():
         # The ledger records the step before observe fires, so elapsed=0.0 >= 0.0
@@ -232,7 +232,7 @@ def test_it_concurrency_cap_rejects_when_inflight_saturated():
     gov.ledger.open_run("r-cc")
     gov.ledger.admit("run:r-cc")  # one slot taken
     dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, run_id="r-cc")
+    governed = _governed(gov, attr, dispatch, trace_id="r-cc")
 
     def run():
         with pytest.raises(Throttled):
@@ -356,7 +356,7 @@ def test_it_context_compaction_rewrites_messages_via_wrap():
     attr = _attr("r-ccx")
     gov.ledger.open_run("r-ccx")
     dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, run_id="r-ccx")
+    governed = _governed(gov, attr, dispatch, trace_id="r-ccx")
     msgs = [
         {"role": "system", "content": "sys"},
         {"role": "user", "content": "dup"},
@@ -385,7 +385,7 @@ def test_it_context_compaction_records_tokens_in_ledger_event():
     attr = _attr("r-cc-meta")
     gov.ledger.open_run("r-cc-meta")
     dispatch, calls = _dispatch(inp=80, out=20)
-    governed = _governed(gov, attr, dispatch, run_id="r-cc-meta")
+    governed = _governed(gov, attr, dispatch, trace_id="r-cc-meta")
     msgs = [
         {"role": "system", "content": "sys"},
         {"role": "user", "content": "dup"},
@@ -435,7 +435,7 @@ def test_it_output_runaway_retries_then_succeeds():
             return ModelResponse(content=text, input_tokens=50, output_tokens=20)
 
     scripted = Scripted()
-    governed = _governed(gov, attr, scripted, run_id="r-or")
+    governed = _governed(gov, attr, scripted, trace_id="r-or")
 
     def run():
         return governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
@@ -464,12 +464,12 @@ def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
     store = Store(str(tmp_path / "hint.db"))
     task = "why shared run budgets matter for multi-agent systems please explain"
     reg = store.register_run(
-        RunRegistration(run_id="r-th", intent="policy_it", user_dims={"user_id": "alice"}),
+        RunRegistration(trace_id="r-th", intent="policy_it", user_dims={"user_id": "alice"}),
     )
     # Detector reads task text from the store run record (not the LLM messages).
     store.create_run(
         RunRecord(
-            run_id="r-th",
+            trace_id="r-th",
             agent="research",
             status="running",
             task=task,
@@ -482,7 +482,7 @@ def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
         input_hash=input_hash(task),
         input_simhash=simhash_as_sqlite(input_simhash(task)),
         input_preview=task[:80],
-        source_run_id="prior",
+        source_trace_id="prior",
         step_summary="1. search 2. write brief answer",
         tool_sequence='["search"]',
         cost_micros=100,
@@ -504,7 +504,7 @@ def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
     attr = _build_attribution(reg, service="research")
     gov.ledger.open_run("r-th")
     dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, run_id="r-th")
+    governed = _governed(gov, attr, dispatch, trace_id="r-th")
 
     def run():
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": task}])

@@ -81,20 +81,20 @@ class TrajectoryHintDetector(Detector):
         self.enabled = enabled
         self._injected: set[str] = set()
 
-    def reset(self, run_id: str) -> None:
-        self._injected.discard(run_id)
+    def reset(self, trace_id: str) -> None:
+        self._injected.discard(trace_id)
 
     def _registration(self, request: CallRequest) -> RunRegistration:
         tags = dict(request.attr.tags)
         intent = tags.pop("intent", "")
         return RunRegistration(
-            run_id=request.attr.run_id,
+            trace_id=request.attr.trace_id,
             intent=intent,
             user_dims={k: v for k, v in tags.items() if k != "intent"},
         )
 
-    def _task_text(self, run_id: str) -> str:
-        rec = self._store.get_run(run_id)
+    def _task_text(self, trace_id: str) -> str:
+        rec = self._store.get_run(trace_id)
         if rec and rec.task:
             return rec.task
         return ""
@@ -102,15 +102,15 @@ class TrajectoryHintDetector(Detector):
     def pre_call(self, request: CallRequest, view: LedgerView) -> Signal | None:
         if not self.enabled:
             return None
-        run_id = request.attr.run_id
-        if run_id in self._injected:
+        trace_id = request.attr.trace_id
+        if trace_id in self._injected:
             return None
-        if not request.primary_agent_turn and view.step_count(run_id) != 0:
+        if not request.primary_agent_turn and view.step_count(trace_id) != 0:
             return None
-        if view.is_halted(run_id):
+        if view.is_halted(trace_id):
             return None
 
-        task = self._task_text(run_id)
+        task = self._task_text(trace_id)
         if not task or len(normalize_input(task)) < 10:
             return None
 
@@ -130,7 +130,7 @@ class TrajectoryHintDetector(Detector):
             return None
 
         hit = TrajectoryHit(
-            source_run_id=raw["source_run_id"],
+            source_trace_id=raw["source_trace_id"],
             step_count=raw["step_count"],
             cost_micros=raw["cost_micros"],
             tool_sequence=raw["tool_sequence"],
@@ -146,15 +146,15 @@ class TrajectoryHintDetector(Detector):
             sequence_plus_pitfalls_max_steps=self.sequence_plus_pitfalls_max_steps,
         )
 
-        self._injected.add(run_id)
+        self._injected.add(trace_id)
         return Signal(
             detector=self.name,
             severity=Severity.WARN,
-            run_id=run_id,
-            reason=f"trajectory hint from {hit.source_run_id} ({hit.match} match, tier={tier})",
+            trace_id=trace_id,
+            reason=f"trajectory hint from {hit.source_trace_id} ({hit.match} match, tier={tier})",
             evidence={
                 "scope_key": sk,
-                "source_run_id": hit.source_run_id,
+                "source_trace_id": hit.source_trace_id,
                 "step_count": hit.step_count,
                 "cost_micros": hit.cost_micros,
                 "tool_sequence": hit.tool_sequence,
@@ -182,7 +182,7 @@ class TrajectoryHintPolicy(Policy):
     def decide(self, signal: Signal, view: LedgerView) -> Action:
         ev = signal.evidence
         hit = TrajectoryHit(
-            source_run_id=str(ev.get("source_run_id", "")),
+            source_trace_id=str(ev.get("source_trace_id", "")),
             step_count=int(str(ev.get("step_count", 0) or 0)),
             cost_micros=int(str(ev.get("cost_micros", 0) or 0)),
             tool_sequence=str(ev.get("tool_sequence", "")),
@@ -196,7 +196,7 @@ class TrajectoryHintPolicy(Policy):
         )
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             inject_message=format_hint(
                 hit,

@@ -42,14 +42,14 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     """Register → govern complete loop → assert attribution on ledger, spend, and HALT."""
     reg = store.register_run(
         RunRegistration(
-            run_id="e2e-run-1",
+            trace_id="e2e-run-1",
             intent="f500_frontier",
             user_dims={"Country": "US", "IsFortune500": "true", "user_id": "alice"},
         )
     )
     attr = _build_attribution(reg, service="research")
 
-    assert attr.run_id == "e2e-run-1"
+    assert attr.trace_id == "e2e-run-1"
     assert attr.agent == "research"
     assert attr.user == "alice"
     assert attr.tags["intent"] == "f500_frontier"

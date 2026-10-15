@@ -31,7 +31,7 @@ from tokenops.control.policies._util import did_you_mean
 class ToolFixDetector(Detector):
     """WARN on an invalid tool call (inject a correction); TRIP after K identical failures.
 
-    Stateful: counts identical failing signatures per run. ``reset(run_id)`` clears it.
+    Stateful: counts identical failing signatures per run. ``reset(trace_id)`` clears it.
     """
 
     name = "tool_fix"
@@ -42,8 +42,8 @@ class ToolFixDetector(Detector):
         self.k = k
         self._fails: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    def reset(self, run_id: str) -> None:
-        self._fails.pop(run_id, None)
+    def reset(self, trace_id: str) -> None:
+        self._fails.pop(trace_id, None)
 
     def _invalid(self, name: str, args) -> str | None:
         if name not in self.registry:
@@ -62,7 +62,7 @@ class ToolFixDetector(Detector):
             return None
 
         # count identical failures (same offending name) for this run
-        fails = self._fails[attr.run_id]
+        fails = self._fails[attr.trace_id]
         fails[name] += 1
         count = fails[name]
         suggestion = did_you_mean(name, self.registry)
@@ -70,7 +70,7 @@ class ToolFixDetector(Detector):
         return Signal(
             detector=self.name,
             severity=sev,
-            run_id=attr.run_id,
+            trace_id=attr.trace_id,
             reason=f"invalid tool call '{name}' ({problem}); attempt {count}/{self.k}",
             evidence={
                 "name": name,
@@ -89,14 +89,14 @@ class ToolFixPolicy(Policy):
         if signal.severity is Severity.TRIP:
             return Action(
                 kind=ActionKind.HALT,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=f"tool_fix: {signal.evidence['count']} identical bad calls, halting",
             )
         ev = signal.evidence
         hint = f" did_you_mean={ev['did_you_mean']}" if ev.get("did_you_mean") else ""
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             replace_tool_result=True,  # deep: substitute the synthetic error for the bad tool's result
             inject_message=(

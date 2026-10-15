@@ -17,7 +17,7 @@ from tokenops.control.context import (
     bind_span,
     current_registration,
     header_parent_span_id,
-    header_run_id,
+    header_trace_id,
 )
 from tokenops.control.core import Attribution
 from tokenops.control.models import (
@@ -66,7 +66,7 @@ def _build_attribution(reg: RunRegistration, *, service: str) -> Attribution:
     if reg.intent:
         tags.setdefault("intent", reg.intent)
     user = reg.user_dims.get("user_id", reg.user_dims.get("user", "unknown"))
-    return Attribution(user=user, agent=service, run_id=reg.run_id, tags=tags)
+    return Attribution(user=user, agent=service, trace_id=reg.trace_id, tags=tags)
 
 
 def begin_entry_run(
@@ -75,18 +75,18 @@ def begin_entry_run(
     headers: Mapping[str, str],
     payload: dict,
     service: str,
-    run_id: str | None = None,
+    trace_id: str | None = None,
 ) -> BoundRun:
     """Register a new run and bind request context. Entry boundary only."""
     rid = (
-        run_id
-        or header_run_id(headers)
-        or str(payload.get("run_id") or "").strip()
+        trace_id
+        or header_trace_id(headers)
+        or str(payload.get("trace_id") or "").strip()
         or new_id("run")
     )
     intent = str(payload.get("intent", ""))
     user_dims = _coerce_user_dims(payload.get("user_dims"))
-    reg = store.register_run(RunRegistration(run_id=rid, intent=intent, user_dims=user_dims))
+    reg = store.register_run(RunRegistration(trace_id=rid, intent=intent, user_dims=user_dims))
     span = SpanContext(
         span_id=new_id("span"), service=service, parent_span_id=header_parent_span_id(headers)
     )
@@ -103,23 +103,23 @@ def begin_downstream_run(
 ) -> BoundRun:
     """Resolve registration and bind a *new* span for this agent hop.
 
-    Missing ``X-TokenOps-Run-Id`` no longer refuses work: we auto-register an
+    Missing ``X-TokenOps-Trace-Id`` no longer refuses work: we auto-register an
     unattributed run and log so cross-agent stitching is visibly broken.
     Each call still opens a fresh span (parent from the inbound header when set).
     """
-    rid = header_run_id(headers)
+    rid = header_trace_id(headers)
     if not rid:
         rid = new_id("run")
         logger.warning(
-            "tokenops.missing_run_id service=%s auto_run_id=%s "
+            "tokenops.missing_trace_id service=%s auto_trace_id=%s "
             "cross_agent_attribution_broken=1 — governing locally; "
-            "propagate X-TokenOps-Run-Id for shared-run budgets",
+            "propagate X-TokenOps-Trace-Id for shared-run budgets",
             service,
             rid,
         )
         reg = store.register_run(
             RunRegistration(
-                run_id=rid,
+                trace_id=rid,
                 intent="unattributed",
                 user_dims={"tokenops_soft_run": "1", "service": service},
             )
@@ -148,7 +148,7 @@ def begin_entry_task_run(
     client: ControlPlaneClient | None = None,
     scrape_payload_dims: bool = True,
 ) -> BoundRun:
-    """Entry agent: reuse inbound ``run_id`` or register a new run via the control plane.
+    """Entry agent: reuse inbound ``trace_id`` or register a new run via the control plane.
 
     UI / clients call the entry agent's ``POST /v1/tasks`` without registering first.
     The entry agent opens the run (``ControlPlaneClient.register_run`` → plane
@@ -160,9 +160,9 @@ def begin_entry_task_run(
     still merge from payload via :func:`merge_registration_dims`.
     """
     from tokenops.control.client import ControlPlaneClient
-    from tokenops.control.context import RUN_ID_HEADER
+    from tokenops.control.context import TRACE_ID_HEADER
 
-    rid = header_run_id(headers)
+    rid = header_trace_id(headers)
     if rid:
         return begin_downstream_run(store, headers=headers, service=service)
 
@@ -199,11 +199,11 @@ def begin_entry_task_run(
         mode=resolved_mode,
     )
     merged = {str(k): str(v) for k, v in headers.items()}
-    merged[RUN_ID_HEADER] = str(registered["run_id"])
+    merged[TRACE_ID_HEADER] = str(registered["trace_id"])
     logger.info(
-        "tokenops.entry_registered service=%s run_id=%s intent=%s",
+        "tokenops.entry_registered service=%s trace_id=%s intent=%s",
         service,
-        registered["run_id"],
+        registered["trace_id"],
         resolved_intent,
     )
     return begin_downstream_run(store, headers=merged, service=service)

@@ -70,15 +70,15 @@ def _tool_step(step: int = 1) -> BoundaryStep:
 
 
 def test_scope_key_from_registration():
-    reg = RunRegistration(run_id="r1", intent="research", user_dims={"team": "growth"})
+    reg = RunRegistration(trace_id="r1", intent="research", user_dims={"team": "growth"})
     assert scope_key(reg, "research", ["intent", "agent"]) == "agent=research|intent=research"
     assert "team=growth" in scope_key(reg, "research", ["intent", "agent", "team"])
 
 
 def test_enqueue_skipped_when_disabled(store):
-    reg = RunRegistration(run_id="r1", intent="demo")
+    reg = RunRegistration(trace_id="r1", intent="demo")
     rec = RunRecord(
-        run_id="r1",
+        trace_id="r1",
         agent="research",
         status="completed",
         task="find pricing API docs",
@@ -97,10 +97,10 @@ def test_enqueue_skipped_when_disabled(store):
 
 
 def test_enqueue_and_drain_builds_index(store):
-    reg = RunRegistration(run_id="run-a", intent="demo")
+    reg = RunRegistration(trace_id="run-a", intent="demo")
     task = "find pricing API documentation"
     rec = RunRecord(
-        run_id="run-a",
+        trace_id="run-a",
         agent="research",
         status="completed",
         task=task,
@@ -127,18 +127,18 @@ def test_enqueue_and_drain_builds_index(store):
         simhash_threshold=4,
     )
     assert hit is not None
-    assert hit["source_run_id"] == "run-a"
+    assert hit["source_trace_id"] == "run-a"
     assert "search" in hit["tool_sequence"]
 
 
 def test_simhash_lookup_paraphrase(store):
-    reg = RunRegistration(run_id="run-a", intent="demo")
+    reg = RunRegistration(trace_id="run-a", intent="demo")
     task = "research enterprise saas pricing models and subscription tiers"
     paraphrase = "enterprise research saas pricing models and subscription tiers"
     assert input_hash(task) != input_hash(paraphrase)
 
     rec = RunRecord(
-        run_id="run-a",
+        trace_id="run-a",
         agent="research",
         status="completed",
         task=task,
@@ -172,10 +172,10 @@ def test_simhash_lookup_paraphrase(store):
 
 
 def test_pre_call_injects_on_step_zero(store):
-    reg = RunRegistration(run_id="prior", intent="demo")
+    reg = RunRegistration(trace_id="prior", intent="demo")
     task = "find enterprise pricing limits"
     rec = RunRecord(
-        run_id="prior",
+        trace_id="prior",
         agent="research",
         status="completed",
         task=task,
@@ -198,11 +198,15 @@ def test_pre_call_injects_on_step_zero(store):
     gov.ledger.open_run("run-new")
     store.create_run(
         RunRecord(
-            run_id="run-new", agent="research", status="running", task=task, started_at=time.time()
+            trace_id="run-new",
+            agent="research",
+            status="running",
+            task=task,
+            started_at=time.time(),
         ),
     )
 
-    attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
+    attr = make_attr(trace_id="run-new", agent="research", tags={"intent": "demo"})
     gov.pre_call(
         CallRequest(
             attr=attr,
@@ -226,14 +230,14 @@ def test_no_inject_when_step_count_nonzero(store):
     gov.ledger.open_run("run-new")
     store.create_run(
         RunRecord(
-            run_id="run-new",
+            trace_id="run-new",
             agent="research",
             status="running",
             task="find enterprise pricing limits",
             started_at=time.time(),
         ),
     )
-    attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
+    attr = make_attr(trace_id="run-new", agent="research", tags={"intent": "demo"})
     view = FakeView(_steps=2)
     det, _ = build_trajectory_hint(store, enabled=True, max_age_days=30)
     assert (
@@ -251,10 +255,10 @@ def test_trajectory_hint_requires_store():
 
 
 def test_skip_inject_when_index_steps_below_min_index_steps(store):
-    reg = RunRegistration(run_id="prior", intent="demo")
+    reg = RunRegistration(trace_id="prior", intent="demo")
     task = "find enterprise pricing limits today"
     rec = RunRecord(
-        run_id="prior",
+        trace_id="prior",
         agent="research",
         status="completed",
         task=task,
@@ -283,10 +287,14 @@ def test_skip_inject_when_index_steps_below_min_index_steps(store):
     gov.ledger.open_run("run-new")
     store.create_run(
         RunRecord(
-            run_id="run-new", agent="research", status="running", task=task, started_at=time.time()
+            trace_id="run-new",
+            agent="research",
+            status="running",
+            task=task,
+            started_at=time.time(),
         ),
     )
-    attr = make_attr(run_id="run-new", agent="research", tags={"intent": "demo"})
+    attr = make_attr(trace_id="run-new", agent="research", tags={"intent": "demo"})
     gov.pre_call(
         CallRequest(attr=attr, provider="openai", model="gpt-4o-mini", primary_agent_turn=True)
     )
@@ -297,7 +305,7 @@ def test_tiered_hint_format():
     from tokenops.control.trajectory.hint import TrajectoryHit, format_hint, hint_tier_for
 
     hit = TrajectoryHit(
-        source_run_id="run-x",
+        source_trace_id="run-x",
         step_count=5,
         cost_micros=100_000,
         tool_sequence="search → paginate",
@@ -310,7 +318,7 @@ def test_tiered_hint_format():
     assert "LLM steps" not in short
 
     hit_long = TrajectoryHit(
-        source_run_id="run-y",
+        source_trace_id="run-y",
         step_count=14,
         cost_micros=200_000,
         tool_sequence="a → b",
