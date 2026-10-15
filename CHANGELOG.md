@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tokenops.repositories.ControlPlaneClient`: a small `httpx` client for control plane 1.0
+  ([#162](https://github.com/theagentplane/tokenops/issues/162)): governance with `ETag` /
+  `If-None-Match` (the last known configuration is returned, flagged `stale`, when the plane is
+  unreachable and one was already fetched), `precheck`, `events:batch`, halt get/set/clear and
+  the trace list. Writes are attempted once and never retried (ADR 0002). It is not wired into
+  the governors yet; that follows with the removal of the 0.2 store and backends.
+- `tests/contract`: contract tests against a real control plane 1.x, run by a separate CI job.
+
 ### Changed (breaking)
 
 - Chronicle 1.0 integration ([#162](https://github.com/theagentplane/tokenops/issues/162)):

@@ -41,6 +41,7 @@ Do not write one for routine changes: a bug fix, a rename, a small refactor.
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0002](0002-ledger-writes-are-attempted-once.md) | Attempt each ledger write once; never retry an unknown outcome | Proposed |
 
 Decisions taken in the suite for the 1.0 rework (trace as run, governance pulled from the
 database, halt as a trace attribute, no deduplication of ledger events, ledger counters) are
