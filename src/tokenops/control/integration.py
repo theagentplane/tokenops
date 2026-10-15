@@ -222,6 +222,25 @@ def _compact_messages(
     return out, meta
 
 
+def _policy_metadata(controls) -> Callable[[object], dict[str, int]]:
+    """Envelope metadata for what a policy did to this call.
+
+    The plane stores no per-policy statistics (control-plane ADR 0009), so what a policy
+    achieved is recorded on the envelope instead: ``tokenops.compaction_tokens_before``,
+    ``..._tokens_after`` and ``..._tokens_saved`` when ``context_compaction`` rewrote the
+    prompt. Read after the dispatch returns, so ``controls.call`` is this call's.
+    """
+
+    def extract(_result: object) -> dict[str, int]:
+        call = getattr(controls, "call", None)
+        compaction = getattr(call, "compaction", None) if call is not None else None
+        if not compaction:
+            return {}
+        return {f"tokenops.compaction_{key}": int(value) for key, value in compaction.items()}
+
+    return extract
+
+
 def wrap_complete(
     governor,
     controls,
@@ -248,7 +267,9 @@ def wrap_complete(
     estimate = est_input_fn or _estimate_input_tokens
     seg = f"trace:{attr.trace_id}"
     boundary_id = f"{service or attr.agent}.chat"
-    traced = wrap_llm(boundary_id, dispatch, provider=provider)
+    traced = wrap_llm(
+        boundary_id, dispatch, provider=provider, extract_metadata=_policy_metadata(controls)
+    )
     controls.compaction_supported = True  # wrap_complete IS the prompt-assembly hook
 
     def governed(p: str, m: str, messages) -> object:
@@ -389,7 +410,12 @@ def wrap_stream(
             output_tokens=max(1, len(text) // 4),
         )
 
-    traced = wrap_llm(boundary_id, _stream_once, provider=provider)
+    traced = wrap_llm(
+        boundary_id,
+        _stream_once,
+        provider=provider,
+        extract_metadata=_policy_metadata(controls),
+    )
 
     def governed(p: str, m: str, messages) -> object:
         from tokenops.control.crossing import reset_wrap_owns_precall, wrap_owns_precall

@@ -7,6 +7,24 @@ Canonical IDs and display labels are registered in ``control.config.POLICY_TEMPL
 The naming glossary is ``docs/product/policies-index.md``; policy behavior is documented
 in ``docs/policies/<id>.md``.
 
+State each policy reads (ADR 0004):
+
+=====================  ==========================================================
+Policy                 Reads
+=====================  ==========================================================
+cost_budget            plane: spend of its budget (``precheck``)
+pre_call_worst_case    plane: spend of its budget (``precheck``)
+cost_guard             plane: spend; in process: velocity from the step window
+concurrency_cap        plane: in-flight count of its segment (``precheck``)
+step_cap               in process: this process's step count for the trace
+progress_guard         in process: the recent step window
+context_compaction     in process: the recent step window
+output_runaway         the current call's output only
+tool_fix               the current call's tool request only
+tool_output_cap        the current call's tool output only
+time_budget            the wall clock since the hop started
+=====================  ==========================================================
+
 ``trajectory_hint`` is a known template that is disabled in ``build_governor``; it has no
 implementation module (its cross-run index lived in the removed SQLite store).
 """

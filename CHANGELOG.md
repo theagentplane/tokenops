@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `context_compaction` savings are recorded as envelope metadata
+  (`tokenops.compaction_tokens_before`, `_tokens_after`, `_tokens_saved`) by `wrap_complete`
+  and `wrap_stream`, because the control plane stores no per-policy statistics (control-plane
+  ADR 0009). They were previously stored on the 0.2 plane's step event.
+- Which state each policy reads, in process or from the plane, is documented in
+  `tokenops.control.policies` and ADR 0004.
+- A contract test that every enabled policy template is in the control plane's allow-list.
+  It currently flags `time_budget`, which the plane does not know (marked `xfail`).
+
 ### Changed
 
 - Requires `agent-chronicle>=1.1,<2` and reads the active span with the public
