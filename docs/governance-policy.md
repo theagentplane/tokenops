@@ -66,7 +66,7 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
 ## 4. Policy names and action identity
 
 The [policy glossary](product/policies-index.md) defines canonical policy IDs, display
-labels, and module/doc naming. `tokenops.control.config.POLICY_TEMPLATES` is the public
+labels, and module/doc naming. `tokenops.framework.config.POLICY_TEMPLATES` is the public
 metadata registry used by the governor builder. The control plane keeps an allow-list of the
 same names and rejects a write for an unknown template. Display labels are
 presentation only, not alternate configuration names.

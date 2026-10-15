@@ -5,17 +5,10 @@ from __future__ import annotations
 import pytest
 
 from conftest import CollectingControls, FakeView, make_attr, toy_price
-from tokenops.control import (
-    ActionKind,
-    Budget,
-    CallRequest,
-    Governor,
-    Halt,
-    Ledger,
-    Observation,
-    Usage,
-)
-from tokenops.control.policies import pre_call_worst_case as pcwc
+from tokenops.framework.core import ActionKind, CallRequest, Halt, Observation, Usage
+from tokenops.framework.engine import Governor
+from tokenops.framework.ledger import Budget, Ledger
+from tokenops.framework.policies import pre_call_worst_case as pcwc
 
 CAP = Budget(budget_id="run_llm_cap", limit_micros=1_000_000, dimension="trace")
 

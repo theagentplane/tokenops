@@ -20,13 +20,13 @@ data model is [primitives](https://github.com/theagentplane/primitives).
 
 | Entry point | Module | Purpose |
 |---|---|---|
-| `tokenops_run` / `instrument_app` | `control/run.py`, `control/instrument.py` | join the trace, build attribution, load governance, bind the governor |
-| `wrap_complete`, `wrap_stream` | `control/integration.py` | the pre-call gate, message rewrite and retry around the model call |
-| `TokenOpsHook` | `control/crossing.py` | the Chronicle hook: pre-call, admit/complete, observe |
+| `tokenops_run` / `instrument_app` | `capabilities/run.py`, `interfaces/instrument.py` | join the trace, build attribution, load governance, bind the governor |
+| `wrap_complete`, `wrap_stream` | `capabilities/complete_wrapper.py` | the pre-call gate, message rewrite and retry around the model call |
+| `TokenOpsHook` | `capabilities/crossing.py` | the Chronicle hook: pre-call, admit/complete, observe |
 | `ControlPlaneClient` | `repositories/control_plane_client.py` | the control-plane HTTP client (governance, precheck, events, halt) |
 | `LedgerEventWriter` | `repositories/ledger_event_writer.py` | background, ordered ledger writes |
-| `build_governor(config, price)` | `control/config.py` | `budgets:`/`policies:` dict to a wired `Governor` |
-| `Ledger` | `control/ledger.py` | spend, in-flight and halt (plane-backed) and the in-process step window |
+| `build_governor(config, price)` | `framework/config.py` | `budgets:`/`policies:` dict to a wired `Governor` |
+| `Ledger` | `framework/ledger.py` | spend, in-flight and halt (plane-backed) and the in-process step window |
 
 ## Data flow
 

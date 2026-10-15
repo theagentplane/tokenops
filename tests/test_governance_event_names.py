@@ -7,29 +7,34 @@ from dataclasses import replace
 import pytest
 
 from conftest import make_attr, toy_price
-from tokenops.control import (
-    Action,
-    ActionKind,
-    CallRequest,
-    Governor,
-    Halt,
-    Ledger,
-    Observation,
-    PreviewControls,
-    RaiseControls,
-    Throttled,
-    Usage,
-    build_governance_stack,
-    governance_events_payload,
-    halt_detector_from_events,
-)
-from tokenops.control.context import (
+from tokenops.framework.config import build_governance_stack
+from tokenops.framework.context import (
     current_controls,
     reset_current_controls,
     set_current_controls,
 )
-from tokenops.control.core import Detector, Policy, Severity, Signal
-from tokenops.control.models import GovernanceMode
+from tokenops.framework.core import (
+    Action,
+    ActionKind,
+    CallRequest,
+    Detector,
+    Halt,
+    Observation,
+    Policy,
+    Severity,
+    Signal,
+    Usage,
+)
+from tokenops.framework.engine import (
+    Governor,
+    PreviewControls,
+    RaiseControls,
+    Throttled,
+    governance_events_payload,
+    halt_detector_from_events,
+)
+from tokenops.framework.ledger import Ledger
+from tokenops.framework.models import GovernanceMode
 
 
 @pytest.mark.parametrize("mode", [GovernanceMode.ENFORCE, GovernanceMode.PREVIEW])

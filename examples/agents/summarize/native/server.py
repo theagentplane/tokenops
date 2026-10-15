@@ -10,12 +10,9 @@ from examples.agents.summarize.native.agent import NativeSummarizeAgent
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Halt,
-    with_governance_errors,
-    wrap_complete,
-)
-from tokenops.control.engine import Throttled
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt, Throttled
+from tokenops.interfaces import with_governance_errors
 from tokenops.providers import complete
 
 AGENT = "summarize"

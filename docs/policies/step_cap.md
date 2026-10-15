@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Included in the default seed; custom configurations may omit it.
 
-Code: [`src/tokenops/control/policies/step_cap.py`](../../src/tokenops/control/policies/step_cap.py)
+Code: [`src/tokenops/framework/policies/step_cap.py`](../../src/tokenops/framework/policies/step_cap.py)
 Tests: [`tests/test_step_cap.py`](../../tests/test_step_cap.py)
 
 ---

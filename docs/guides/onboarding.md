@@ -39,7 +39,8 @@ Prerequisites, the minimum integration, and the questions people ask first.
 
 ```python
 from tokenops import tokenops_run
-from tokenops.control import Halt, wrap_complete
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt
 from tokenops.providers import complete
 from tokenops.repositories import ControlPlaneClient
 

@@ -7,7 +7,7 @@
 Companion to `halt.md`. Documents the governance action this policy
 takes. Default, always-on.
 
-Code: [`src/tokenops/control/policies/cost_budget.py`](../../src/tokenops/control/policies/cost_budget.py)
+Code: [`src/tokenops/framework/policies/cost_budget.py`](../../src/tokenops/framework/policies/cost_budget.py)
 Tests: [`tests/test_cost_budget.py`](../../tests/test_cost_budget.py)
 
 ---

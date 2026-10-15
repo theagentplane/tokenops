@@ -18,7 +18,7 @@ os.environ.setdefault("TOKENOPS_SKIP_GOVERNANCE_SEED", "1")
 
 from dataclasses import dataclass, field
 
-from tokenops.control.core import Action, ActionKind, Attribution, BoundaryStep, Halt, Usage
+from tokenops.framework.core import Action, ActionKind, Attribution, BoundaryStep, Halt, Usage
 
 
 def toy_price(provider: str, model: str, usage: Usage) -> int:

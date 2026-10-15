@@ -1,57 +1,12 @@
-"""Policy templates — one module per LLD policy row, each a ``(Detector, Policy)`` pair.
+"""Deprecated: the policies moved to ``tokenops.framework.policies``."""
 
-Every module exposes a ``build(...) -> tuple[Detector, Policy]`` factory so the config
-layer can instantiate templates declaratively and register them with the Governor.
+import warnings
 
-Canonical IDs and display labels are registered in ``control.config.POLICY_TEMPLATES``.
-The naming glossary is ``docs/product/policies-index.md``; policy behavior is documented
-in ``docs/policies/<id>.md``.
+from tokenops.framework.policies import *  # noqa: F401,F403
 
-State each policy reads (ADR 0004):
-
-=====================  ==========================================================
-Policy                 Reads
-=====================  ==========================================================
-cost_budget            plane: spend of its budget (``precheck``)
-pre_call_worst_case    plane: spend of its budget (``precheck``)
-cost_guard             plane: spend; in process: velocity from the step window
-concurrency_cap        plane: in-flight count of its segment (``precheck``)
-step_cap               in process: this process's step count for the trace
-progress_guard         in process: the recent step window
-context_compaction     in process: the recent step window
-output_runaway         the current call's output only
-tool_fix               the current call's tool request only
-tool_output_cap        the current call's tool output only
-time_budget            the wall clock since the hop started
-=====================  ==========================================================
-
-``trajectory_hint`` (a cross-run playbook hint) was removed in 1.0.1; see ADR 0005.
-"""
-
-from tokenops.control.policies import (
-    concurrency_cap,
-    context_compaction,
-    cost_budget,
-    cost_guard,
-    output_runaway,
-    pre_call_worst_case,
-    progress_guard,
-    step_cap,
-    time_budget,
-    tool_fix,
-    tool_output_cap,
+warnings.warn(
+    "tokenops.control.policies moved to tokenops.framework.policies; the old path is "
+    "deprecated and will be removed in 2.0",
+    DeprecationWarning,
+    stacklevel=2,
 )
-
-__all__ = [
-    "concurrency_cap",
-    "context_compaction",
-    "cost_budget",
-    "cost_guard",
-    "output_runaway",
-    "pre_call_worst_case",
-    "progress_guard",
-    "step_cap",
-    "time_budget",
-    "tool_fix",
-    "tool_output_cap",
-]

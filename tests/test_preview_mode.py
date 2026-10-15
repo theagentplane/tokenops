@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control import (
-    ActionKind,
-    Halt,
-    PreviewControls,
-    build_governance_stack,
-    wrap_complete,
-)
-from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import GovernanceMode, HopAttribution
-from tokenops.control.pricing import build_price_book
+from tokenops.capabilities import wrap_complete
+from tokenops.framework.attribution import _build_attribution
+from tokenops.framework.config import build_governance_stack
+from tokenops.framework.context import SpanContext, _governance_scope, run_scope
+from tokenops.framework.core import ActionKind, Halt
+from tokenops.framework.engine import PreviewControls
+from tokenops.framework.models import GovernanceMode, HopAttribution
+from tokenops.framework.pricing import build_price_book
 
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
@@ -91,7 +88,7 @@ def test_enforce_mode_still_halts():
 
 
 def test_parse_governance_mode_invalid():
-    from tokenops.control.models import parse_governance_mode
+    from tokenops.framework.models import parse_governance_mode
 
     with pytest.raises(ValueError, match="unknown governance mode"):
         parse_governance_mode("bogus")

@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 
 from conftest import FakeView, make_attr, make_step, toy_price
-from tokenops.control import ActionKind, Budget, Governor, Halt, Ledger, Observation
-from tokenops.control.policies import time_budget
+from tokenops.framework.core import ActionKind, Halt, Observation
+from tokenops.framework.engine import Governor
+from tokenops.framework.ledger import Budget, Ledger
+from tokenops.framework.policies import time_budget
 
 
 def test_detector_trips_at_ceiling():

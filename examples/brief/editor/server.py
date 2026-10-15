@@ -14,12 +14,9 @@ from examples.brief.editor.agent import EditorAgent
 from examples.brief.langchain_bridge import GovernedChatModel, make_langchain_dispatch
 from examples.brief.messages import edit_response, parse_angles, parse_sections
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Halt,
-    with_governance_errors,
-    wrap_complete,
-)
-from tokenops.control.engine import Throttled
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt, Throttled
+from tokenops.interfaces import with_governance_errors
 
 AGENT = "editor"
 

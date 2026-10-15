@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control.attribution import (
+from tokenops.capabilities import step_to_observation
+from tokenops.framework.attribution import (
     _build_attribution,
     merge_hop_dims,
     require_hop,
 )
-from tokenops.control.context import SpanContext, clear, run_scope
-from tokenops.control.integration import step_to_observation
-from tokenops.control.models import HopAttribution, NoGovernanceScopeError
+from tokenops.framework.context import SpanContext, clear, run_scope
+from tokenops.framework.models import HopAttribution, NoGovernanceScopeError
 
 
 def test_build_attribution_maps_service_and_user_dims():

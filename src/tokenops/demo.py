@@ -45,8 +45,8 @@ def _fake_llm_factory():
 
 def _price_micros(input_tokens: int, output_tokens: int) -> int:
     """gpt-4o list price, the same book the ledger uses."""
-    from tokenops.control.core import Usage
-    from tokenops.control.pricing import build_price_book
+    from tokenops.framework import Usage
+    from tokenops.framework.pricing import build_price_book
 
     price = build_price_book()
     return price("openai", "gpt-4o", Usage(input=input_tokens, output=output_tokens))
@@ -65,7 +65,8 @@ def run_ungoverned() -> int:
 def run_governed() -> tuple[int, int, str]:
     """The same loop with TokenOps in front of the model call."""
     from tokenops import tokenops_run
-    from tokenops.control import Halt, wrap_complete
+    from tokenops.capabilities import wrap_complete
+    from tokenops.framework import Halt
 
     fake_llm, _ = _fake_llm_factory()
 

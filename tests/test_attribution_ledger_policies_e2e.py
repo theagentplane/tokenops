@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
-from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.ledger import LIFETIME, TRACE_TOTAL_BUDGET, segment_key_for
-from tokenops.control.models import HopAttribution
-from tokenops.control.pricing import build_price_book
+from tokenops.capabilities import wrap_complete
+from tokenops.framework.attribution import _build_attribution
+from tokenops.framework.config import build_governor
+from tokenops.framework.context import SpanContext, _governance_scope, run_scope
+from tokenops.framework.core import Halt
+from tokenops.framework.engine import ApplyControls
+from tokenops.framework.ledger import LIFETIME, TRACE_TOTAL_BUDGET, segment_key_for
+from tokenops.framework.models import HopAttribution
+from tokenops.framework.pricing import build_price_book
 
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):

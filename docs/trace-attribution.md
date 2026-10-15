@@ -78,11 +78,11 @@ A budget's `dimension` picks which attribute forms its segment key:
 | `tag` | `tag:<key>=<value>` | a `user_dims` tag |
 
 The control plane treats segment keys as opaque; TokenOps computes them
-(`control/ledger.py`, `segment_key_for`). Governance configuration is pulled from the control
+(`framework/ledger.py`, `segment_key_for`). Governance configuration is pulled from the control
 plane per agent (`GET /v1/governance/{agent}`).
 
 ## In-process context
 
 `contextvars` hold the active registration, span and governance for the request. Boundaries and
 the hook read ambient context; handlers do not pass dims as arguments. Code:
-`control/context.py`, `control/attribution.py`, `control/chronicle_trace_utils.py`.
+`framework/context.py`, `framework/attribution.py`, `capabilities/chronicle_trace_utils.py`.

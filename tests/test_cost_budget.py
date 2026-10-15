@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 
 from conftest import FakeView, make_attr, make_step, toy_price
-from tokenops.control import ActionKind, Budget, Governor, Halt, Ledger, Observation, Usage
-from tokenops.control.policies import cost_budget
+from tokenops.framework.core import ActionKind, Halt, Observation, Usage
+from tokenops.framework.engine import Governor
+from tokenops.framework.ledger import Budget, Ledger
+from tokenops.framework.policies import cost_budget
 
 CAP = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="trace")
 

@@ -5,19 +5,11 @@ from __future__ import annotations
 import pytest
 
 from conftest import make_attr, toy_price
-from tokenops.control import (
-    Action,
-    ActionKind,
-    ApplyControls,
-    Budget,
-    Governor,
-    Halt,
-    Ledger,
-    Throttled,
-    apply_carry_to_messages,
-    wrap_complete,
-)
-from tokenops.control.policies import pre_call_worst_case
+from tokenops.capabilities import apply_carry_to_messages, wrap_complete
+from tokenops.framework.core import Action, ActionKind, Halt
+from tokenops.framework.engine import ApplyControls, Governor, Throttled
+from tokenops.framework.ledger import Budget, Ledger
+from tokenops.framework.policies import pre_call_worst_case
 
 # ---- ApplyControls unit -------------------------------------------------- #
 
@@ -129,7 +121,7 @@ def test_pre_call_halt_blocks_dispatch():
 
 
 def test_concurrency_cap_throttles_through_wrap():
-    from tokenops.control.policies import concurrency_cap
+    from tokenops.framework.policies import concurrency_cap
 
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()

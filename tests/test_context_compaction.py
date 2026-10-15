@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from conftest import FakeView, make_attr, make_step
-from tokenops.control import ActionKind, CallRequest, Usage
-from tokenops.control.context import reset_current_controls, set_current_controls
-from tokenops.control.engine import ApplyControls
-from tokenops.control.integration import _compact_messages
-from tokenops.control.policies import context_compaction
+from tokenops.framework.context import reset_current_controls, set_current_controls
+from tokenops.framework.core import ActionKind, CallRequest, Usage
+from tokenops.framework.engine import ApplyControls
+from tokenops.framework.message_steering import compact_messages
+from tokenops.framework.policies import context_compaction
 
 
 def _req(est):
@@ -72,7 +72,7 @@ def _estimate(messages):
 
 
 def test_compact_messages_returns_metadata_with_estimate():
-    compacted, meta = _compact_messages(_MSGS, estimate=_estimate)
+    compacted, meta = compact_messages(_MSGS, estimate=_estimate)
     assert len(compacted) < len(_MSGS)
     assert meta["tokens_before"] > 0
     assert meta["tokens_after"] > 0
@@ -81,13 +81,13 @@ def test_compact_messages_returns_metadata_with_estimate():
 
 
 def test_compact_messages_zeroed_metadata_without_estimate():
-    compacted, meta = _compact_messages(_MSGS)
+    compacted, meta = compact_messages(_MSGS)
     assert len(compacted) < len(_MSGS)
     assert meta == {"tokens_before": 0, "tokens_after": 0, "tokens_saved": 0}
 
 
 def test_compact_messages_drops_duplicates_preserves_system():
-    compacted, _ = _compact_messages(_MSGS, estimate=_estimate)
+    compacted, _ = compact_messages(_MSGS, estimate=_estimate)
     roles_and_content = [(m.get("role"), m.get("content")) for m in compacted]
     # System message always kept
     assert ("system", "You are helpful.") in roles_and_content
@@ -96,7 +96,7 @@ def test_compact_messages_drops_duplicates_preserves_system():
 
 
 def test_observation_carry_compaction_when_present():
-    from tokenops.control.core import Attribution, Observation
+    from tokenops.framework.core import Attribution, Observation
 
     obs = Observation(
         attr=Attribution(user="u", agent="a", trace_id="r"),
@@ -110,7 +110,7 @@ def test_observation_carry_compaction_when_present():
 
 
 def test_observation_no_compaction_when_none():
-    from tokenops.control.core import Attribution, Observation
+    from tokenops.framework.core import Attribution, Observation
 
     obs = Observation(
         attr=Attribution(user="u", agent="a", trace_id="r"),

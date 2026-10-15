@@ -8,8 +8,9 @@ import pytest
 
 from conftest import make_attr, toy_price
 from tokenops import flush_ledger_writes, tokenops_run
-from tokenops.control import Observation, Usage, build_governor
-from tokenops.control.ledger import LIFETIME
+from tokenops.framework.config import build_governor
+from tokenops.framework.core import Observation, Usage
+from tokenops.framework.ledger import LIFETIME
 from tokenops.repositories import LedgerEventWriter
 
 GOV = {

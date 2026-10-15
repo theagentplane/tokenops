@@ -5,16 +5,13 @@ from __future__ import annotations
 import pytest
 
 from conftest import toy_price
-from tokenops.control import (
-    ApplyControls,
-    Governor,
-    Ledger,
-    install_crossing_hook,
-    wrap_complete,
-)
-from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import HopAttribution
+from tokenops.capabilities import wrap_complete
+from tokenops.capabilities.crossing import install_crossing_hook
+from tokenops.framework.attribution import _build_attribution
+from tokenops.framework.context import SpanContext, _governance_scope, run_scope
+from tokenops.framework.engine import ApplyControls, Governor
+from tokenops.framework.ledger import Ledger
+from tokenops.framework.models import HopAttribution
 from tokenops.providers.types import ModelResponse
 
 

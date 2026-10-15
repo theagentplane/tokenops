@@ -3,12 +3,12 @@
 from types import SimpleNamespace as NS
 from unittest.mock import patch
 
-from tokenops.control.boundary import observation_from_crossing
-from tokenops.control.context import SpanContext, run_scope
-from tokenops.control.core import Attribution, Usage
-from tokenops.control.integration import step_to_observation
-from tokenops.control.models import HopAttribution
-from tokenops.control.pricing import Rate, build_price_book
+from tokenops.capabilities import step_to_observation
+from tokenops.framework.boundary import observation_from_crossing
+from tokenops.framework.context import SpanContext, run_scope
+from tokenops.framework.core import Attribution, Usage
+from tokenops.framework.models import HopAttribution
+from tokenops.framework.pricing import Rate, build_price_book
 from tokenops.providers import anthropic as ant
 from tokenops.providers import openai as oa
 from tokenops.providers.types import ModelResponse
@@ -148,8 +148,8 @@ def test_reasoning_is_not_double_billed():
 
 
 def test_context_trend_includes_cached_prompt_tokens():
-    from tokenops.control.core import CallRequest
-    from tokenops.control.policies.context_compaction import ContextCompactionDetector
+    from tokenops.framework.core import CallRequest
+    from tokenops.framework.policies.context_compaction import ContextCompactionDetector
 
     request = CallRequest(
         attr=Attribution(user="t", agent="t", trace_id="t"),

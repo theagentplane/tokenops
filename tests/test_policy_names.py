@@ -11,11 +11,11 @@ import yaml
 
 from conftest import toy_price
 from tokenops.config.loader import DEFAULT_CONFIG, load_governance_yaml
-from tokenops.control import build_governor, policies
-from tokenops.control import config as config_module
-from tokenops.control.config import POLICY_TEMPLATES, policy_template_ids
-from tokenops.control.policies import tool_output_cap
-from tokenops.control.policy_labels import policy_label
+from tokenops.framework import config as config_module
+from tokenops.framework import policies
+from tokenops.framework.config import POLICY_TEMPLATES, build_governor, policy_template_ids
+from tokenops.framework.policies import tool_output_cap
+from tokenops.framework.policy_labels import policy_label
 
 ROOT = Path(__file__).resolve().parents[1]
 YAML_CONFIGS = sorted(
@@ -26,7 +26,7 @@ YAML_CONFIGS = sorted(
 def test_registry_matches_policy_modules_exports_and_doc_slugs():
     module_ids = {
         path.stem
-        for path in (ROOT / "src/tokenops/control/policies").glob("*.py")
+        for path in (ROOT / "src/tokenops/framework/policies").glob("*.py")
         if not path.name.startswith("_")
     }
     doc_ids = {path.stem for path in (ROOT / "docs/policies").glob("*.md")}
@@ -60,7 +60,7 @@ def test_template_key_matches_runtime_names_and_modules(policy_id):
     assert (
         type(detector).__module__
         == type(policy).__module__
-        == (f"tokenops.control.policies.{policy_id}")
+        == (f"tokenops.framework.policies.{policy_id}")
     )
     assert template.disabled_reason is None
     assert policy_label(policy_id) == f"{template.display_name} ({policy_id})"

@@ -54,7 +54,7 @@ Helpers in `tests/conftest.py` and `tests/`:
 ## Adding a policy
 
 1. Add the module under `src/tokenops/control/policies/` and register it in
-   `control/config.py` (`POLICY_TEMPLATES`).
+   `framework/config.py` (`POLICY_TEMPLATES`).
 2. Add the docs page `docs/policies/<id>.md` and a row to `docs/product/policies-index.md`.
 3. Add `tests/test_<id>.py` against `FakeView`, and a case in
    `test_policies_wrap_integration.py`.

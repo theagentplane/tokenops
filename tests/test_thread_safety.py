@@ -7,8 +7,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from conftest import make_attr, toy_price
-from tokenops.control.core import Observation, Usage
-from tokenops.control.ledger import Ledger
+from tokenops.framework.core import Observation, Usage
+from tokenops.framework.ledger import Ledger
 
 
 def _llm_obs(trace_id: str, ts: float, *, input_tokens: int = 100) -> Observation:

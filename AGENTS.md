@@ -36,10 +36,11 @@ Decisions that shape this repository are recorded as ADRs in [`docs/adr/`](docs/
   accept it.
 - **Never rewrite an accepted ADR.** Supersede it with a new one.
 
-## Layers (target)
+## Layers
 
-Each layer imports only from the ones above it. The current tree under `src/tokenops/control/`
-predates this and is being moved onto it by the pull requests of issue 162.
+Each layer imports only from the ones above it; `tests/test_layering.py` enforces it.
+`src/tokenops/control/` holds only deprecated import shims for the 1.0 paths (removed in 2.0):
+add nothing there, and import from the layers.
 
 | Layer | Package | Rule |
 |---|---|---|

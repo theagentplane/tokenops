@@ -18,16 +18,10 @@ from examples.brief.langchain_bridge import GovernedChatModel, make_langchain_di
 from examples.brief.messages import scout_response
 from examples.brief.scout.agent import ScoutAgent
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Action,
-    ActionKind,
-    Halt,
-    governance_events_payload,
-    with_governance_errors,
-    wrap_complete,
-)
-from tokenops.control.engine import Throttled
-from tokenops.control.ledger import LIFETIME
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Action, ActionKind, Halt, Throttled, governance_events_payload
+from tokenops.framework.ledger import LIFETIME
+from tokenops.interfaces import with_governance_errors
 
 AGENT = "scout"
 INTENT = "brief_scout"

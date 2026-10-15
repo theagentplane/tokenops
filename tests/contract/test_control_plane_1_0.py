@@ -185,6 +185,6 @@ def test_every_enabled_policy_template_is_known_to_the_plane():
     """A template the plane does not know cannot be written to it (a 400)."""
     from control_plane.models import POLICY_TEMPLATES as PLANE_TEMPLATES
 
-    from tokenops.control.config import policy_template_ids
+    from tokenops.framework.config import policy_template_ids
 
     assert set(policy_template_ids()) <= set(PLANE_TEMPLATES)

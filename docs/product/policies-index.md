@@ -2,7 +2,7 @@
 
 This is the single glossary of built-in policy IDs and display labels. Runtime
 registration, the governance configuration and the control plane's allow-list share
-[`POLICY_TEMPLATES`](../../src/tokenops/control/config.py). Per-policy behavior
+[`POLICY_TEMPLATES`](../../src/tokenops/framework/config.py). Per-policy behavior
 lives under [`docs/policies/`](../policies/).
 
 ## Canonical policy IDs
@@ -32,7 +32,7 @@ policy. For example:
 
 | Surface | Value for Tool fix |
 |---------|--------------------|
-| Python module | `tokenops.control.policies.tool_fix` |
+| Python module | `tokenops.framework.policies.tool_fix` |
 | `Detector.name`, `Policy.name`, `Signal.detector` | `tool_fix` |
 | YAML key | `governance.policies.tool_fix` |
 | Stored `PolicyInstance.template` | `tool_fix` |

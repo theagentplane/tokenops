@@ -44,6 +44,6 @@ but ordered arbitrarily.
 
 ## Modules
 
-- `tokenops.control.ledger`: `Ledger._lock` around the in-memory maps.
+- `tokenops.framework.ledger`: `Ledger._lock` around the in-memory maps.
 - `tokenops.repositories.control_plane_client`: governance cache lock.
 - `tokenops.repositories.ledger_event_writer`: the queue and the worker thread.

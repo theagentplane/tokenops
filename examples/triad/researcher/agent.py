@@ -10,7 +10,7 @@ from examples.agents.types import CorpusProfile, Finding, StepCallback, StepEven
 from examples.app_config import ResearcherServerConfig
 from examples.triad.researcher.prompts import decision_prompt
 from examples.triad.researcher.tools import make_fetch_tool, make_search_tool
-from tokenops.control.context import current_governance
+from tokenops.framework.context import current_governance
 from tokenops.providers import complete
 
 

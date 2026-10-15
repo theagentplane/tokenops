@@ -42,7 +42,7 @@ def _reason_strings(path: pathlib.Path) -> list[tuple[int, str]]:
     return found
 
 
-POLICY_FILES = sorted((SRC / "control" / "policies").glob("*.py"))
+POLICY_FILES = sorted((SRC / "framework" / "policies").glob("*.py"))
 
 
 @pytest.mark.parametrize("path", POLICY_FILES, ids=lambda p: p.name)

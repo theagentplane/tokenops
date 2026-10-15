@@ -8,7 +8,8 @@ from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.summarize.langchain.agent import LangChainSummarizeAgent
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
-from tokenops.control import install_crossing_hook, with_governance_errors
+from tokenops.capabilities.crossing import install_crossing_hook
+from tokenops.interfaces import with_governance_errors
 
 
 def build_app():

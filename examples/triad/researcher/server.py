@@ -13,12 +13,9 @@ from examples.app_config import load_config
 from examples.triad.messages import parse_outline, parse_questions, research_response
 from examples.triad.researcher.agent import ResearcherAgent
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Halt,
-    with_governance_errors,
-    wrap_complete,
-)
-from tokenops.control.engine import Throttled
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt, Throttled
+from tokenops.interfaces import with_governance_errors
 from tokenops.providers import complete
 
 AGENT = "researcher"

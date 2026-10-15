@@ -4,7 +4,7 @@
 
 **Policy ID:** [`time_budget`](../product/policies-index.md)
 
-Code: [`src/tokenops/control/policies/time_budget.py`](../../src/tokenops/control/policies/time_budget.py)
+Code: [`src/tokenops/framework/policies/time_budget.py`](../../src/tokenops/framework/policies/time_budget.py)
 Tests: [`tests/test_time_budget.py`](../../tests/test_time_budget.py)
 
 ---

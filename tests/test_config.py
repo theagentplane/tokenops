@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from conftest import make_attr, toy_price
-from tokenops.control import Halt, Observation, Usage, build_governor
+from tokenops.framework.config import build_governor
+from tokenops.framework.core import Halt, Observation, Usage
 
 CONFIG = {
     "governance": {

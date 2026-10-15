@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control import ApplyControls
-from tokenops.control.core import Action, ActionKind
+from tokenops.framework.core import Action, ActionKind
+from tokenops.framework.engine import ApplyControls
 
 
 def mutate(**kw) -> Action:

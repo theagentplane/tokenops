@@ -18,13 +18,13 @@ from tokenops import (
     instrument_app,
     tokenops_run,
 )
-from tokenops.control.context import (
+from tokenops.capabilities.crossing import TokenOpsHook, install_crossing_hook
+from tokenops.framework.context import (
     clear,
     current_governance,
     current_hop,
 )
-from tokenops.control.crossing import TokenOpsHook, install_crossing_hook
-from tokenops.control.models import GovernanceMode
+from tokenops.framework.models import GovernanceMode
 from tokenops.repositories import ControlPlaneError, ControlPlaneUnavailable
 
 CONFIG = {

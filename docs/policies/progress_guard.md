@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Default.
 
-Code: [`src/tokenops/control/policies/progress_guard.py`](../../src/tokenops/control/policies/progress_guard.py)
+Code: [`src/tokenops/framework/policies/progress_guard.py`](../../src/tokenops/framework/policies/progress_guard.py)
 Tests: [`tests/test_progress_guard.py`](../../tests/test_progress_guard.py)
 
 ---

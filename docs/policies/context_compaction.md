@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Default; capability derived from controls.
 
-Code: [`src/tokenops/control/policies/context_compaction.py`](../../src/tokenops/control/policies/context_compaction.py)
+Code: [`src/tokenops/framework/policies/context_compaction.py`](../../src/tokenops/framework/policies/context_compaction.py)
 Tests: [`tests/test_context_compaction.py`](../../tests/test_context_compaction.py)
 
 ---

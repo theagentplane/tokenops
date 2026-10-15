@@ -12,17 +12,10 @@ from examples.agents.research.native.agent import NativeResearchAgent
 from examples.agents.types import RunResult, StepEvent, TokenUsage
 from examples.app_config import load_config
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Action,
-    ActionKind,
-    Halt,
-    governance_events_payload,
-    with_governance_errors,
-    wrap_complete,
-    wrap_stream,
-)
-from tokenops.control.engine import Throttled
-from tokenops.control.ledger import LIFETIME
+from tokenops.capabilities import wrap_complete, wrap_stream
+from tokenops.framework import Action, ActionKind, Halt, Throttled, governance_events_payload
+from tokenops.framework.ledger import LIFETIME
+from tokenops.interfaces import with_governance_errors
 from tokenops.providers import complete, stream_complete
 
 AGENT = "research"

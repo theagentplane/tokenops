@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Default.
 
-Code: [`src/tokenops/control/policies/output_runaway.py`](../../src/tokenops/control/policies/output_runaway.py)
+Code: [`src/tokenops/framework/policies/output_runaway.py`](../../src/tokenops/framework/policies/output_runaway.py)
 Tests: [`tests/test_output_runaway.py`](../../tests/test_output_runaway.py)
 
 ---

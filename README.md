@@ -83,7 +83,8 @@ Wrap your model call once, then hand the wrapped version to your agent.
 
 ```python
 from tokenops import tokenops_run
-from tokenops.control import Halt, wrap_complete
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt
 from tokenops.providers import complete
 
 GOVERNANCE = {"governance": {
@@ -245,7 +246,10 @@ Only `src/tokenops/` is the installable package. Demos and benches stay under `e
 
 ```
 src/tokenops/              # installable package
-├── control/               # the governors: ledger, policies, wrap_complete, Chronicle hook
+├── framework/             # in-process machinery: ledger, policies, pricing, governor (no network)
+├── capabilities/          # tokenops_run, wrap_complete, the Chronicle hook
+├── interfaces/            # instrument_app, HTTP error mapping
+├── control/               # deprecated import shims (removed in 2.0)
 ├── repositories/          # the control-plane client and the background ledger writer
 ├── providers/             # OpenAI / Anthropic complete dispatch
 └── config/                # packaged default governance

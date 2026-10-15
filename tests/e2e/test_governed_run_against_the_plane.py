@@ -14,7 +14,8 @@ import pytest
 from chronicle import ReplayPlan
 
 from tokenops import flush_ledger_writes, tokenops_run
-from tokenops.control import Halt, wrap_complete
+from tokenops.capabilities import wrap_complete
+from tokenops.framework.core import Halt
 from tokenops.providers.types import ModelResponse
 from tokenops.repositories import ControlPlaneClient, PrecheckRequest
 

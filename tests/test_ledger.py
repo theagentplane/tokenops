@@ -5,8 +5,14 @@ from __future__ import annotations
 import pytest
 
 from conftest import make_attr, toy_price
-from tokenops.control.core import Observation, Usage
-from tokenops.control.ledger import TRACE_TOTAL_BUDGET, UNLIMITED_LEFT, Budget, Ledger, segment_key
+from tokenops.framework.core import Observation, Usage
+from tokenops.framework.ledger import (
+    TRACE_TOTAL_BUDGET,
+    UNLIMITED_LEFT,
+    Budget,
+    Ledger,
+    segment_key,
+)
 
 
 def _ledger():

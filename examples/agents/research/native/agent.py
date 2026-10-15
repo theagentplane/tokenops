@@ -11,7 +11,7 @@ from examples.agents.research import prompts
 from examples.agents.research.tools import core
 from examples.agents.types import CorpusProfile, Finding, StepCallback, StepEvent, TokenUsage
 from examples.app_config import AgentServerConfig
-from tokenops.control.context import current_governance
+from tokenops.framework.context import current_governance
 from tokenops.providers import complete
 
 

@@ -6,7 +6,7 @@
 
 Companion to `halt.md`.
 
-Code: [`src/tokenops/control/policies/tool_fix.py`](../../src/tokenops/control/policies/tool_fix.py)
+Code: [`src/tokenops/framework/policies/tool_fix.py`](../../src/tokenops/framework/policies/tool_fix.py)
 Tests: [`tests/test_tool_fix.py`](../../tests/test_tool_fix.py)
 
 ---

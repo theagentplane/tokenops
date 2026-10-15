@@ -23,16 +23,10 @@ from examples.triad.client import delegate_researcher, delegate_writer
 from examples.triad.messages import plan_response
 from examples.triad.planner.agent import PlannerAgent
 from tokenops import ControlPlaneClient, instrument_app, tokenops_run
-from tokenops.control import (
-    Action,
-    ActionKind,
-    Halt,
-    governance_events_payload,
-    with_governance_errors,
-    wrap_complete,
-)
-from tokenops.control.engine import Throttled
-from tokenops.control.ledger import LIFETIME
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Action, ActionKind, Halt, Throttled, governance_events_payload
+from tokenops.framework.ledger import LIFETIME
+from tokenops.interfaces import with_governance_errors
 from tokenops.providers import complete
 
 AGENT = "planner"

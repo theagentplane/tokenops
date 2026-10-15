@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from conftest import FakeView, make_attr, make_step
-from tokenops.control import ActionKind
-from tokenops.control.policies import tool_output_cap
-from tokenops.control.policies._util import est_tokens
+from tokenops.framework.core import ActionKind
+from tokenops.framework.policies import tool_output_cap
+from tokenops.framework.policies._util import est_tokens
 
 
 def test_large_structured_payload_offloaded():

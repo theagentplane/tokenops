@@ -1,18 +1,13 @@
-"""Policy display labels; stored/configured identifiers are never rewritten."""
+"""Deprecated: this module moved to ``tokenops.framework.policy_labels``."""
 
-from tokenops.control.config import POLICY_TEMPLATES
+import sys
+import warnings
 
+from tokenops.framework import policy_labels as _module
 
-def policy_label(policy_id: str) -> str:
-    """Keep the exact ID visible alongside its label.
-
-    Custom/historical event IDs without built-in metadata remain verbatim, not guessed
-    or treated as aliases for another policy.
-    """
-    template = POLICY_TEMPLATES.get(policy_id)
-    if template is None:
-        return policy_id
-    label = f"{template.display_name} ({policy_id})"
-    if template.factory is None:
-        label += " [temporarily disabled]"
-    return label
+warnings.warn(
+    "tokenops.control.policy_labels moved to tokenops.framework.policy_labels; the old path is deprecated and will be removed in 2.0",
+    DeprecationWarning,
+    stacklevel=2,
+)
+sys.modules[__name__] = _module

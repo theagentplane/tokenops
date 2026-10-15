@@ -4,7 +4,7 @@ from examples.a2a import messages
 from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage, summarize_request
 from examples.a2a.server import fetch_agent_card, fetch_agent_card_sync, post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
-from tokenops.control.models import GovernanceMode
+from tokenops.framework import GovernanceMode
 
 
 def _parse_run_result(data: dict) -> RunResult:

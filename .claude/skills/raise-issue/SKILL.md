@@ -82,7 +82,7 @@ files the issue does not touch.
 - **Quantify the blast radius.** Which providers, which configurations, how many
   users. "Every non-OpenAI, non-Anthropic model" is actionable; "some models" is not.
 - **Distinguish correct-but-unhelpful from wrong.** If the behaviour is by design,
-  say so and quote the invariant (e.g. `control/core.py:18`), then argue about the
+  say so and quote the invariant (e.g. `framework/core.py:18`), then argue about the
   ergonomics. Reviewers push back hard on issues that read as if a deliberate
   safety property were an accident.
 

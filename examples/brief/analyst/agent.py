@@ -13,7 +13,7 @@ from examples.app_config import AnalystServerConfig
 from examples.brief.analyst.prompts import decision_prompt
 from examples.brief.analyst.tools import make_fetch_tool, make_search_tool
 from examples.brief.langchain_bridge import GovernedChatModel, get_chat_model
-from tokenops.control.context import current_governance
+from tokenops.framework.context import current_governance
 
 
 def _parse_decision(content: str) -> dict:

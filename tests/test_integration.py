@@ -5,9 +5,12 @@ from __future__ import annotations
 import pytest
 
 from conftest import make_attr, toy_price
-from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
-from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import HopAttribution
+from tokenops.capabilities import wrap_complete
+from tokenops.framework.config import build_governor
+from tokenops.framework.context import SpanContext, _governance_scope, run_scope
+from tokenops.framework.core import Halt
+from tokenops.framework.engine import ApplyControls
+from tokenops.framework.models import HopAttribution
 
 
 def test_budget_halts_governed_complete():

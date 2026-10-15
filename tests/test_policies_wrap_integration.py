@@ -11,21 +11,14 @@ from __future__ import annotations
 import pytest
 
 from conftest import toy_price
-from tokenops.control import (
-    ActionKind,
-    ApplyControls,
-    Budget,
-    Governor,
-    Halt,
-    Ledger,
-    Throttled,
-    wrap_complete,
-)
-from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.core import Observation
-from tokenops.control.models import HopAttribution
-from tokenops.control.policies import (
+from tokenops.capabilities import wrap_complete
+from tokenops.framework.attribution import _build_attribution
+from tokenops.framework.context import SpanContext, _governance_scope, run_scope
+from tokenops.framework.core import ActionKind, Halt, Observation
+from tokenops.framework.engine import ApplyControls, Governor, Throttled
+from tokenops.framework.ledger import Budget, Ledger
+from tokenops.framework.models import HopAttribution
+from tokenops.framework.policies import (
     concurrency_cap,
     context_compaction,
     cost_budget,

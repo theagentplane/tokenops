@@ -5,15 +5,12 @@ from __future__ import annotations
 from chronicle import boundary, default_hooks
 
 from conftest import toy_price
-from tokenops.control import (
-    ApplyControls,
-    build_governor,
-    install_crossing_hook,
-)
-from tokenops.control.attribution import _build_attribution
-from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
-from tokenops.control.crossing import TokenOpsHook
-from tokenops.control.models import HopAttribution
+from tokenops.capabilities.crossing import TokenOpsHook, install_crossing_hook
+from tokenops.framework.attribution import _build_attribution
+from tokenops.framework.config import build_governor
+from tokenops.framework.context import SpanContext, _governance_scope, clear, run_scope
+from tokenops.framework.engine import ApplyControls
+from tokenops.framework.models import HopAttribution
 
 
 def test_install_crossing_hook_is_idempotent():

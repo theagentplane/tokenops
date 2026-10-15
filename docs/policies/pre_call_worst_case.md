@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Default (preventive).
 
-Code: [`src/tokenops/control/policies/pre_call_worst_case.py`](../../src/tokenops/control/policies/pre_call_worst_case.py)
+Code: [`src/tokenops/framework/policies/pre_call_worst_case.py`](../../src/tokenops/framework/policies/pre_call_worst_case.py)
 Tests: [`tests/test_pre_call_worst_case.py`](../../tests/test_pre_call_worst_case.py)
 
 ---

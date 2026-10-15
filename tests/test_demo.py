@@ -52,7 +52,8 @@ def test_demo_uses_only_public_api():
     source = DEMO.read_text(encoding="utf-8")
     for expected in (
         "from tokenops import tokenops_run",
-        "from tokenops.control import Halt, wrap_complete",
+        "from tokenops.capabilities import wrap_complete",
+        "from tokenops.framework import Halt",
         "from tokenops.providers.types import ModelResponse",
     ):
         assert expected in source, f"demo no longer imports: {expected}"

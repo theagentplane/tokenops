@@ -6,7 +6,7 @@
 
 Companion to `halt.md`. Strong, always-on.
 
-Code: [`src/tokenops/control/policies/tool_output_cap.py`](../../src/tokenops/control/policies/tool_output_cap.py)
+Code: [`src/tokenops/framework/policies/tool_output_cap.py`](../../src/tokenops/framework/policies/tool_output_cap.py)
 Tests: [`tests/test_tool_output_cap.py`](../../tests/test_tool_output_cap.py)
 
 ---

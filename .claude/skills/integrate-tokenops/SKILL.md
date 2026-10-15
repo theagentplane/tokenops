@@ -62,7 +62,8 @@ The whole integration. No server, no Docker.
 
 ```python
 from tokenops import tokenops_run
-from tokenops.control import Halt, wrap_complete
+from tokenops.capabilities import wrap_complete
+from tokenops.framework import Halt
 from tokenops.providers import complete          # or your own dispatch fn
 
 GOVERNANCE = {
@@ -184,7 +185,8 @@ so handlers can call bare `tokenops_run()`.
 
 ```python
 from tokenops import instrument_app, tokenops_run
-from tokenops.control import with_governance_errors, wrap_complete
+from tokenops.capabilities import wrap_complete
+from tokenops.interfaces import with_governance_errors
 from tokenops.providers import complete
 from tokenops.repositories import ControlPlaneClient
 

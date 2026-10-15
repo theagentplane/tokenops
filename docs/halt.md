@@ -3,9 +3,9 @@
 What a halt does to a running agent, why it does not interrupt an in-flight call, and how
 work is resumed.
 
-Code: [`control/engine.py`](../src/tokenops/control/engine.py) (Governor, controls),
-[`control/ledger.py`](../src/tokenops/control/ledger.py) (halt flag, window),
-[`control/policies/cost_budget.py`](../src/tokenops/control/policies/cost_budget.py) (the
+Code: [`framework/engine.py`](../src/tokenops/framework/engine.py) (Governor, controls),
+[`framework/ledger.py`](../src/tokenops/framework/ledger.py) (halt flag, window),
+[`framework/policies/cost_budget.py`](../src/tokenops/framework/policies/cost_budget.py) (the
 canonical HALT producer).
 
 ## In short

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from tokenops.control.core import Usage
-from tokenops.control.pricing import Rate, build_price_book
+from tokenops.framework.core import Usage
+from tokenops.framework.pricing import Rate, build_price_book
 
 
 def test_prices_known_model_in_micros():

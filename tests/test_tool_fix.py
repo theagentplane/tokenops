@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from conftest import FakeView, make_attr, make_step
-from tokenops.control import ActionKind
-from tokenops.control.policies import tool_fix
+from tokenops.framework.core import ActionKind
+from tokenops.framework.policies import tool_fix
 
 
 def _tool_step(name, args=None):

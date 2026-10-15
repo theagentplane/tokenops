@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-15
+
+The governor code is split into the layers `AGENTS.md` describes, and the layering is now
+enforced. **No behaviour changed and no 1.0 import broke**: every old path keeps working as a
+deprecated shim until 2.0 ([ADR 0006](docs/adr/0006-layered-packages-with-deprecated-shims.md)).
+
+### Added
+
+- `tokenops.framework` (in-process machinery, no network), `tokenops.capabilities`
+  (`tokenops_run`, `wrap_complete`, the Chronicle hook) and `tokenops.interfaces`
+  (`instrument_app`, HTTP error mapping), each with an `__all__`.
+- `LedgerBackend` and `LedgerWriter` protocols (`tokenops.framework`): the ledger depends on
+  these, and `ControlPlaneClient` and `LedgerEventWriter` satisfy them.
+- `tests/test_layering.py` fails if a layer imports one above it.
+
+### Changed
+
+- `tokenops.control.<module>` is now a deprecated alias of the module's new home (the same
+  module object, with a `DeprecationWarning` on import), and `import tokenops.control` warns.
+  Import from `tokenops`, or from the layer packages. Removed in 2.0. Where each module went:
+  `control/{attribution,boundary,config,context,core,engine,ledger,models,policies,policy_labels,
+  pricing,request_context,usage}` is `framework/`; `control/{crossing,integration,ledger_writers,
+  run,chronicle_trace_utils}` is `capabilities/`; `control/{http,instrument}` is `interfaces/`.
+- The control-plane wire types (`LedgerEvent`, `PrecheckRequest`, `PrecheckResult`,
+  `ApplyResult`, ...) are defined in `tokenops.framework.ledger_types`; `tokenops.repositories`
+  still exports them.
+- Files split by concept: `integration.py` into `complete_wrapper.py`, `stream_wrapper.py`,
+  `step_observation.py` and `framework/message_steering.py`; `ledger.py` into `budget.py`,
+  `ledger_events.py` and `ledger.py`. `capabilities/integration.py` remains as a re-export.
+- `mypy --strict` flags are enforced on the four layered packages.
+
 ## [1.0.1] - 2026-10-15
 
 ### Fixed

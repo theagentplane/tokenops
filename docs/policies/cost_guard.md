@@ -6,7 +6,7 @@
 
 Companion to `halt.md`.
 
-Code: [`src/tokenops/control/policies/cost_guard.py`](../../src/tokenops/control/policies/cost_guard.py)
+Code: [`src/tokenops/framework/policies/cost_guard.py`](../../src/tokenops/framework/policies/cost_guard.py)
 Tests: [`tests/test_cost_guard.py`](../../tests/test_cost_guard.py)
 
 ---
