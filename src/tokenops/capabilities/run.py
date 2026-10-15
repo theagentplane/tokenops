@@ -61,11 +61,6 @@ class TokenOpsBound:
     controls: ApplyControls | PreviewControls
     client: ControlPlaneClient | None
 
-    @property
-    def registration(self) -> HopAttribution:
-        """Deprecated alias of ``hop``."""
-        return self.hop
-
 
 def _resolve_ambient(
     *,

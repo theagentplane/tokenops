@@ -249,7 +249,6 @@ src/tokenops/              # installable package
 ├── framework/             # in-process machinery: ledger, policies, pricing, governor (no network)
 ├── capabilities/          # tokenops_run, wrap_complete, the Chronicle hook
 ├── interfaces/            # instrument_app, HTTP error mapping
-├── control/               # deprecated import shims (removed in 2.0)
 ├── repositories/          # the control-plane client and the background ledger writer
 ├── providers/             # OpenAI / Anthropic complete dispatch
 └── config/                # packaged default governance

@@ -8,7 +8,6 @@
 | `src/tokenops/repositories/` | the only I/O: `ControlPlaneClient`, `LedgerEventWriter`, their types and errors |
 | `src/tokenops/capabilities/` | governed-run workflows: `run.py` (`tokenops_run`), `complete_wrapper.py` (`wrap_complete`), `stream_wrapper.py`, `crossing.py` (the Chronicle hook), `step_observation.py` |
 | `src/tokenops/interfaces/` | what an app touches: `instrument.py` (`instrument_app`), `http.py` |
-| `src/tokenops/control/` | **deprecated** import shims for the 1.0 paths (removed in 2.0); no logic |
 | `src/tokenops/config/` | governance YAML loader and the packaged `default.yaml` |
 | `src/tokenops/providers/` | LLM `complete` helpers (OpenAI, Anthropic) |
 | `src/tokenops/adapters/` | LangChain adapter |

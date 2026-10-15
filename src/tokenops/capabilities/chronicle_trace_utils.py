@@ -2,7 +2,7 @@
 
 A run is a Chronicle trace: its only identifier is ``trace_id``. A hop arrives with the
 caller's ``traceparent`` and joins that trace; the entry hop starts a new one. This module is
-the single place that reads the active Chronicle span, so the rest of ``tokenops.control``
+the single place that reads the active Chronicle span, so the rest of TokenOps
 never touches Chronicle's session.
 
 ``chronicle.current_session`` (Chronicle 1.1) reads the active session without opening one;

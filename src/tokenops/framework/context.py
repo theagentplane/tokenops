@@ -30,11 +30,6 @@ class BoundRun:
     hop: HopAttribution
     span: SpanContext
 
-    @property
-    def registration(self) -> HopAttribution:
-        """Deprecated alias of ``hop``."""
-        return self.hop
-
 
 _hop: ContextVar[HopAttribution | None] = ContextVar("tokenops_hop", default=None)
 _span: ContextVar[SpanContext | None] = ContextVar("run_span", default=None)
@@ -125,8 +120,3 @@ def run_scope(hop: HopAttribution, span: SpanContext) -> Iterator[BoundRun]:
     finally:
         _hop.reset(tok_reg)
         _span.reset(tok_span)
-
-
-# Deprecated names kept for 1.x.
-current_registration = current_hop
-bind_registration = bind_hop

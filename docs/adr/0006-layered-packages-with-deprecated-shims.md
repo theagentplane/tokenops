@@ -46,7 +46,7 @@ We will move the code into `tokenops.framework`, `tokenops.capabilities` and
   satisfy. The wire types (`LedgerEvent`, `PrecheckRequest`, ...) moved to
   `framework/ledger_types.py`; `tokenops.repositories` re-exports them.
 - `tests/test_layering.py` fails if a layer imports one above it, or if anything outside
-  `tokenops.control` imports it. The four layered packages are held to `mypy --strict`.
+  `tokenops.control` imports it (until it was removed in 2.0). The four layered packages are held to `mypy --strict`.
 
 ## Consequences
 
@@ -54,7 +54,8 @@ We will move the code into `tokenops.framework`, `tokenops.capabilities` and
 - **Bad or risky:** a patch target that names a deep 1.0 path still works only because of the
   `sys.modules` alias; code that held a reference to a private helper that moved (for example
   `_compact_messages`, now `framework.message_steering.compact_messages`) must be updated.
-- **Follow-ups:** remove `tokenops.control` in 2.0. `wrap_complete` onto Chronicle hooks is #173.
+- **Follow-ups:** `tokenops.control` and the 1.x registration aliases were removed in 2.0.0
+  (see `docs/migration-1.x-to-2.0.md`). `wrap_complete` onto Chronicle hooks is #173.
 
 ## Impact on other repositories
 

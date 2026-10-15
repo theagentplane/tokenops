@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-15
+
+Removes what 1.1 deprecated. **No behaviour changed**; only import paths and alias names are
+gone. Migration table: [docs/migration-1.x-to-2.0.md](docs/migration-1.x-to-2.0.md).
+
+### Removed (breaking)
+
+- **`tokenops.control`**: the package and every `tokenops.control.<module>` shim. Import from
+  `tokenops`, `tokenops.framework`, `tokenops.capabilities`, `tokenops.interfaces` or
+  `tokenops.repositories`. *Consumers:* rewrite `tokenops.control.<module>` to the layer that
+  owns it (the 1.1 `DeprecationWarning` named the new path).
+- The 1.x registration aliases: `RunRegistration`, `RunNotRegisteredError`, `bound.registration`,
+  `current_registration`, `bind_registration`, `require_registration` and
+  `merge_registration_dims`. *Consumers:* use `HopAttribution`, `NoGovernanceScopeError`,
+  `bound.hop`, `current_hop`, `bind_hop`, `require_hop` and `merge_hop_dims`.
+
 ## [1.1.0] - 2026-10-15
 
 The governor code is split into the layers `AGENTS.md` describes, and the layering is now
