@@ -12,9 +12,7 @@ runtime vocabulary.
 
 from tokenops.framework.attribution import (
     merge_hop_dims,
-    merge_registration_dims,
     require_hop,
-    require_registration,
 )
 from tokenops.framework.boundary import emit_observation, observation_from_crossing
 from tokenops.framework.config import build_governance_stack, build_governor
@@ -56,8 +54,6 @@ from tokenops.framework.models import (
     GovernanceMode,
     HopAttribution,
     NoGovernanceScopeError,
-    RunNotRegisteredError,
-    RunRegistration,
     parse_governance_mode,
 )
 from tokenops.framework.request_context import (
@@ -97,8 +93,6 @@ __all__ = [
     "PreviewControls",
     "RaiseControls",
     "RequestContext",
-    "RunNotRegisteredError",
-    "RunRegistration",
     "Severity",
     "Signal",
     "SpanContext",
@@ -113,10 +107,8 @@ __all__ = [
     "governance_events_payload",
     "halt_detector_from_events",
     "merge_hop_dims",
-    "merge_registration_dims",
     "observation_from_crossing",
     "parse_governance_mode",
     "require_hop",
-    "require_registration",
     "segment_key",
 ]

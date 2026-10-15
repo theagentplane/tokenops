@@ -48,8 +48,3 @@ class HopAttribution:
 
 class NoGovernanceScopeError(LookupError):
     """Telemetry was produced outside a bound ``tokenops_run`` scope."""
-
-
-# Deprecated names kept for 1.x; use HopAttribution and NoGovernanceScopeError.
-RunRegistration = HopAttribution
-RunNotRegisteredError = NoGovernanceScopeError

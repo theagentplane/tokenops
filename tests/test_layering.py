@@ -1,8 +1,7 @@
 """The layers import only downwards (AGENTS.md: Layers).
 
 framework -> repositories -> capabilities -> interfaces. The framework does no I/O, so it must
-not see the control-plane client; ``tokenops.control`` is only deprecated shims and nothing in
-the package may depend on it.
+not see the control-plane client.
 """
 
 from __future__ import annotations
@@ -16,10 +15,10 @@ SRC = Path(__file__).resolve().parent.parent / "src" / "tokenops"
 
 #: layer -> the tokenops packages it must NOT import
 FORBIDDEN = {
-    "framework": ("repositories", "capabilities", "interfaces", "control"),
-    "repositories": ("capabilities", "interfaces", "control"),
-    "capabilities": ("interfaces", "control"),
-    "interfaces": ("control",),
+    "framework": ("repositories", "capabilities", "interfaces"),
+    "repositories": ("capabilities", "interfaces"),
+    "capabilities": ("interfaces",),
+    "interfaces": (),
 }
 
 
@@ -49,16 +48,6 @@ def test_a_layer_imports_only_the_layers_below_it(layer: str) -> None:
         if bad:
             offenders.append(f"{path.relative_to(SRC)} imports {sorted(bad)}")
     assert not offenders, "\n".join(offenders)
-
-
-def test_nothing_outside_the_deprecated_package_imports_tokenops_control() -> None:
-    offenders = []
-    for path in sorted(SRC.rglob("*.py")):
-        if path.relative_to(SRC).parts[0] == "control":
-            continue
-        if "control" in _tokenops_imports(path):
-            offenders.append(str(path.relative_to(SRC)))
-    assert not offenders, offenders
 
 
 def test_the_framework_package_has_no_network_client() -> None:

@@ -1,4 +1,4 @@
-# TokenOps control plane seed. Consumed by tokenops.control.build_governor / Store auto-seed.
+# TokenOps control plane seed. Consumed by tokenops.framework.build_governor / Store auto-seed.
 # Budgets are spend caps bound to a segment; policies are the (detect, fix) templates.
 # Policy keys are canonical IDs, not display labels or instance IDs. See docs/product/policies-index.md.
 governance:

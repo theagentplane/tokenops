@@ -57,8 +57,3 @@ def require_hop() -> HopAttribution:
             "no governed scope in this context: wrap the work in tokenops_run"
         )
     return reg
-
-
-# Deprecated names kept for 1.x.
-require_registration = require_hop
-merge_registration_dims = merge_hop_dims

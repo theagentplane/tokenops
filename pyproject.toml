@@ -129,7 +129,7 @@ module = [
 ]
 follow_imports = "skip"
 
-# The layered packages are held to `mypy --strict`; `tokenops.control` is only deprecated shims.
+# The layered packages are held to `mypy --strict`.
 [[tool.mypy.overrides]]
 module = [
   "tokenops.framework",
