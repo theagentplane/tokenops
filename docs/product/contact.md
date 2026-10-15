@@ -16,11 +16,11 @@ We respond to onboarding inquiries through GitHub Discussions or email. Include 
 
 ## What onboarding typically covers
 
-1. **Run registration** — stable `run_id`, intent, and customer tags before any telemetry  
-2. **Boundary hooks** — LLM, tool, and delegate crossings instrumented for `pre_call` and `observe`  
-3. **Budget design** — per-run caps, per-tenant rollups, and which policies link to which buckets  
-4. **Policy selection** — which of the ten default policies to enable, and parameters for your task shapes  
-5. **Operator visibility** — run history, halt reasons, and control-plane signals for your team  
+1. **Attribution** — the Chronicle trace as the run, plus intent and customer tags per hop
+2. **Boundary hooks** — LLM, tool, and delegate crossings instrumented for `pre_call` and `observe`
+3. **Budget design** — per-run caps, per-tenant rollups, and which policies link to which buckets
+4. **Policy selection** — which of the ten default policies to enable, and parameters for your task shapes
+5. **Operator visibility** — run history, halt reasons, and control-plane signals for your team
 
 ---
 

@@ -35,15 +35,15 @@ flowchart LR
     subgraph agenthost["Agent hosts (trusted code)"]
         A1["Agent process<br/>SDK: governor + wrapper"]
         A2["Agent process<br/>SDK"]
-        UI["Dashboard"]
+        UI["Web page"]
     end
     subgraph planehost["Control-plane host"]
         CP["Control plane<br/>HTTP API + API-key auth"]
-        DB[("SQLite ledger<br/>budgets, spend, halt, policies")]
+        DB[("Database<br/>budgets, spend, halt, policies, traces")]
         CP --> DB
     end
-    A1 -->|"register + ledger over HTTP"| CP
-    A2 -->|"register + ledger over HTTP"| CP
+    A1 -->|"governance + ledger over HTTP"| CP
+    A2 -->|"governance + ledger over HTTP"| CP
     UI -->|"read over HTTP"| CP
 ```
 
@@ -57,11 +57,11 @@ HTTP API, where the plane can authenticate the caller.
 - **Enforcement is in-process.** Governance is applied by wrapping your
   model-call function. A code path that calls the model without the wrapper is
   not counted. Keep model access behind the governed wrapper.
-- **The reference Docker deployment shares the ledger file.** In the current
-  bundled `docker-compose` setup, agent containers mount the ledger database on a
-  shared volume rather than reaching it only through the plane. An agent with
-  file access can therefore read or change ledger state directly. This is a known
-  gap; the hardened path below closes it.
+- **The agent holds a key that can write the ledger.** Agents reach spend, halt and
+  budget state only through the HTTP API, with a scoped key (`read`, `ingest`). A
+  compromised agent can write its own spend and halt, so keys should be per service and
+  carry only the scopes they need. TokenOps ships no deployment of its own; the
+  control plane's deployment documentation covers hardening.
 - **Ledger authorization on the plane is coarse.** The control plane
   authenticates callers with scoped API keys, but ledger routes do not yet check
   that a caller owns the run or segment it acts on. Until per-tenant

@@ -1,77 +1,62 @@
-# Testing the TokenOps control plane
+# Testing TokenOps
 
-How to run the tests yourself, what each suite proves, and how to add a test when you add a
-policy. Default CI runs **everything that needs no real API key or vendored framework** —
-including the example-bench end-to-end tests (real servers, real Governor, real policy
-HALT/MUTATE decisions; only the model call and search tool are faked, so no network or key
-is needed). Only `live` (genuinely needs an API key / vendored framework) is excluded.
+How to run the tests, what each suite proves, and how to add a test when you add a policy.
+Default CI needs no API key and no vendored framework: the model is scripted, and the control
+plane (when a test needs one) is the released `agentplane-control-plane` running in process.
 
----
-
-## Run everything (default CI)
-
-From the repo root:
+## Run everything
 
 ```bash
+pip install -e ".[contract]" --group dev
 python -m pytest -q
 ```
 
-Pytest config lives in `pyproject.toml` (`testpaths=["tests"]`, `pythonpath=["src", "."]`,
-`addopts = "-m 'not live'"`). Only the `live` suite is excluded by default; `e2e` is part of
-the regular run precisely so a real run+policy regression can't go unnoticed the way #127
-did (two example-bench e2e tests silently broke against `main` for a while because they
-were excluded from CI at the time).
-
-Useful variants:
+Pytest config is in `pyproject.toml` (`testpaths=["tests"]`, `pythonpath=["src", "."]`,
+`addopts = "-m 'not live'"`). Use `python -m pytest` on Windows.
 
 ```bash
 python -m pytest -q tests/test_cost_budget.py      # one policy
 python -m pytest -q -k "halt or budget"            # by keyword
-python -m pytest -q -m e2e                         # only the example benches
-python -m pytest -q -m live                        # needs keys / vendored frameworks
-python -m pytest -v                                # show every test name
-python -m pytest -x                                # stop at first failure
+python -m pytest -q tests/e2e                      # end to end, real control plane
+python -m pytest -q tests/contract                 # contract tests only
 ```
+
+`tests/contract` and `tests/e2e` are skipped unless `agentplane-control-plane>=1.0` is installed
+(the `contract` extra installs it).
 
 ## What the suites cover
 
-| File | Proves |
-|------|--------|
-| `test_ledger.py` | pricing, single-source `cum_spent`, velocity/recent, `budget_left`, inflight, sticky halt |
-| `test_cost_budget.py` … `test_tool_fix.py` (+ `test_trajectory_hint.py`) | one per policy — detector + Action (`FakeView`) |
-| `test_policies_wrap_integration.py` | **all** policies through Governor + mocked `wrap_complete` / observe |
-| `test_config.py` | `build_governor` wires policies from a dict |
-| `test_integration.py` | in-process wrap + fake model halt |
-| `test_apply.py` | corrective controls through `wrap_complete` |
-| `test_store.py` | SQLite CRUD, auto-seed, clear/reseed |
-| `test_attribution.py` | registration, headers, fail-closed resolve |
-| `test_boundary.py` / `test_chronicle_boundary.py` | `@boundary` + Chronicle ingest |
-| `test_attribution_ledger_policies_e2e.py` | register → ledger → HALT (in-process + HTTP) |
-| `test_cross_process_budget_gating.py` | shared SQLite spend/halt across Governors |
-| `test_server_enforcement.py` | Admin store → server → HALT → RunRecord |
-| `tests/examples/` | real A2A bench / triad servers, real Governor + policy HALT/MUTATE, real multi-agent shared ledger (marker: `e2e`, no key needed, **now in the default run**) |
-| `tests/benchmarking/` | harness unit tests; MetaGPT/browser-use need vendor (marker: `live` where applicable) |
+| Where | Proves |
+|---|---|
+| `test_ledger.py` | pricing, single-source `cum_spent`, velocity and recent, `budget_left`, in-flight, sticky halt |
+| `test_cost_budget.py` ... `test_tool_fix.py` | one per policy: detector plus action (`FakeView`) |
+| `test_policies_wrap_integration.py` | all policies through the Governor and `wrap_complete` |
+| `test_config.py`, `test_policy_names.py` | `build_governor` from a dict; canonical names across code, YAML and docs |
+| `test_tokenops_run.py`, `test_attribution.py` | joining the trace, attribution, fail-closed behaviour when the plane is down |
+| `test_crossing_hook.py`, `test_chronicle_boundary.py`, `test_boundary.py` | the Chronicle hook and `@boundary` |
+| `test_cross_process_budget_gating.py`, `test_thread_safety.py` | shared spend and halt across Governors on one plane (fake) |
+| `test_repositories_*`, `test_async_ledger.py` | the control-plane client and the background writer |
+| `tests/contract` | the client and the in-memory fake against a real plane 1.x (the fake is verified) |
+| `tests/e2e` | a governed agent trips its budget, two agents share one ledger, a halted trace is replayed with the fix |
 
 ## How the tests stay isolated
 
-Two helpers in `tests/conftest.py`:
+Helpers in `tests/conftest.py` and `tests/`:
 
-* **`FakeView`** — a `LedgerView` whose reads are fixed by constructor kwargs
-* **`CollectingControls`** — OUT connector that records Actions (and raises on HALT)
-* **`toy_price`** — deterministic price book
-* **`TOKENOPS_SKIP_GOVERNANCE_SEED=1`** — set in `tests/conftest.py` so fixtures get an empty store unless they seed explicitly
+- **`FakeView`**: a `LedgerView` whose reads are fixed by constructor kwargs.
+- **`CollectingControls`**: a controls object that records actions (and raises on HALT).
+- **`toy_price`**: a deterministic price book.
+- **`fake_plane`** (`tests/fake_plane.py`): an in-memory control plane 1.0 behind
+  `httpx.MockTransport`, with an `.down` switch for outages.
+- **`chronicle_envelopes`**: the envelopes Chronicle recorded, read through a `record` hook.
+- **`LocalPlane`** (`tests/local_plane.py`): the real plane, in process on SQLite.
 
-## DB scripts (governance reset)
+## Adding a policy
 
-```bash
-make db-clear      # delete all rows (runs + governance)
-make db-reseed     # replace governance from default.yaml
-make db-reset      # clear + reseed
-```
-
-## Example e2e (offline, mocked LLM — part of the default run)
-
-```bash
-pip install -e ".[examples]" --group dev
-python -m pytest -q -m e2e   # just this slice, e.g. while iterating on it
-```
+1. Add the module under `src/tokenops/control/policies/` and register it in
+   `control/config.py` (`POLICY_TEMPLATES`).
+2. Add the docs page `docs/policies/<id>.md` and a row to `docs/product/policies-index.md`.
+3. Add `tests/test_<id>.py` against `FakeView`, and a case in
+   `test_policies_wrap_integration.py`.
+4. The control plane must know the template: add it to its allow-list
+   (`tests/contract` flags a template the plane does not know).

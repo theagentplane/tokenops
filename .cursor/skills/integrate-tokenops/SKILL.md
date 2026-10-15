@@ -5,9 +5,9 @@ description: >-
   system: put a spend cap on a whole workflow, halt or steer a run before the
   next LLM call, and attribute cost per agent. Use when the user wants to cap
   agent spend, stop a runaway agent, budget a multi-agent run, or mentions
-  TokenOps, tokenops_run, wrap_complete, register_run, crossing hooks, the
-  control plane, or TOKENOPS_URL. Works for a single script, a LangChain or
-  LangGraph agent, and FastAPI / A2A multi-agent stacks.
+  TokenOps, tokenops_run, wrap_complete, crossing hooks, the control plane, or
+  CONTROL_PLANE_URL. Works for a single script, a LangChain or LangGraph agent,
+  and FastAPI / A2A multi-agent stacks.
 ---
 
 <!-- Generated from .claude/skills/integrate-tokenops/SKILL.md by `make sync-skills`. Edit that file, not this one. -->
@@ -22,51 +22,63 @@ because the project looks big. Most integrations start and stay at Tier 1.
 | Tier | Use when | Adds |
 |---|---|---|
 | **1. One process** | A script, notebook, or single agent | ~10 lines, no server |
-| **2. Shared plane** | Several agent processes must share one budget | A control plane on `:7700` |
-| **3. Instrumented app** | FastAPI / A2A, run ids must flow across HTTP hops | `instrument_app` + header propagation |
+| **2. Shared control plane** | Several agent processes must share one budget, or you want the halt and spend visible | A running control plane and `CONTROL_PLANE_URL` |
+| **3. Instrumented app** | FastAPI / A2A, the trace must flow across HTTP hops | `instrument_app` + Chronicle propagation |
 
-Install: `pip install agent-tokenops` (Python 3.10+).
+Install: `pip install agent-tokenops` (Python 3.10+). It depends on
+`agent-chronicle>=1.1`.
 
-Runnable reference: `python -m tokenops.demo` (Tier 1, ships in the package),
-`examples/triad/` and `examples/agents/` (Tier 3).
+Runnable reference: `python -m tokenops.demo` (Tier 1, ships in the package).
 
 ---
 
 ## The one thing to understand first
 
-TokenOps governs a **run**, not a request. A run is one whole workflow. Every
-model call and tool call in it shares one `run_id` and one ledger, so a
-research to summarize to review pipeline stays inside a single budget even when
-each step is a separate process.
+TokenOps governs a **run**, not a request. A run is one whole workflow, and it
+is a [Chronicle](https://github.com/theagentplane/chronicle) **trace**: the only
+identifier is `trace_id`. Every model call and tool call in the run shares one
+trace and one ledger, so a research to summarize to review pipeline stays inside
+a single budget even when each step is a separate process.
 
-Three moving parts:
+Four moving parts:
 
-- **`tokenops_run(...)`** opens or joins a run and hands back a `bound` handle.
-- **`wrap_complete(...)`** wraps the function that calls the model. This is the
-  enforcement point: detect, decide, and apply all run *before* the call.
-- **The ledger** records spend and step count and carries the halt flag.
+- **`tokenops_run(...)`** joins the Chronicle trace (or starts one), builds the
+  run's attribution, loads governance, and hands back a `bound` handle.
+- **`wrap_complete(...)`** wraps the function that calls the model. Detect,
+  decide and apply all run *before* the call.
+- **The ledger** records spend and carries the halt flag. With a control plane it
+  is shared across processes; without one it lives in the process.
+- **The control plane** (optional, Tier 2+) stores governance configuration and
+  the shared ledger. TokenOps has no server, store or UI of its own.
 
-When a policy trips, `wrap_complete` raises `Halt`. Let it propagate, or catch
-it and return a partial result. The run is flagged halted, so later calls on the
-same `run_id` are refused even from another process.
+When a policy trips, `wrap_complete` raises `Halt`. Let it propagate, or catch it
+and return a partial result. The trace is flagged halted
+(`tokenops.halted` on the trace), so later calls are refused even from another
+process.
 
 ---
 
-## Tier 1 — one process
+## Tier 1: one process
 
-The whole integration. No server, no Docker, no config file.
+The whole integration. No server, no Docker.
 
 ```python
-import os
-os.environ.setdefault("TOKENOPS_EMBEDDED", "1")   # in-process ledger
-
-from tokenops import ControlPlaneClient, tokenops_run
+from tokenops import tokenops_run
 from tokenops.control import Halt, wrap_complete
 from tokenops.providers import complete          # or your own dispatch fn
 
-client = ControlPlaneClient.from_env()
+GOVERNANCE = {
+    "governance": {
+        "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "trace"}],
+        "policies": {
+            "cost_budget": {"budget": "run_llm_cap"},
+            "pre_call_worst_case": {"budget": "run_llm_cap"},
+            "step_cap": {"max_steps": 20},
+        },
+    }
+}
 
-with tokenops_run(client=client, service="my-agent", intent="research",
+with tokenops_run(config=GOVERNANCE, service="my-agent", intent="research",
                   provider="openai", model="gpt-4o") as bound:
     governed = wrap_complete(
         bound.governor, bound.controls, bound.attr,
@@ -83,6 +95,9 @@ with tokenops_run(client=client, service="my-agent", intent="research",
 its model client, that is the one thing to refactor: make the completion
 function injectable. Keep the agent itself vanilla.
 
+`config=` also accepts the packaged defaults:
+`tokenops.config.loader.load_governance_yaml()`.
+
 ### `dispatch` contract
 
 Any callable with this shape works, so you are not tied to
@@ -95,33 +110,14 @@ def dispatch(provider: str, model: str, messages, max_output_tokens=None, **kw):
 ```
 
 `ModelResponse` lives in `tokenops.providers.types`. Report real token counts:
-the ledger bills from them. For LangChain, `tokenops.adapters.langchain` already
+the ledger prices from them. For LangChain, `tokenops.adapters.langchain`
 provides a conforming dispatch.
 
-### Set the budget
+### Budgets and policies
 
-The seed config is `src/tokenops/config/default.yaml` ($2.00 per run). To change
-it, copy that file, edit `limit_micros`, and point at it:
-
-```bash
-export TOKENOPS_CONFIG=my-governance.yaml
-```
-
-```yaml
-governance:
-  budgets:
-    - id: run_llm_cap
-      limit_micros: 500000        # $0.50 per run
-      dimension: run
-  policies:
-    cost_budget:
-      budget: run_llm_cap         # halts after the call that crosses the cap
-    pre_call_worst_case:
-      budget: run_llm_cap         # halts BEFORE a call that could cross it
-      default_max_output: 1024
-    step_cap:
-      max_steps: 20
-```
+`limit_micros` is integer micro-USD (`$1.00 == 1_000_000`).
+`dimension` is `trace`, `user`, `agent`, `tenant` or `tag`; `trace` is the
+per-run cap. Policy keys are the canonical IDs in `docs/policies/`.
 
 `cost_budget` is the backstop and can overshoot by one call.
 `pre_call_worst_case` is the pre-emptive one. Enable both.
@@ -132,54 +128,67 @@ governance:
 python -m tokenops.demo
 ```
 
-It runs the same loop ungoverned and governed, and prints both totals. Expect the
+It runs the same loop ungoverned and governed and prints both totals. Expect the
 governed run to halt with `budget 'run_llm_cap' exhausted`.
 
 ---
 
-## Tier 2 — several processes, one budget
+## Tier 2: a control plane, several processes, one budget
 
 Tier 1 keeps the ledger inside one process, so two processes would each get the
-full cap. Point every process at one plane and one SQLite file.
+full cap. Run the AgentPlane control plane and point every process at it:
 
 ```bash
-export TOKENOPS_URL=http://localhost:7700   # every agent process
-export TOKENOPS_DB=tokenops.db              # plane and agents share this file
-python -m tokenops.server                   # the plane, on :7700
+pip install agentplane-control-plane
+control-plane serve                           # see its README for deployment
+export CONTROL_PLANE_URL=http://localhost:8000
+export CONTROL_PLANE_API_KEY=...              # a key with ingest + read scopes
 ```
 
-Agent code is unchanged from Tier 1: `ControlPlaneClient.from_env()` sees
-`TOKENOPS_URL` and registers over HTTP instead of writing locally.
+Governance configuration lives in the control plane's database, not in your
+code. Put it there with `control-plane db seed --file my.yaml`, the API
+(`PUT /v1/budgets`, `PUT /v1/policies`; `admin` scope) or the TokenOps tab of its
+web page. The agent pulls it on every run, `ETag` cached.
 
-**Do not set `TOKENOPS_EMBEDDED=1` here.** It forces the in-process store and
-silently defeats the shared cap.
-
-Downstream processes must receive the run id, or they open a second run:
+Agent code changes from `config=` to a client:
 
 ```python
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, RUN_ID_HEADER
+from tokenops import tokenops_run
+from tokenops.repositories import ControlPlaneClient
 
-headers = {RUN_ID_HEADER: run_id}
-if parent_span_id:
-    headers[PARENT_SPAN_ID_HEADER] = parent_span_id
+client = ControlPlaneClient.from_env()        # raises if CONTROL_PLANE_URL is unset
+
+with tokenops_run(client=client, service="my-agent", intent="research",
+                  provider="openai", model="gpt-4o") as bound:
+    ...                                       # wrap_complete exactly as in Tier 1
 ```
 
-Every hop uses the same `with tokenops_run(...)`. The entry agent registers the
-run; downstream hops see the header and join it.
+How it behaves when the plane is down (explicit, tested):
 
-Admin and Dashboard UI: `make ui` on `:8501`.
+- A configuration was fetched earlier: the last one is used and a WARNING is
+  logged (`tokenops.governance_stale`).
+- Nothing fetched yet: `tokenops_run` raises, so the hop never runs ungoverned.
+- Ledger writes: spend and completion are queued and sent in the background
+  (`async_writes=True`); admit and halt are synchronous. A batch is retried only
+  when the request never reached the plane, never when the outcome is unknown
+  (the plane does not deduplicate events), so an outage can understate spend.
+  `LedgerEventWriter.stats` counts what was dropped. Call
+  `tokenops.flush_ledger_writes()` before a short-lived process exits (it also
+  runs at exit). Use `tokenops_run(async_writes=False)` for one synchronous
+  write per crossing.
 
 ---
 
-## Tier 3 — FastAPI / A2A
+## Tier 3: FastAPI / A2A
 
-`instrument_app` binds request context and installs the crossing hook once, so
-handlers can call bare `tokenops_run()`.
+`instrument_app` binds the request context and installs the governor hook once,
+so handlers can call bare `tokenops_run()`.
 
 ```python
-from tokenops import ControlPlaneClient, instrument_app, tokenops_run
+from tokenops import instrument_app, tokenops_run
 from tokenops.control import with_governance_errors, wrap_complete
 from tokenops.providers import complete
+from tokenops.repositories import ControlPlaneClient
 
 client = ControlPlaneClient.from_env()
 
@@ -197,14 +206,34 @@ instrument_app(app, service=AGENT, intent="triad_plan",
                provider=cfg.provider, model=cfg.model)
 ```
 
+### One trace across HTTP hops
+
+Hops join the same run through the W3C `traceparent` header, which Chronicle
+sends and reads. There is no TokenOps header.
+
+```python
+import chronicle
+
+chronicle.configure(
+    control_plane_url="http://control-plane:8000",
+    api_key="...",
+    inject_hosts=["researcher.internal", "writer.internal"],   # default deny
+)
+chronicle.instrument_httpx()      # outbound httpx calls carry traceparent
+```
+
+Inbound, `tokenops_run` reads `traceparent` from the request headers and joins
+that trace; with none it starts a new one.
+
 Rules that are easy to get wrong:
 
-- The **client sends the task only**. No `run_id`, no intent, no mode. The entry
-  agent owns those and passes them via `instrument_app`.
-- Agents must **not** mount `/v1/runs` when `TOKENOPS_URL` is set. Guard with
-  `should_mount_run_registration()`.
+- The **client sends the task only**. No trace id, intent or mode. The agent
+  owns those and passes them via `instrument_app`.
+- A hop's attribution (intent, `user_dims`, mode) comes from that hop's own
+  arguments and the payload allow-list. A downstream hop does not inherit the
+  entry hop's intent, so pass the dims that tag budgets use.
 - **Never re-bill child spend on the parent.** The shared ledger already has it
-  under the same `run_id`. Propagate headers, not costs.
+  under the same trace.
 
 Non-FastAPI frameworks have no middleware yet. Bind manually:
 
@@ -214,28 +243,24 @@ from tokenops import RequestContext, bind_request_context, tokenops_run
 bind_request_context(RequestContext(
     headers=dict(headers), payload=payload, service=AGENT, intent="...",
 ))
-with tokenops_run():
+with tokenops_run(client=client):
     ...
 ```
 
 ### Tool calls
 
 Model calls are covered by `wrap_complete`. Tool calls need a Chronicle
-boundary, which the crossing hook turns into a ledger observation:
+boundary, which the governor hook turns into a ledger observation:
 
 ```python
-from chronicle import Input, boundary
-from tokenops.control import install_crossing_hook
+import chronicle
 
-@boundary("search", kind="tool",
-          extract_input=lambda q: Input(arguments={"name": "search", "args": {"query": q}}, messages=[]))
+@chronicle.boundary("search", kind="tool")
 def invoke(query: str) -> SearchResult:
     return core.search(query, profile)
-
-install_crossing_hook()   # already done by instrument_app and tokenops.init
 ```
 
-Reference: `examples/triad/researcher/tools.py`.
+`instrument_app` and `tokenops.init()` install the hook.
 
 ---
 
@@ -243,23 +268,12 @@ Reference: `examples/triad/researcher/tools.py`.
 
 | Variable | Meaning |
 |---|---|
-| `TOKENOPS_URL` | Plane base URL. Set it, and registration goes over HTTP. Aliases: `CONTROL_PLANE_URL`, `TOKENOPS_CONTROL_PLANE_URL`. |
-| `TOKENOPS_EMBEDDED` | `1` forces the in-process store. Tier 1 and tests only. |
-| `TOKENOPS_DB` | SQLite path shared by the plane and every agent. Defaults to `tokenops.db`. |
-| `TOKENOPS_CONFIG` | Governance seed YAML. |
+| `CONTROL_PLANE_URL` | Control plane base URL. Required for `ControlPlaneClient.from_env()`. |
+| `CONTROL_PLANE_API_KEY` | Bearer key (scopes: `read`, `ingest`, `admin`). |
+| `CHRONICLE_CONTROL_PLANE_URL`, `CHRONICLE_API_KEY` | Where Chronicle saves envelopes (set the same plane). |
 
-**Precedence footgun.** `ControlPlaneClient.from_env` takes the HTTP path only
-when a URL is set **and** `TOKENOPS_EMBEDDED` is not `1`. So
-`TOKENOPS_EMBEDDED=1` wins over `TOKENOPS_URL`, and setting both silently falls
-back to a local SQLite file. Every process then gets its own full budget with no
-error. When moving from Tier 1 to Tier 2, unset `TOKENOPS_EMBEDDED` first.
-
-Confirm which path a process took:
-
-```python
-client = ControlPlaneClient.from_env()
-print("embedded" if client.embedded else f"plane at {client.url}")
-```
+There is no local-ledger fallback variable: with a plane configured, every
+process governs against it; without one, pass `config=` (Tier 1).
 
 ---
 
@@ -270,17 +284,17 @@ print("embedded" if client.embedded else f"plane at {client.url}")
 - [ ] tokenops_run wraps the unit of work you want budgeted
 - [ ] wrap_complete wraps every model call inside it
 - [ ] Halt is caught somewhere, or deliberately allowed to propagate
-- [ ] Budget set in TOKENOPS_CONFIG, both cost_budget and pre_call_worst_case on
-- [ ] Tier 2+: TOKENOPS_URL and TOKENOPS_DB shared, TOKENOPS_EMBEDDED unset
-- [ ] Tier 2+: run id propagated on every hop
+- [ ] Budget configured: config= (Tier 1) or in the control plane (Tier 2+)
+- [ ] Tier 2+: CONTROL_PLANE_URL and CONTROL_PLANE_API_KEY set on every process
+- [ ] Tier 2+: Chronicle configured and inject_hosts lists the downstream services
 - [ ] Tier 3: tools carry a Chronicle @boundary
 - [ ] Child spend is not re-billed on the parent
 ```
 
 ## Docs
 
-- Onboarding: `docs/guides/onboarding.md`
-- Triad deep dive: `docs/guides/field-guide-add-tokenops.md`
+- Quickstart and FAQ: `docs/guides/onboarding.md`
 - Policies, one file each: `docs/policies/`
-- Attribution: `docs/run-attribution.md`
-- Deploy: `docs/control-plane-deploy.md`
+- Attribution: `docs/trace-attribution.md`
+- Halt semantics: `docs/halt.md`
+- Migrating from 0.4: `docs/migration-0.4-to-1.0.md`

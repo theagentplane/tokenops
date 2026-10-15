@@ -7,7 +7,7 @@ TokenOps manages token spend using a small set of rules that stay true regardles
 | Unit | What it is |
 |---|---|
 | **Request** | One model call (prompt in, completion out) |
-| **Run** | One user task — many calls, tools, and delegations, tied together by a `run_id` |
+| **Run** | One user task — many calls, tools, and delegations, tied together by one Chronicle trace (`trace_id`) |
 
 Spend caps on individual requests miss the failure modes that matter: recursive tool loops, context that grows every turn, and multi-agent fan-out. TokenOps accumulates cost and behavior signals across the whole run.
 
