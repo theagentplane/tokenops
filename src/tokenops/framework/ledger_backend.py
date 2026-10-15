@@ -25,11 +25,9 @@ class LedgerBackend(Protocol):
 
     def precheck(self, request: PrecheckRequest) -> PrecheckResult:
         """Read halt, spend and in-flight state for one trace."""
-        ...
 
     def apply_events(self, events: list[LedgerEvent]) -> ApplyResult:
         """Apply a batch of ledger events in order, once."""
-        ...
 
 
 class LedgerWriter(Protocol):
@@ -37,8 +35,6 @@ class LedgerWriter(Protocol):
 
     def submit(self, events: Sequence[LedgerEvent]) -> int:
         """Queue events; return how many were accepted."""
-        ...
 
     def flush(self, timeout: float = 5.0) -> bool:
         """Wait until queued events are sent or dropped (``False`` on timeout)."""
-        ...
