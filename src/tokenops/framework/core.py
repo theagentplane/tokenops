@@ -271,21 +271,29 @@ class LedgerView(Protocol):
       * ``window`` is **O(N)** — escape hatch; do not call on every ``observe``.
     """
 
-    def cost_micros(self, trace_id: str) -> Micros: ...
+    def cost_micros(self, trace_id: str) -> Micros:
+        """Run-total spend in micro-USD."""
 
-    def step_count(self, trace_id: str) -> int: ...
+    def step_count(self, trace_id: str) -> int:
+        """Steps recorded for the trace."""
 
-    def is_halted(self, trace_id: str) -> bool: ...
+    def is_halted(self, trace_id: str) -> bool:
+        """Whether the trace is halted."""
 
-    def budget_left(self, budget_id: str, segment_key: str, period: str) -> Micros: ...
+    def budget_left(self, budget_id: str, segment_key: str, period: str) -> Micros:
+        """Micro-USD left in one budget accumulator."""
 
-    def inflight(self, segment_key: str) -> int: ...
+    def inflight(self, segment_key: str) -> int:
+        """Calls currently in flight for a segment."""
 
-    def velocity(self, trace_id: str, m: int) -> float: ...
+    def velocity(self, trace_id: str, m: int) -> float:
+        """Mean spend per step over the last ``m`` steps."""
 
-    def recent(self, trace_id: str, n: int) -> Sequence[BoundaryStep]: ...
+    def recent(self, trace_id: str, n: int) -> Sequence[BoundaryStep]:
+        """The last ``n`` steps (bounded tail)."""
 
-    def window(self, trace_id: str) -> Sequence[BoundaryStep]: ...
+    def window(self, trace_id: str) -> Sequence[BoundaryStep]:
+        """The whole step window (O(N); not for hot paths)."""
 
 
 # =========================================================================== #
@@ -334,7 +342,8 @@ class Policy(ABC):
     name: str = "policy"
 
     @abstractmethod
-    def decide(self, signal: Signal, view: LedgerView) -> Action: ...
+    def decide(self, signal: Signal, view: LedgerView) -> Action:
+        """Turn a detector signal into an action."""
 
 
 # =========================================================================== #
