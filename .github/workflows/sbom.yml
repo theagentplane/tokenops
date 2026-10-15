@@ -54,6 +54,24 @@ jobs:
             --validate \
             --output-file sbom.cdx.json
 
+      - name: Set the root component version from the installed wheel
+        run: |
+          # pyproject.toml has a dynamic version (src/tokenops/_version.py), so
+          # cyclonedx-py cannot read one from it. Take it from the wheel that was
+          # installed into the clean environment instead, so the SBOM and the
+          # release verify the same thing.
+          VERSION="$("$RUNNER_TEMP/sbom-env/bin/python" -c "import importlib.metadata as m; print(m.version('agent-tokenops'))")"
+          VERSION="$VERSION" python - <<'PY'
+          import json, os
+
+          path = "sbom.cdx.json"
+          doc = json.load(open(path))
+          root = doc["metadata"]["component"]
+          root["version"] = os.environ["VERSION"]
+          json.dump(doc, open(path, "w"), indent=2)
+          print(f"root component: {root['name']} {root['version']}")
+          PY
+
       - name: Summarize
         run: |
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
