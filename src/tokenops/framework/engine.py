@@ -65,7 +65,8 @@ class AgentControls(Protocol):
     """Connector OUT — the single channel the control plane uses to act on a run. One
     method, polymorphic on ``action.kind``; adding an ActionKind never changes it."""
 
-    def apply(self, action: Action) -> None: ...
+    def apply(self, action: Action) -> None:
+        """Carry out one governance action on the run."""
 
 
 class RaiseControls:

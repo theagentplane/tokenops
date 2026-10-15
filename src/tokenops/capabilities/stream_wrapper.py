@@ -8,6 +8,7 @@ tighter) or INJECT. There is no HALT here: the breakers backstop any hard stop.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -70,10 +71,8 @@ def _stream_and_watch(
                 gen.close()  # CANCEL: hard-break the stream
                 break
     finally:
-        try:
+        with contextlib.suppress(Exception):  # already closed or finished
             gen.close()
-        except Exception:
-            pass
     return cancelled, "".join(acc)
 
 
