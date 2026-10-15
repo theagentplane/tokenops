@@ -11,6 +11,7 @@ from tokenops.repositories.control_plane_types import (
     PrecheckRequest,
     PrecheckResult,
 )
+from tokenops.repositories.ledger_event_writer import LedgerEventWriter, WriterStats
 
 __all__ = [
     "ApplyResult",
@@ -21,6 +22,8 @@ __all__ = [
     "GovernanceResult",
     "HaltStatus",
     "LedgerEvent",
+    "LedgerEventWriter",
     "PrecheckRequest",
     "PrecheckResult",
+    "WriterStats",
 ]

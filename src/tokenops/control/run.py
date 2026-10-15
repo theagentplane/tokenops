@@ -41,6 +41,7 @@ from tokenops.control.core import Attribution
 from tokenops.control.crossing import install_crossing_hook
 from tokenops.control.engine import ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import PriceFn
+from tokenops.control.ledger_writers import writer_for
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 from tokenops.control.pricing import build_price_book
 from tokenops.control.request_context import current_request_context
@@ -152,6 +153,7 @@ def tokenops_run(
     governor: Governor | None = None,
     controls: ApplyControls | PreviewControls | None = None,
     open_ledger_run: bool = True,
+    async_writes: bool = True,
 ) -> Iterator[TokenOpsBound]:
     """One hop under a governed trace: join the trace, bind span + governance.
 
@@ -163,6 +165,10 @@ def tokenops_run(
     ``client`` is the control plane (default: built from ``CONTROL_PLANE_URL``). Pass
     ``config=`` (a governance dict) to run in process with no control plane: spend, in-flight
     and halt are then kept in this process only.
+
+    With a plane, spend and completion writes are queued and sent in the background
+    (``async_writes``, ADR 0003); ``admit`` and halt writes stay synchronous. Pass
+    ``async_writes=False`` for a synchronous write per crossing.
     """
     install_crossing_hook()
 
@@ -199,14 +205,20 @@ def tokenops_run(
             price_fn = price if price is not None else build_price_book()
             gov_config = _governance_config(client_obj, config, svc)
             enforce = reg.mode is not GovernanceMode.PREVIEW
+            writer = writer_for(client_obj) if client_obj is not None and async_writes else None
             if controls is not None:
                 gov = build_governor(
-                    gov_config, price_fn, controls, backend=client_obj, enforce=enforce
+                    gov_config,
+                    price_fn,
+                    controls,
+                    backend=client_obj,
+                    writer=writer,
+                    enforce=enforce,
                 )
                 ctrl: ApplyControls | PreviewControls = controls
             else:
                 gov, ctrl = build_governance_stack(
-                    gov_config, price_fn, backend=client_obj, mode=reg.mode
+                    gov_config, price_fn, backend=client_obj, writer=writer, mode=reg.mode
                 )
         else:
             gov = governor

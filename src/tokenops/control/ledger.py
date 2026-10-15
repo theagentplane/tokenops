@@ -59,6 +59,7 @@ from tokenops.repositories import (
     BudgetTarget,
     ControlPlaneClient,
     LedgerEvent,
+    LedgerEventWriter,
     PrecheckRequest,
 )
 
@@ -231,9 +232,13 @@ class Ledger:
         budgets: Sequence[Budget] = (),
         price: PriceFn | None = None,
         backend: ControlPlaneClient | None = None,
+        writer: LedgerEventWriter | None = None,
+        barrier_timeout_s: float = 2.0,
     ) -> None:
         self._lock = threading.RLock()
         self._backend = backend
+        self._writer = writer if backend is not None else None
+        self._barrier_timeout = barrier_timeout_s
         self.runs: dict[str, LocalRunState] = {}
         self._spent: dict[tuple[str, str, str], Micros] = defaultdict(int)
         self._inflight: dict[str, int] = defaultdict(int)
@@ -244,8 +249,18 @@ class Ledger:
     def _spent_key(self, budget_id: str, segment_key: str, period: str) -> tuple[str, str, str]:
         return (budget_id, segment_key, period)
 
+    def _barrier(self) -> None:
+        """Read-your-writes: wait (bounded) for this process's queued writes before a read.
+
+        Only the already-queued events are awaited, so the wait is short; on a timeout the
+        read proceeds and may be stale by the events still queued.
+        """
+        if self._writer is not None:
+            self._writer.flush(self._barrier_timeout)
+
     def _read_spent(self, budget_id: str, segment_key: str, period: str) -> Micros:
         if self._backend is not None:
+            self._barrier()
             state = self._backend.precheck(
                 PrecheckRequest(
                     trace_id=_trace_id_from_segment_key(segment_key) or "",
@@ -302,7 +317,11 @@ class Ledger:
         with self._lock:
             if self._backend is not None:
                 trace_id = _trace_id_from_segment_key(segment_key) or ""
-                self._backend.apply_events([_inflight_event("complete", trace_id, segment_key)])
+                event = _inflight_event("complete", trace_id, segment_key)
+                if self._writer is not None:
+                    self._writer.submit([event])
+                else:
+                    self._backend.apply_events([event])
             else:
                 self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
 
@@ -341,16 +360,21 @@ class Ledger:
                         targets.append(
                             {"budget_id": b.budget_id, "segment_key": sk, "period": b.period}
                         )
-                    result = self._backend.apply_events(
-                        [_spent_add_event(obs.attr.trace_id, cost, targets)]
-                    )
-                    if result.halted:
-                        rs.halted = True
-                    total_key = (
-                        f"{TRACE_TOTAL_BUDGET.budget_id}|trace:{obs.attr.trace_id}|{LIFETIME}"
-                    )
-                    if total_key in result.totals:
-                        rs.cum_spent_cache = result.totals[total_key]
+                    spend = _spent_add_event(obs.attr.trace_id, cost, targets)
+                    if self._writer is not None:
+                        # Asynchronous: no ack, so the trace total is this process's own
+                        # running sum; reads of shared spend go through ``_barrier``.
+                        self._writer.submit([spend])
+                        rs.cum_spent_cache += cost
+                    else:
+                        result = self._backend.apply_events([spend])
+                        if result.halted:
+                            rs.halted = True
+                        total_key = (
+                            f"{TRACE_TOTAL_BUDGET.budget_id}|trace:{obs.attr.trace_id}|{LIFETIME}"
+                        )
+                        if total_key in result.totals:
+                            rs.cum_spent_cache = result.totals[total_key]
                 cum = rs.cum_spent_cache
             else:
                 # One event can feed many accumulators (incl. the system run-total) —
@@ -422,6 +446,7 @@ class Ledger:
             if rs and rs.halted:
                 return True  # fast path: already known locally, no round trip
             if self._backend is not None:
+                self._barrier()
                 state = self._backend.precheck(PrecheckRequest(trace_id=trace_id, want=["halt"]))
                 if state.halted:
                     if rs is None:
@@ -444,6 +469,7 @@ class Ledger:
     def inflight(self, segment_key: str) -> int:
         with self._lock:
             if self._backend is not None:
+                self._barrier()
                 trace_id = _trace_id_from_segment_key(segment_key) or ""
                 state = self._backend.precheck(
                     PrecheckRequest(

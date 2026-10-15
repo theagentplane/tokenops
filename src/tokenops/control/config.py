@@ -51,7 +51,7 @@ from tokenops.control.policies import (
     tool_fix,
     tool_output_cap,
 )
-from tokenops.repositories import ControlPlaneClient
+from tokenops.repositories import ControlPlaneClient, LedgerEventWriter
 
 
 @dataclass
@@ -223,6 +223,7 @@ def build_governor(
     controls: AgentControls | None = None,
     *,
     backend: ControlPlaneClient | None = None,
+    writer: LedgerEventWriter | None = None,
     enforce: bool = True,
 ) -> Governor:
     """Build a fully-registered Governor (and its Ledger, on ``governor.ledger``) from a
@@ -235,7 +236,7 @@ def build_governor(
     gov_cfg = config.get("governance", config)
     budgets = parse_budgets(gov_cfg.get("budgets"))
 
-    ledger = Ledger(budgets=list(budgets.values()), price=price, backend=backend)
+    ledger = Ledger(budgets=list(budgets.values()), price=price, backend=backend, writer=writer)
     governor = Governor(ledger, controls, enforce=enforce)
     ctx = _Ctx(budgets=budgets, price=price)
 
@@ -261,11 +262,14 @@ def build_governance_stack(
     price: PriceFn,
     *,
     backend: ControlPlaneClient | None = None,
+    writer: LedgerEventWriter | None = None,
     mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[Governor, ApplyControls | PreviewControls]:
     """Wire a Governor + OUT connector for enforce or preview mode."""
     enforce = mode is not GovernanceMode.PREVIEW
     controls: ApplyControls | PreviewControls
     controls = ApplyControls() if enforce else PreviewControls()
-    governor = build_governor(config, price, controls, backend=backend, enforce=enforce)
+    governor = build_governor(
+        config, price, controls, backend=backend, writer=writer, enforce=enforce
+    )
     return governor, controls

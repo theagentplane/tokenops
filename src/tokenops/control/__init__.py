@@ -63,6 +63,7 @@ install_crossing_hook()
 
 from tokenops.control.http import with_governance_errors
 from tokenops.control.instrument import instrument_app
+from tokenops.control.ledger_writers import flush_ledger_writes
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 from tokenops.control.request_context import (
     RequestContext,
@@ -131,6 +132,7 @@ __all__ = [
     "clear_request_context",
     "current_request_context",
     "instrument_app",
+    "flush_ledger_writes",
     "SpanContext",
     "GovernanceContext",
     "observation_from_crossing",

@@ -42,6 +42,7 @@ Do not write one for routine changes: a bug fix, a rename, a small refactor.
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-ledger-writes-are-attempted-once.md) | Attempt each ledger write once; never retry an unknown outcome | Proposed |
+| [0003](0003-ledger-spend-writes-are-asynchronous.md) | Send spend and completion writes in the background; keep admit and halt synchronous | Proposed |
 
 Decisions taken in the suite for the 1.0 rework (trace as run, governance pulled from the
 database, halt as a trace attribute, no deduplication of ledger events, ledger counters) are

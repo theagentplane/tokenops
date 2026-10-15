@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Asynchronous ledger writes ([#162](https://github.com/theagentplane/tokenops/issues/162),
+  ADR 0003). With a control plane, `tokenops_run` sends `spent_add` and `complete` events from
+  a background `LedgerEventWriter` (one per client, shared by every hop of the process) so the
+  post-call write no longer blocks the agent. `admit` and halt writes stay synchronous, and a
+  read of shared state first waits (bounded) for this process's own queued writes. A batch is
+  retried only on a failed connect, never on an unknown outcome; a full queue or an
+  unreachable plane drops and counts events (`LedgerEventWriter.stats`). Pass
+  `tokenops_run(async_writes=False)` for a synchronous write per crossing, and call
+  `tokenops.flush_ledger_writes()` before a short-lived process exits (also done at exit).
+
+### Added
+
 - `tokenops.repositories.ControlPlaneClient`: a small `httpx` client for control plane 1.0
   ([#162](https://github.com/theagentplane/tokenops/issues/162)): governance with `ETag` /
   `If-None-Match` (the last known configuration is returned, flagged `stale`, when the plane is

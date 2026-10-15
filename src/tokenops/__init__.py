@@ -21,6 +21,7 @@ def init() -> None:
 
 # First-class SDK surface for agents / UIs talking to the plane.
 from tokenops.control.instrument import instrument_app as instrument_app
+from tokenops.control.ledger_writers import flush_ledger_writes as flush_ledger_writes
 from tokenops.control.request_context import (
     RequestContext as RequestContext,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "bind_request_context",
     "clear_request_context",
     "current_request_context",
+    "flush_ledger_writes",
     "init",
     "instrument_app",
     "tokenops_run",
