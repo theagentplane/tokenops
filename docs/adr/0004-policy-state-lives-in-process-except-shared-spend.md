@@ -50,12 +50,12 @@ envelope metadata (`tokenops.compaction_*`) so they are visible in the trace.
 - **Bad or risky:** in a multi-process run, `step_cap` limits each process's own steps, not the
   run's total. A shared step budget needs a plane counter, which the plane does not have.
 - **Follow-ups:** `trajectory_hint` stays disabled; re-homing it needs a cross-run index, which
-  is a separate decision. `time_budget` is not in the control plane's template allow-list, so a
-  `time_budget` policy cannot be written to the plane yet (a control-plane issue).
+  is a separate decision.
 
 ## Impact on other repositories
 
-control-plane: its template allow-list lacks `time_budget`.
+control-plane: its template allow-list must name every enabled template; `time_budget` was
+missing in 1.0.0 and is in 1.0.1 (a contract test asserts it).
 
 ## Links
 

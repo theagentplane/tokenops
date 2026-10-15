@@ -66,7 +66,7 @@ dev = [
 # The tests that need it `pytest.importorskip("control_plane")`, so a plain `dev` install
 # stays green. To run them: `pip install -e ".[contract]"`.
 contract = [
-  "agentplane-control-plane>=1.0",
+  "agentplane-control-plane>=1.0.1",
 ]
 examples = [
   "ddgs>=9.0",

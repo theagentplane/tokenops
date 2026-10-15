@@ -18,7 +18,7 @@ Delivered as the series in [#162](https://github.com/theagentplane/tokenops/issu
 [docs/migration-0.4-to-1.0.md](docs/migration-0.4-to-1.0.md).**
 
 Requires `agent-chronicle>=1.1,<2`, `agentplane-primitives==0.2.*` and a control plane `>=1.0`
-(only where you run one).
+(only where you run one; `>=1.0.1` to configure a `time_budget` policy there).
 
 ### Changed (breaking)
 
@@ -77,7 +77,7 @@ Requires `agent-chronicle>=1.1,<2`, `agentplane-primitives==0.2.*` and a control
   `Segment`, `BudgetSpec` and `PolicyInstance`. Delete any local `tokenops.db`.
 - `tokenops.control.trajectory` and the `trajectory_hint` implementation. The template stays
   known and disabled (it could not be built before either); re-homing it is undecided.
-- The `contract` extra no longer accepts control plane 0.x (`agentplane-control-plane>=1.0`).
+- The `contract` extra no longer accepts control plane 0.x (`agentplane-control-plane>=1.0.1`).
 
 ### Added
 
@@ -100,8 +100,6 @@ Requires `agent-chronicle>=1.1,<2`, `agentplane-primitives==0.2.*` and a control
 
 - `wrap_complete` and `wrap_stream` are still TokenOps wrappers around `chronicle.wrap_llm`
   ([#173](https://github.com/theagentplane/tokenops/issues/173)).
-- The control plane's template allow-list does not include `time_budget`, so that policy cannot
-  be written to the plane yet (flagged by an `xfail` contract test).
 - The control plane on SQLite can answer a TokenOps agent and Chronicle writing at once with
   `database is locked` ([control-plane#28](https://github.com/theagentplane/control-plane/issues/28)).
 - `src/tokenops/` is not yet split into the framework, repositories, capabilities and interfaces

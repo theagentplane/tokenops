@@ -181,10 +181,6 @@ def test_events_are_not_deduplicated(ledger_client: ControlPlaneClient):
 
 
 @_NEEDS_PLANE
-@pytest.mark.xfail(
-    strict=True,
-    reason="the control plane's template allow-list does not include time_budget",
-)
 def test_every_enabled_policy_template_is_known_to_the_plane():
     """A template the plane does not know cannot be written to it (a 400)."""
     from control_plane.models import POLICY_TEMPLATES as PLANE_TEMPLATES
