@@ -1,116 +1,96 @@
-# TokenOps control plane — architecture & dependency graph
+# Architecture
 
-Where the code starts, how the modules depend on each other, and what each is for.
-Control plane under `src/tokenops/control/`; SDK + plane; A2A demos and Chat/Simulator under
-`examples/`; state shared via one SQLite file.
+Where the code starts, how the pieces depend on each other, and what each is for.
 
----
+TokenOps is the **governor**: it decides, inside an agent's own process, whether the next
+model call may happen. It stores nothing itself. Configuration and the shared ledger live in
+the AgentPlane [control plane](https://github.com/theagentplane/control-plane); recording and
+trace identity come from [Chronicle](https://github.com/theagentplane/chronicle); the shared
+data model is [primitives](https://github.com/theagentplane/primitives).
+
+## The three pieces
+
+| Piece | Owns | Does not own |
+|---|---|---|
+| **Control plane** | Governance configuration (budgets, policies, segments), the shared ledger (spend, in-flight, halt), traces and the web page | The decision to stop a call |
+| **Chronicle** | The trace (a run is a trace), recording, replay, propagation across services | Cost, budgets, policies |
+| **TokenOps (this package)** | The governors: policies, pricing, the ledger view, the hook that runs them | A server, a database, a UI |
 
 ## Starting points (what you call)
 
 | Entry point | Module | Purpose |
-|-------------|--------|---------|
-| `tokenops_run` / `instrument_app` | `control/run.py`, `instrument.py` | register-or-join + bind governance |
-| `ControlPlaneClient` | `control/client.py` | SDK register_run (HTTP or embedded Store) |
-| `python -m tokenops.server` | `server/app.py` | standalone control plane (:7700) |
-| `POST /v1/tasks` | `examples/a2a/server.py` | task handler (run via `tokenops_run`) |
-| `@boundary` + crossing hook | Chronicle + `control/crossing.py` | record crossing + govern ingest |
-| `wrap_complete(…)` | `integration.py` | pre_call gate; dispatch via Chronicle `wrap_llm` |
-| `GovernedChatModel` | `adapters/langchain.py` | LangChain `BaseChatModel` → governed complete_fn |
-| `build_governor(config, price)` | `config.py` | `budgets:`/`policies:` → wired `Governor` |
-| `Store.governance_config_for(agent)` | `store.py` | SQLite → exact `build_governor` dict |
-| `seed_default_governance_if_empty()` | `store.py` | first-open seed from `default.yaml` `governance:` |
-| `run_simulation(…)` | `examples/ui/simulator.py` | in-process research→summarize with trace log |
+|---|---|---|
+| `tokenops_run` / `instrument_app` | `control/run.py`, `control/instrument.py` | join the trace, build attribution, load governance, bind the governor |
+| `wrap_complete`, `wrap_stream` | `control/integration.py` | the pre-call gate, message rewrite and retry around the model call |
+| `TokenOpsHook` | `control/crossing.py` | the Chronicle hook: pre-call, admit/complete, observe |
+| `ControlPlaneClient` | `repositories/control_plane_client.py` | the control-plane HTTP client (governance, precheck, events, halt) |
+| `LedgerEventWriter` | `repositories/ledger_event_writer.py` | background, ordered ledger writes |
+| `build_governor(config, price)` | `control/config.py` | `budgets:`/`policies:` dict to a wired `Governor` |
+| `Ledger` | `control/ledger.py` | spend, in-flight and halt (plane-backed) and the in-process step window |
 
-Native A2A servers under `examples/` wire these per request; Admin writes the store; Dashboard reads runs.
-
-## Dependency + data-flow graph
+## Data flow
 
 ```mermaid
 graph TD
-    subgraph dataplane["data plane (your agents / examples)"]
-        agent["A2A / in-process agents"]
-        chronicle["chronicle @boundary / wrap_llm"]
+    subgraph agent["agent process"]
+        code["your agent"]
+        run["tokenops_run"]
+        wrap["wrap_complete"]
+        hook["TokenOpsHook (Chronicle hook)"]
+        gov["Governor + policies"]
+        led["Ledger (step window in process)"]
+        wr["LedgerEventWriter (background)"]
     end
 
-    subgraph uis["Product UI"]
-        admin["Admin"]
-        dash["Dashboard"]
+    subgraph plane["control plane"]
+        gcfg["governance config (database)"]
+        shared["ledger: spend, in-flight, halt (trace attribute)"]
     end
 
-    store[("SQLite tokenops.db\nregistrations · budgets · policies · runs")]
+    chron["Chronicle: trace, record, propagate"]
 
-    subgraph control["control plane"]
-        attr["attribution · context"]
-        boundary["boundary · integration"]
-        cfg["config.build_governor"]
-        engine["engine.Governor"]
-        policies["policies/* (10)"]
-        ledger["ledger + pricing"]
-        plane["tokenops.server :7700"]
-    end
-
-    plane -->|register_run| store
-    agent -->|TOKENOPS_URL / Store| plane
-    admin -->|upsert| store
-    store -->|governance_config_for| cfg
-    agent -->|write RunRecord| store
-    store -->|list_runs| dash
-    chronicle --> boundary
-    boundary --> engine
-    agent --> boundary
-    agent -->|wrap_complete| boundary
-    cfg --> engine
-    engine --> ledger
-    policies --> ledger
+    run -->|"GET /v1/governance/{agent} (ETag)"| gcfg
+    run --> gov
+    code --> wrap --> gov
+    chron --> hook --> gov
+    gov --> led
+    led -->|"precheck (reads)"| shared
+    led --> wr -->|"events:batch (spent_add, complete)"| shared
+    led -->|"admit, halt_mark (sync)"| shared
+    chron -->|"envelopes"| plane
 ```
 
-## Runtime flow of one governed run
+## Runtime flow of one governed call
 
-```
-UI: POST /v1/tasks  (task only; no run_id)
-  ├─ instrument_app binds RequestContext (service, intent, provider, model)
-  ├─ with tokenops_run(client=…):  →  register-or-join + SpanContext + governance
-  │     register_run also upserts a dashboard runs row (status="running")
-  ├─ optional create_run/update_run for richer status/cost/steps (not required for visibility)
-  │
-  ├─ agent.run(…, complete_fn=wrap_complete(bound.…))
-  │     pre_call  → worst-case / concurrency detectors
-  │     dispatch  → chronicle.wrap_llm(providers.complete)
-  │     observe   → LLM Observation via on_crossing → Governor
-  │     @boundary tool  → Chronicle envelope + observe
-  │
-  ├─ delegate  →  child server (same run_id, X-TokenOps-Parent-Span-Id)
-  │     child spend → shared ledger (no parent rollup)
-  │
-  └─ client.update_run(status, halt_reason, cost_micros, steps)
-```
+1. `tokenops_run` joins the Chronicle trace of the active span (or the inbound
+   `traceparent`), builds the hop's attribution from its own `intent`, `user_dims` and `mode`,
+   and pulls governance for the agent (or uses `config=`).
+2. `wrap_complete`: `pre_call` runs the detectors (`pre_call_worst_case`,
+   `concurrency_cap`, ...). A `Halt` here means the call never starts.
+3. The prompt is rewritten if a policy asked (carry, `context_compaction`).
+4. `ledger.admit` (synchronous), then the dispatch through Chronicle `wrap_llm`, which records
+   the call and runs the hook.
+5. The hook's `crossing` event turns the result into an `Observation`; the ledger prices it and
+   queues a `spent_add`; the observe-side detectors (`cost_budget`, `step_cap`, ...) run.
+6. `ledger.complete` is queued. If a policy retries, the loop repeats from step 4.
 
-The **Ledger** splits state by lifetime:
+State by lifetime:
 
-| State | Scope | Backend |
+| State | Scope | Where |
 |---|---|---|
-| Spend, inflight, halt | Cross-process (same `run_id`) | SQLite `ledger_*` tables in `tokenops.db` |
-| Step window, local step count | Per agent process | In-memory `RunState` |
-
-SQLite also holds config + run history. Pass `store=` into `build_governor(...)` so A2A servers share accumulators.
-
-## DB maintenance
-
-```bash
-make db-clear    # wipe all rows
-make db-reseed   # replace governance from default.yaml
-make db-reset    # clear + reseed
-```
-
-Scripts: `scripts/db_clear.py`, `scripts/db_reseed.py`. UI `get_store()` uses `auto_seed=False`
-(governance seeded at deploy or via scripts; Admin owns edits).
+| Spend, in-flight, halt | across processes, per trace | the control plane (`precheck`, `events:batch`) |
+| Step window, local step count, velocity | per process, per trace | in memory (`LocalRunState`) |
+| Governance configuration | across processes | the control plane, `ETag` cached per client |
 
 ## Design rules
 
-- Dependencies point **one way**; the data plane never imports control internals except taps.
-- **Store assembles the `build_governor` dict** — YAML `governance:` is reference + auto-seed source.
-- **Per-request governor** — typical isolation for window / local halt; spend / inflight / halt may be shared via Store.
-- **Fail closed** — missing registration, unknown template, unknown price → refuse.
+- **Dependencies point one way.** The data plane never imports control internals except the hook.
+- **The control plane owns configuration.** The agent pulls it; nothing is written locally.
+- **Fail closed.** No governance and no plane raises rather than running ungoverned; an unknown
+  price or an unknown policy template refuses.
+- **No double counting.** The plane does not deduplicate ledger events, so a write whose outcome
+  is unknown is never retried ([ADR 0002](adr/0002-ledger-writes-are-attempted-once.md)).
+- **Architecture decisions are ADRs** in [`docs/adr/`](adr/README.md).
 
-See also `docs/run-attribution.md` and `docs/concurrency.md` (thread / multi-process contract).
+See also [trace attribution](trace-attribution.md), [halt](halt.md) and
+[concurrency](concurrency.md).

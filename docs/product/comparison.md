@@ -81,7 +81,7 @@ TokenOps governs the **run** — a full agent workflow across many model, tool, 
 </tbody>
 </table>
 
-**Primary Focus** — TokenOps tracks state across an entire agent task (`run_id`). Gateways see independent API calls; Langfuse records traces for analysis after the fact.
+**Primary Focus** — TokenOps tracks state across an entire agent task (`trace_id`). Gateways see independent API calls; Langfuse records traces for analysis after the fact.
 
 **Execution Scope** — A research → summarize → review pipeline is one governed unit in TokenOps. Other tools scope to a single hop unless you stitch traces manually.
 

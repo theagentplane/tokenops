@@ -53,10 +53,10 @@ add your own.
 
 ## 🚀 Quickstart
 
-Requires Python 3.10+ and a running control plane — TokenOps has no ledger of its
-own, so every agent (even a single process) governs against one. Zero-setup taste:
-`python -m tokenops.demo` launches a throwaway plane for you automatically. For your
-own agent, start one first (see [Quickdeploy](#-quickdeploy) below), then:
+Requires Python 3.10+. Zero-setup taste: `python -m tokenops.demo` runs a governed
+agent in process, no server and no keys. For your own agent in one process, pass a
+governance config; to share one budget across processes, point every agent at a
+control plane (see [Quickdeploy](#-quickdeploy) below):
 
 ### 1. Put it in your agent
 
@@ -79,18 +79,20 @@ Anywhere else (Cursor, Copilot, ...), paste this:
 <details>
 <summary><b>Manual</b>, about ten lines</summary>
 
-Wrap your model call once, then hand the wrapped version to your agent. Needs
-`CONTROL_PLANE_URL` (or `TOKENOPS_URL`) pointing at a running control plane —
-see [Quickdeploy](#-quickdeploy).
+Wrap your model call once, then hand the wrapped version to your agent.
 
 ```python
-from tokenops import ControlPlaneClient, tokenops_run
+from tokenops import tokenops_run
 from tokenops.control import Halt, wrap_complete
 from tokenops.providers import complete
 
-client = ControlPlaneClient.from_env()  # raises if CONTROL_PLANE_URL isn't set
+GOVERNANCE = {"governance": {
+    "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "trace"}],
+    "policies": {"cost_budget": {"budget": "run_llm_cap"},
+                 "pre_call_worst_case": {"budget": "run_llm_cap"}},
+}}
 
-with tokenops_run(client=client, service="my-agent", intent="research",
+with tokenops_run(config=GOVERNANCE, service="my-agent", intent="research",
                   provider="openai", model="gpt-4o") as bound:
     governed = wrap_complete(
         bound.governor, bound.controls, bound.attr,
@@ -105,7 +107,9 @@ with tokenops_run(client=client, service="my-agent", intent="research",
 
 Pass `governed` to your agent instead of `complete`; nothing else changes.
 `wrap_complete` checks the budget before each call and raises `Halt` when the
-run is out, even from another process.
+run is out. With a control plane, replace `config=GOVERNANCE` with
+`client=ControlPlaneClient.from_env()` (`from tokenops.repositories import
+ControlPlaneClient`); the budget then lives in the plane and is shared across processes.
 
 </details>
 
@@ -118,7 +122,7 @@ run is out, even from another process.
 | FastAPI or A2A services | [Instrumented app](.claude/skills/integrate-tokenops/SKILL.md#tier-3--fastapi--a2a) |
 | Something other than stopping | [The ten policies](docs/policies/) |
 | Cost per agent in a dashboard | [Quickdeploy](#-quickdeploy) |
-| A worked end-to-end example | [Field guide](docs/guides/field-guide-add-tokenops.md) |
+| Coming from 0.4 | [Migration](docs/migration-0.4-to-1.0.md) |
 | Everything else | [Onboarding guide](docs/guides/onboarding.md) |
 
 ### 3. See it in action
@@ -136,27 +140,24 @@ run is out, even from another process.
 ## 🐳 Quickdeploy
 
 > [!NOTE]
-> TokenOps no longer ships its own control plane or UI. Governance, the ledger and the run
-> list live in the AgentPlane [control plane](https://github.com/theagentplane/control-plane);
-> run it from there (see its deployment docs). This section and the examples are rewritten
-> against it as part of [#162](https://github.com/theagentplane/tokenops/issues/162).
-
-<details>
-<summary><b>Pointing several processes at one plane</b></summary>
+> TokenOps does not ship its own control plane or UI. Governance configuration, the shared
+> ledger and the run list live in the AgentPlane
+> [control plane](https://github.com/theagentplane/control-plane); its web page has a TokenOps
+> tab for budgets, policies and halted runs.
 
 ```bash
-export TOKENOPS_URL=http://localhost:7700
-export TOKENOPS_DB=tokenops.db   # plane and every agent read the same file
+pip install agentplane-control-plane
+control-plane serve                      # see its README for the Docker image and deployment
+export CONTROL_PLANE_URL=http://localhost:8000
+export CONTROL_PLANE_API_KEY=...         # on every agent: read + ingest scopes
 ```
 
-> tokenops has no ledger of its own — every process governs against the plane at
-> `TOKENOPS_URL`. There is no local-fallback env var to accidentally leave unset.
+Put a budget there with `control-plane db seed --file my.yaml`, or through its API
+(`PUT /v1/budgets`, `PUT /v1/policies`). Every agent pulls it, `ETag` cached.
 
 PyPI name is `agent-tokenops`; the import is `tokenops`. Extras:
-`pip install "agent-tokenops[examples]"` for the LangChain benches,
-`".[examples]" --group dev` from source. Releases: [`RELEASING.md`](RELEASING.md).
-
-</details>
+`pip install "agent-tokenops[examples]"` for the LangChain examples. Releases:
+[`RELEASING.md`](RELEASING.md).
 
 ## 🆚 How TokenOps compares
 
@@ -170,7 +171,7 @@ TokenOps is not a gateway or a tracing dashboard. It governs the **run**, a full
 | Steer next call (mutate / inject) | Yes | Partial | No |
 | Shared ledger across processes | Yes | — | — |
 
-What this does **not** do: replace your LLM gateway, replace Chronicle-style record-and-replay, or host a SaaS control plane for you.
+What this does **not** do: replace your LLM gateway, replace [Chronicle](https://github.com/theagentplane/chronicle)'s record-and-replay, or host a SaaS control plane for you.
 
 Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.md).
 
@@ -179,35 +180,35 @@ Longer table with logos: [`docs/product/comparison.md`](docs/product/comparison.
 Things you will want eventually, not now.
 
 <details>
-<summary><b>Architecture: how the plane and the SDK split the work</b></summary>
+<summary><b>Architecture: how the control plane, Chronicle and TokenOps split the work</b></summary>
 
-TokenOps is two layers that share one artifact, the **run**: a control plane that registers runs and stores budgets/policies, and an in-process SDK that enforces at every boundary crossing.
+Three pieces share one artifact, the **run**, which is a Chronicle trace (`trace_id`):
 
 ```mermaid
 flowchart LR
-    subgraph PLANE["Control plane (:7700)"]
-        R["POST /v1/runs"] --> DB[("SQLite TOKENOPS_DB<br/>registrations · budgets · policies · ledger")]
-        UI["Admin + Dashboard"] --> DB
+    subgraph PLANE["Control plane"]
+        CFG[("governance config<br/>budgets · policies")]
+        LEDGER[("ledger<br/>spend · in-flight · halt")]
     end
 
-    subgraph AGENTS["Agent processes (SDK)"]
-        E["Entry agent<br/>tokenops_run"] -->|"register_run"| R
-        E -->|"X-TokenOps-Run-Id"| D["Downstream agents<br/>tokenops_run"]
-        E & D -->|"wrap_complete"| G["Governor<br/>pre_call → detect → decide → apply"]
-        E & D -->|"@boundary + crossing hook"| G
-        G --> L["Shared ledger<br/>(same run_id)"]
+    subgraph AGENTS["Agent processes"]
+        E["Entry agent<br/>tokenops_run"] -->|"traceparent"| D["Downstream agents<br/>tokenops_run"]
+        E & D -->|"wrap_complete + governor hook"| G["Governor<br/>pre_call → detect → decide → apply"]
     end
 
-    L --> DB
-    DB -->|"governance_config_for"| G
+    CFG -->|"GET /v1/governance/{agent} (ETag)"| G
+    G -->|"precheck (reads)"| LEDGER
+    G -->|"events:batch (spend, complete) · admit / halt (sync)"| LEDGER
 ```
 
 | Piece | Owns | Does not own |
 |---|---|---|
-| **Control plane** (`python -m tokenops.server`) | `POST /v1/runs`, shared SQLite, Admin/Dashboard | Agent loops, LLM calls, tools |
-| **SDK (in agents)** | `tokenops_run`, `wrap_complete`, ledger/policies, Chronicle crossing hook | Ad-hoc run IDs; mounting `/v1/runs` when `TOKENOPS_URL` is set |
+| **Control plane** | configuration, the shared ledger, traces, the web page | the decision to stop a call |
+| **Chronicle** | the trace, recording, replay, propagation | cost, budgets, policies |
+| **TokenOps (this package)** | the governors: policies, pricing, the ledger view, the hook | a server, a database, a UI |
 
-Chronicle records decision boundaries; TokenOps attaches as the cost/governance observer on live crossings. See [Chronicle](https://github.com/theagentplane/chronicle) for record-and-replay, accepted at [REALM](https://realm-workshop.github.io/) (Research on Agent Language Models), a workshop at EMNLP 2026.
+See [`docs/architecture.md`](docs/architecture.md). Chronicle is accepted at
+[REALM](https://realm-workshop.github.io/) (Research on Agent Language Models), a workshop at EMNLP 2026.
 
 </details>
 
@@ -216,14 +217,12 @@ Chronicle records decision boundaries; TokenOps attaches as the cost/governance 
 
 | Variable | Purpose |
 |---|---|
-| `TOKENOPS_URL` (or `CONTROL_PLANE_URL`) | The control plane's base URL (e.g. `http://localhost:8800`) — **required** |
-| `TOKENOPS_CONFIG` | YAML for governance seed (core: `src/tokenops/config/default.yaml`) |
+| `CONTROL_PLANE_URL` | The control plane's base URL (for example `http://localhost:8000`). Required for `ControlPlaneClient.from_env()` |
+| `CONTROL_PLANE_API_KEY` | Bearer key (scopes `read`, `ingest`; `admin` to write configuration) |
+| `CHRONICLE_CONTROL_PLANE_URL`, `CHRONICLE_API_KEY` | Where Chronicle saves envelopes; set the same plane |
 
-tokenops has no ledger or run registry of its own — `ControlPlaneClient.from_env()`
-raises if `TOKENOPS_URL`/`CONTROL_PLANE_URL` isn't set, rather than silently falling
-back to anything local. Every process talks to the same plane, so they share one
-budget by construction. `TOKENOPS_URL` also accepts the alias
-`TOKENOPS_CONTROL_PLANE_URL`.
+There is no local ledger fallback. With a plane configured every process shares one budget;
+without one, pass `config=` and the ledger lives in the process.
 
 </details>
 
@@ -246,12 +245,13 @@ Only `src/tokenops/` is the installable package. Demos and benches stay under `e
 
 ```
 src/tokenops/              # installable package
-├── control/               # SDK: ledger, policies, wrap_complete, crossing hook
+├── control/               # the governors: ledger, policies, wrap_complete, Chronicle hook
+├── repositories/          # the control-plane client and the background ledger writer
 ├── providers/             # OpenAI / Anthropic complete dispatch
-└── config/                # default.yaml governance seed
-examples/                  # A2A agent stacks (rewritten in #162)
-docs/                      # architecture, policies, guides, product
-tests/                     # unit + e2e
+└── config/                # packaged default governance
+examples/                  # A2A agent stacks (being rewritten)
+docs/                      # architecture, policies, ADRs, migration
+tests/                     # unit, contract and end-to-end (real control plane)
 ```
 
 </details>
@@ -259,11 +259,11 @@ tests/                     # unit + e2e
 <details>
 <summary><b>More documentation</b></summary>
 
-- [Onboarding](docs/guides/onboarding.md): prereqs, minimum integration, FAQ, current limits
-- [Field guide](docs/guides/field-guide-add-tokenops.md): a triad walked through, with screenshots
-- [Policies](docs/policies/): one page per policy
-- [Run attribution](docs/run-attribution.md) - [control plane deploy](docs/control-plane-deploy.md) - [status](docs/control-plane-status.md)
-- [Examples](examples/README.md) - [comparison](docs/product/comparison.md) - [shared ledger](docs/product/shared-ledger.md)
+- [Onboarding](docs/guides/onboarding.md): prerequisites, minimum integration, FAQ, current limits
+- [Migrating from 0.4](docs/migration-0.4-to-1.0.md)
+- [Architecture](docs/architecture.md) - [trace attribution](docs/trace-attribution.md) - [halt](docs/halt.md)
+- [Policies](docs/policies/): one page per policy - [decisions](docs/adr/README.md)
+- [Examples](examples/README.md) - [comparison](docs/product/comparison.md)
 
 </details>
 

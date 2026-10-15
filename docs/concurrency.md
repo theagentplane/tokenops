@@ -1,43 +1,49 @@
 # Concurrency contract
 
-TokenOps is designed for **many concurrent runs in one process** (threads or asyncio
-tasks that hop to worker threads). Guarantees below are for the shared control-plane
-state: `Store`, `Ledger`, and the governance config cache.
+TokenOps is designed for **many concurrent runs in one process** (threads, or asyncio tasks that
+hop to worker threads) and for **many processes sharing one control plane**.
 
-`GovernorContainer` / shared Governor re-entrancy across the same `run_id` is a later
-wave (§11); today’s usual pattern remains **per-request Governor** + request-local
-contextvars.
+A shared long-lived `Governor` for many runs is out of scope; the usual pattern is one
+`Governor` per hop (`tokenops_run`) plus request-local contextvars.
 
 ## Summary
 
 | Surface | Same process, many threads | Different processes |
 |---|---|---|
-| `Store` (one instance) | Safe — DB ops serialized on an RLock | Safe for ledger spend/inflight/halt via WAL + atomic SQL (each process opens its own connection) |
-| `Ledger` (in-memory) | Safe — maps serialized on an RLock | N/A (not shared) |
-| `Ledger` + shared `Store` | Safe for spend/inflight/halt across Ledgers/Governors | Same as Store |
-| Governance config cache | Safe — process Lock on get/set/invalidate | Per-process cache (not shared) |
-| contextvars / request dims | Task/request local — not mutex-protected | N/A |
+| `Ledger` (one instance) | Safe: in-memory maps are serialized on an `RLock` | n/a (not shared) |
+| `Ledger` with a control plane | Safe for spend, in-flight and halt across Ledgers/Governors | Shared through the plane |
+| `ControlPlaneClient` | Safe: `httpx.Client` plus a lock around the governance cache | Per-process governance cache |
+| `LedgerEventWriter` | Safe: a queue with one worker thread; `submit` never blocks | Per-process queue |
+| contextvars / request dims | Task and request local, not mutex-protected | n/a |
 
-## Different `run_id` vs same `run_id`
+## Different traces vs the same trace
 
-**Different `run_id`s** on one `Ledger` / one `Store`: concurrent `record`, `admit` /
-`complete`, and ledger spend updates must not lose increments. Tests cover this.
+**Different `trace_id`s** on one `Ledger`: concurrent `record`, `admit`/`complete` and spend
+updates must not lose increments. Tests cover this (`tests/test_thread_safety.py`).
 
-**Same `run_id`**: mutations serialize on the Ledger (and Store for persisted halt/spend).
-Halt flags (`mark_halted` / `is_halted`) are not torn. Prefer a single logical writer per
-run when possible; concurrent writers are correct but ordered arbitrarily.
+**The same `trace_id`**: mutations serialize on the Ledger. Halt flags (`mark_halted`,
+`is_halted`) are not torn. Prefer one logical writer per trace; concurrent writers are correct
+but ordered arbitrarily.
 
-## What is *not* claimed
+## Writes and reads with a control plane
 
-- Sharing one `sqlite3` connection across processes (don’t).
-- Lock-free / wait-free hot paths — correctness uses coarse RLocks.
-- Asyncio: coroutines that call Store/Ledger must not interleave on the same thread
-  without await boundaries that release the lock (locks are held only for sync critical
-  sections; do not `await` while holding them — current APIs are sync).
-- A shared long-lived `Governor` for many runs — out of scope until §11.
+- `admit` and `halt_mark`/`halt_clear` are written synchronously: other processes gate on them.
+- `spent_add` and `complete` are queued and sent in order from a background thread
+  ([ADR 0003](adr/0003-ledger-spend-writes-are-asynchronous.md)).
+- A read of shared state first waits (bounded, 2 s) for this process's own queued writes, so a
+  process always sees its own spend. Other processes see it after the queue delay.
+- A write is attempted once and never retried when its outcome is unknown, because the plane does
+  not deduplicate events ([ADR 0002](adr/0002-ledger-writes-are-attempted-once.md)).
+
+## What is not claimed
+
+- Lock-free hot paths: correctness uses coarse locks.
+- Asyncio: do not `await` while holding a ledger lock; the APIs are synchronous.
+- A shared step window across processes: the window is per process and per trace
+  ([ADR 0004](adr/0004-policy-state-lives-in-process-except-shared-spend.md)).
 
 ## Modules
 
-- `tokenops.control.store` — `Store._lock` (RLock) around DB critical sections
-- `tokenops.control.ledger` — `Ledger._lock` around in-memory maps (+ Store for shared state)
-- `tokenops.control.governance_cache` — module Lock around the dict
+- `tokenops.control.ledger`: `Ledger._lock` around the in-memory maps.
+- `tokenops.repositories.control_plane_client`: governance cache lock.
+- `tokenops.repositories.ledger_event_writer`: the queue and the worker thread.

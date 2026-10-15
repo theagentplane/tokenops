@@ -1,7 +1,7 @@
 # Policies & actions (index)
 
 This is the single glossary of built-in policy IDs and display labels. Runtime
-registration, Store validation, and Admin choices share
+registration, the governance configuration and the control plane's allow-list share
 [`POLICY_TEMPLATES`](../../src/tokenops/control/config.py). Per-policy behavior
 lives under [`docs/policies/`](../policies/).
 
@@ -67,11 +67,11 @@ not restrict that API.
 Existing YAML keys, policy class imports, and stored instance IDs remain valid.
 
 - **`tool_freq` was an unsupported catalog typo**, not a legacy runtime alias.
-  Use `tool_fix` and `tool_fix.md` in copied references. Config and Store continue
+  Use `tool_fix` and `tool_fix.md` in copied references. Config continues
   to reject `tool_freq`, display labels, class names, and instance IDs when used
   as template names; there is no hidden normalization or duplicate registration.
 - **`tool_reject` was a stale example/documentation name**, also unsupported by
-  the current config and Store registries. The Compose examples now use `tool_fix`
+  the current config registry. The examples now use `tool_fix`
   with their original `registry` and `k` values. Update the key in copied YAML
   without changing its params; for a historical stored row, update only its
   `template`, retaining the instance `id` and params. No runtime alias is added.
@@ -99,6 +99,6 @@ be added without this explicit path; none is needed for the corrections above.
 
 ## Actions
 
-Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE): see [`docs/control-plane-status.md`](../control-plane-status.md) and [`docs/governance-policy.md`](../governance-policy.md).
+Actuators (HALT · MUTATE · INJECT · REJECT/QUEUE): see [`docs/halt.md`](../halt.md) and [`docs/governance-policy.md`](../governance-policy.md).
 
-[Principles](./principles.md) · [Comparison](./comparison.md) · [Shared ledger](./shared-ledger.md)
+[Principles](./principles.md) · [Comparison](./comparison.md)

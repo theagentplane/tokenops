@@ -32,7 +32,7 @@ dimension is absent on this event).
 
 1. Detector emits `Signal(TRIP)` with evidence `{budget_id, segment, left_micros}`.
 2. Policy maps any TRIP → `Action(HALT)`.
-3. Governor sets `runs[run_id].halted` **before** applying (so the flag survives a
+3. Governor sets `runs[trace_id].halted` **before** applying (so the flag survives a
    swallowed raise), then the OUT connector raises `Halt`.
 4. The agent loop unwinds; every later call is refused at the IN edge (kill switch).
 

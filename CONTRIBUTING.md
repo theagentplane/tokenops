@@ -55,11 +55,12 @@ Markers (see `docs/testing.md`):
 | Library / control plane SDK | `src/tokenops/` |
 | Unit + integration tests | `tests/` |
 | Demo agents / orchestrators | `examples/` |
-| Field guide | `docs/guides/field-guide-add-tokenops.md` |
+| Architecture decisions | `docs/adr/` |
 | Governance policy docs | `docs/policies/` |
 
 Keep agent business logic in `examples/` (or your app); the library owns
-governance wraps, ledger, and the control-plane server.
+governance wraps, the ledger and the control-plane client. The control plane
+itself is a separate repository.
 
 ## Pull requests
 
@@ -105,7 +106,7 @@ Use **[GitHub Discussions](https://github.com/theagentplane/tokenops/discussions
 
 | Category | Use for |
 |----------|---------|
-| Q&A | Integration help (`tokenops_run`, `wrap_complete`, `TOKENOPS_URL`, policies) |
+| Q&A | Integration help (`tokenops_run`, `wrap_complete`, `CONTROL_PLANE_URL`, policies) |
 | Ideas | Feature sketches and RFCs |
 | Show and tell | Integrations, benches, production setups |
 | General | Everything else |

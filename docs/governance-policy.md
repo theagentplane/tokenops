@@ -1,22 +1,22 @@
 # TokenOps Technical Governance Plan
- 
+
 ## 1. What it governs: the run, not the request
- 
-TokenOps governs the **resource axis**: the tokens and compute a *run* consumes, and the behaviors that drive it (loops, context decay, fan-out). The unit is the **run** (`run_id`): all model, tool, and delegation calls of one task, across one or more agents, with child runs rolled up.
- 
+
+TokenOps governs the **resource axis**: the tokens and compute a *run* consumes, and the behaviors that drive it (loops, context decay, fan-out). The unit is the **run**, a Chronicle trace (`trace_id`): all model, tool, and delegation calls of one task, across one or more agents.
+
 | Layer | Sees | Can govern |
 |---|---|---|
 | AI gateway (proxy) | independent requests | per-request budget, rate, routing |
 | **TokenOps (in-process)** | the **run**: step sequence, context, fan-out | loops, context decay, fan-out, per-customer cost |
- 
+
 > A **request** is one model call (prompt in, completion out); a **run** is the whole agent task, many calls plus tools and delegations. A gateway sees requests one by one, so it can cap or route each; it can't see that calls repeat (a loop) or that context grows across them, because that lives in the run.
- 
+
 > Spend caps alone are commoditizing inside gateways. The defensible layer is run-aware **behavioral** governance, which a request-level proxy is blind to.
- 
+
 > **Why it can't be bypassed:** out-of-band control, in-path enforcement. The policy lives outside the agent (it can't rewrite it), but the check sits in the call path (it stops spend before it lands).
- 
+
 ## 2. Architecture
- 
+
 ```
             data plane: your agent (unchanged)
                        │  every call
@@ -29,23 +29,23 @@ TokenOps governs the **resource axis**: the tokens and compute a *run* consumes,
    │                                 └─ halt  (breaker: the only stop)
    └───────────────────────────────────────────────┘
 ```
- 
+
 | Module | Job |
 |---|---|
 | Instrument | price each call, stamp the owner at the boundary |
 | Account | per-segment ledger: running totals + per-run window + live counters |
 | Enforce | circuit breaker (only stop) + active steering |
- 
-Every call is tagged with `run / user / agent / tenant / tags`. Budgets and policies attach along `global → tenant → user → agent → run`; one call matches many, most specific wins, any breach trips.
- 
+
+Every call is tagged with `trace / user / agent / tenant / tags`. Budgets and policies attach along `global → tenant → user → agent → trace`; one call matches many, most specific wins, any breach trips.
+
 ## 3. Policies
- 
+
 > **Four failure modes:** **Spend** (runaway cost) · **Stuck** (loops, stalls, hangs) · **Decay** (context rot) · **Fan-out** (parallel explosion). Attribution is the always-on base.
- 
+
 > **Design rule:** every policy is deterministic (no model in the path) and **acts**. It either **Heals** (recovers in flight), **Bounds** (caps or refuses, run continues), or **Stops** (halts). No passive alerts.
- 
+
 Rows are in **execution order**: the pre-call gate, then the stream, then after the call. A hard stop wins over steers; the cheaper fixes run before `progress_guard` escalates, because clearing decayed context often cures the stall.
- 
+
 | When | Policy | Mode | Detect (when it fires) | Fix | Acts |
 |---|---|---|---|---|---|
 | ~~pre-call~~ | ~~`delegation_cap`~~ | ~~fan-out~~ | ~~an agent spawns sub-agents too deep, or too many at once~~ | ~~refuse the new sub-agent~~ | ~~Bound~~ *Removed — depth-based spawn limits dropped; see `concurrency_cap` and spend breakers.* |
@@ -60,31 +60,34 @@ Rows are in **execution order**: the pre-call gate, then the stream, then after 
 | observe | `tool_output_cap` | fan-out | one tool returns a payload too big for the context | store it, hand back a summary plus "fetch it in pages" | Heal |
 | observe | `progress_guard` | stuck | the agent repeats the same call and result, makes no progress, or hangs | tell it plainly why it is stuck; stop as a last resort | Heal, then Stop |
 | always | `attribution` | base | always on | tag and total every call per customer; emit a standard span | Telemetry |
- 
+
 **When a policy stops a run:** a stop halts spend and preserves state (cost so far, reason, snapshot). It never destroys the run. Resume is delegated and always deliberate. TokenOps provides the snapshot, and the runtime or a human decides whether to resume; never automatic.
 
 ## 4. Policy names and action identity
 
 The [policy glossary](product/policies-index.md) defines canonical policy IDs, display
 labels, and module/doc naming. `tokenops.control.config.POLICY_TEMPLATES` is the public
-metadata registry used by the governor builder, Store, and UI. Display labels are
+metadata registry used by the governor builder. The control plane keeps an allow-list of the
+same names and rejects a write for an unknown template. Display labels are
 presentation only, not alternate configuration names.
 
 For policy decisions, Governor carries `Signal.detector` on `Action.policy_id`.
 Governance events record that exact ID in `policy` rather than inferring identity from
 the reason. For manually constructed actions without `policy_id`, its determined using the reason-text.
 
-## 5. Configuration & ops (v1 bench)
+## 5. Configuration and operations
 
 | Concern | Where |
 |---|---|
-| Governance source of truth | SQLite `tokenops.db` (`TOKENOPS_DB`) |
-| Reference + auto-seed | `src/tokenops/config/default.yaml` → `governance:` |
-| Admin edits | Streamlit **Policy admin** → next run picks up |
-| Reset | `make db-reset` / `scripts/db_reseed.py` |
-| Registration dims | `POST /v1/runs` — `intent`, `user_dims` (see `docs/run-attribution.md`) |
-| Segment-scoped budgets | Supported via `Budget.dimension` + `segment_key_for`; seed is run-only ([#8](https://github.com/theagentplane/tokenops/issues/8)) |
+| Governance source of truth | the control plane's database (`GET /v1/governance/{agent}`, `ETag`) |
+| First start | the packaged `default.yaml` is seeded for tenant `local` by the control plane |
+| Load a file | `control-plane db seed --file my.yaml [--tenant acme] [--reset]` |
+| Edit | `PUT /v1/budgets`, `/v1/policies`, `/v1/segments` (scope `admin`), or the TokenOps tab |
+| No plane (tests, scripts, the demo) | `tokenops_run(config=...)`, an in-process dict |
+| Attribution dims | the hop's own `intent` and `user_dims` (see [trace attribution](trace-attribution.md)) |
+| Where each policy's state lives | [ADR 0004](adr/0004-policy-state-lives-in-process-except-shared-spend.md) |
 
-## 6. V2
- 
-Smart dashboard: live per-customer cost, run health, a halt and steer feed, and the observe-to-enforce recommender. Reads the ledger, off the hot path.
+## 6. Later
+
+A richer dashboard: live per-customer cost, run health, a halt and steer feed. It belongs in the
+control plane's web page, reading the ledger off the hot path.

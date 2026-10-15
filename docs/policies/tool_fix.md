@@ -25,7 +25,7 @@ name ∉ registry  (O(1) hash)   OR   ¬valid(args, schema[name]) ;   track fail
 ```
 `registry` is the set of real tool names; `schema[name].required` lists required args. The
 detector keeps a **per-run counter of identical failing names** (the first stateful
-detector) — `reset(run_id)` clears it.
+detector) — `reset(trace_id)` clears it.
 
 ## Action it takes to govern — INJECT, then HALT after K
 

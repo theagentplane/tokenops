@@ -4,24 +4,20 @@
 
 **Policy ID:** [`trajectory_hint`](../product/policies-index.md)
 
-> **⛔ TEMPORARILY DISABLED (remote-only control-plane work).**
-> `config.build_governor` now *refuses* a config that contains `trajectory_hint`.
-> It is the only cross-run policy — it needs a persistent index the HTTP plane does
-> not yet serve (`HttpStore` no-ops the three trajectory methods), and its Phase-1
-> quality gates are known-insufficient (see Learnings below). The policy code and the
-> `tokenops.control.trajectory/*` package are left intact. Re-enabling requires real
-> trajectory snapshot/index routes **and** a quality gate, plus coordinated changes
-> to `config.POLICY_TEMPLATES`, the governor build path, the `steering_trajectory`
-> bench preset, and the skipped tests (`test_trajectory_hint*.py`).
+> **⛔ DISABLED, and the implementation is removed.**
+> `config.build_governor` refuses a config that contains `trajectory_hint`. It is the only
+> cross-run policy: it needs a persistent index of prior traces, which the control plane does
+> not serve (it stores no step window and no per-policy statistics, control-plane ADR 0009),
+> and its Phase-1 quality gates are known to be insufficient (see Learnings). The SQLite store
+> that held the index, `tokenops.control.trajectory` and the policy module were removed in
+> TokenOps 1.0; they remain in the git history of 0.4.x.
+> Re-enabling it is a design decision (where the index lives, and a quality gate); the template
+> name stays reserved so a configuration naming it fails clearly.
 
-Companion to `halt.md`. **Temporarily disabled — cannot be enabled through configuration.**
+Companion to [`halt.md`](../halt.md). **Cannot be enabled through configuration.**
 
-Code: [`src/tokenops/control/policies/trajectory_hint.py`](../../src/tokenops/control/policies/trajectory_hint.py)
-Tests: [`tests/test_trajectory_hint.py`](../../tests/test_trajectory_hint.py)
-Bench: [`benchmarking/browseruse/run_trajectory_hint_bench.py`](../../benchmarking/browseruse/run_trajectory_hint_bench.py)
-
-The sections below describe the retained Phase 1 design and historical experiments,
-not a currently supported configuration.
+The sections below describe the Phase 1 design and historical experiments, not a supported
+configuration.
 
 ---
 
@@ -51,9 +47,9 @@ skip inject if indexed step_count < min_index_steps
 
 ```
 scope_key = sorted join of dim=value for each configured scope_dim:
-  intent  → RunRegistration.intent
+  intent  → the hop's `intent`
   agent   → boundary service
-  <tag>   → RunRegistration.user_dims[<tag>] or "_none"
+  <tag>   → the hop's `user_dims[<tag>]` or "_none"
 ```
 
 Default ``scope_dims: [intent, agent]``. No hardcoded tenant.
@@ -105,10 +101,6 @@ trajectory_hint:
   hint_max_chars: 1600
 ```
 
-Before disablement, this configuration required ``store=`` in ``build_governor``.
-
-The ``tokenops_config_steering_trajectory`` benchmark preset is also temporarily disabled
-and raises ``NotImplementedError``; use ``steering`` for live benchmarks.
 
 ## Learnings (live bench, Phase 1)
 
@@ -154,14 +146,13 @@ thrashing, not speed.
 
 ### Bench hygiene — rate limits
 
-Historical runs used ``run_trajectory_hint_bench.py --pause-seconds 90`` (or 120 for heavy
-scenarios) to avoid OpenAI TPM limits (429s). The default is 90s between all phases
-(seed → matrix → cost). This bench cannot exercise hints while ``trajectory_hint`` is disabled.
+Historical runs (the benchmark harness was removed from the repository in 1.0) paused 90 to
+120 seconds between phases to avoid OpenAI TPM limits (429s).
 
 ## Status
 
-⛔ Temporarily disabled in ``build_governor`` and the browser-use benchmark preset.
+⛔ Disabled in ``build_governor``; implementation removed in 1.0.
 
-✅ Phase 1 implementation retained (lookup, inject, background index, ``min_index_steps``, tiered hint).
+✅ Phase 1 design documented above (lookup, inject, background index, ``min_index_steps``, tiered hint).
 
 ⏳ Phase 2 deferred: quality gate, constraint-aware indexing, reliable cost savings proof.

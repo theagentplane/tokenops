@@ -1,60 +1,41 @@
-# TokenOps examples
+# Examples
 
-Runnable A2A test benches and demos (same repo as the TokenOps core library).
+Agent stacks that show TokenOps in a multi-agent run: the research to summarize pair under
+`agents/`, the planner, researcher and writer triad under `triad/`, and a LangChain stack under
+`brief/`, all speaking A2A (`a2a/`).
 
-| Stack | Agents | Make target |
-|-------|--------|-------------|
-| Two-agent | Research → Summarize | `make demo` |
-| Triad | Planner → Researcher → Writer | `make demo-triad` |
-| Brief | Scout → Analyst → Editor (**LangChain** + TokenOps) | `make demo-brief` |
-| Bench UI | Chat + Simulator | `make bench-ui` |
-
-## Setup
-
-From the repo root:
-
-```bash
-make install   # pip install -e ".[examples]" --group dev
-cp .env.example .env   # optional API keys
-TOKENOPS_CONFIG=examples/config/default.yaml make db-reset
-make demo          # plane :7700 + agents + Admin UI
-# or
-make demo-triad    # plane + planner/researcher/writer + Admin UI
-make demo-brief    # plane + scout/analyst/editor (ports 8021–8023)
-# smoke brief under run_llm_cap:
-#   TOKENOPS_CONFIG=examples/config/brief.yaml TOKENOPS_DB=tokenops-brief.db make db-reset
-#   TOKENOPS_DB=tokenops-brief.db make demo-brief   # then in another shell:
-#   TOKENOPS_DB=tokenops-brief.db python scripts/smoke_brief.py
-make bench-ui      # Chat + Simulator only
-```
-
-Docker (two-agent):
-
-```bash
-docker compose -f docker-compose.examples.yml up --build
-```
-
-Triad overlay:
-
-```bash
-docker compose -f docker-compose.examples.yml -f docker-compose.triad.yml up --build \
-  tokenops planner researcher writer
-```
+> **Status.** These were written for TokenOps 0.4, which shipped its own plane and UI. They
+> import and use the 1.0 API (`tokenops_run`, `wrap_complete`, `ControlPlaneClient`), but they
+> have not been re-verified end to end against a control plane 1.x, and the launcher scripts and
+> `make` targets were removed. They are being rewritten; see
+> [#162](https://github.com/theagentplane/tokenops/issues/162). For a runnable, tested reference
+> use `python -m tokenops.demo` (in process) and `tests/e2e` (a real control plane).
 
 ## Layout
 
 ```
 examples/
-  run.py / run_triad.py / run_brief.py  # demo orchestrators (make demo*)
-  a2a/          # shared HTTP helpers
-  agents/       # research + summarize
-  triad/        # planner + researcher + writer
-  brief/        # scout + analyst + editor (LangChain + TokenOps)
-  servers/      # python -m entrypoints
-  ui/           # Chat + Simulator
-  config/       # demo governance YAML seeds
-benchmarking/   # MetaGPT / browseruse / trials harness
+├── a2a/        # A2A server and client helpers
+├── agents/     # research -> summarize (native)
+├── triad/      # planner -> researcher -> writer
+├── brief/      # scout -> analyst -> editor (LangChain)
+├── config/     # example governance YAML (dimension: trace)
+└── servers/    # `python -m examples.servers.<name>` entry points
 ```
 
-Field guide: [`docs/guides/field-guide-add-tokenops.md`](../docs/guides/field-guide-add-tokenops.md).
-Demo screenshots: [`docs/product/demo-bench.md`](../docs/product/demo-bench.md).
+## Running one agent server by hand
+
+Start a control plane 1.x, point the agent at it, then start the server:
+
+```bash
+export CONTROL_PLANE_URL=http://localhost:8000
+export CONTROL_PLANE_API_KEY=...
+pip install -e ".[examples]" --group dev
+python -m examples.servers.research
+```
+
+Hops share a budget through Chronicle's `traceparent` header: configure
+`chronicle.configure(inject_hosts=[...])` and `chronicle.instrument_httpx()`.
+
+Reference for the integration itself:
+[`.claude/skills/integrate-tokenops/SKILL.md`](../.claude/skills/integrate-tokenops/SKILL.md).
