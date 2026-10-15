@@ -1,4 +1,4 @@
-"""Run registration and attribution."""
+"""Attribution: dims merge, attribution builder, fail-closed registration lookup."""
 
 from __future__ import annotations
 
@@ -6,90 +6,15 @@ import pytest
 
 from tokenops.control.attribution import (
     _build_attribution,
-    begin_downstream_run,
-    begin_entry_run,
+    merge_registration_dims,
     require_registration,
 )
-from tokenops.control.context import clear, current_registration, current_span
+from tokenops.control.context import SpanContext, clear, run_scope
 from tokenops.control.integration import step_to_observation
-from tokenops.control.models import (
-    RunAlreadyRegisteredError,
-    RunNotRegisteredError,
-    RunRegistration,
-)
-from tokenops.control.store import Store
+from tokenops.control.models import RunNotRegisteredError, RunRegistration
 
 
-@pytest.fixture
-def store(tmp_path):
-    s = Store(str(tmp_path / "attr.db"))
-    yield s
-    s.close()
-
-
-def test_register_and_resolve(store):
-    reg = store.register_run(
-        RunRegistration(trace_id="r1", intent="frontier", user_dims={"Country": "US"})
-    )
-    assert reg.intent == "frontier"
-    resolved = store.resolve_run("r1")
-    assert resolved.user_dims["Country"] == "US"
-
-
-def test_duplicate_register_fails(store):
-    store.register_run(RunRegistration(trace_id="r1"))
-    with pytest.raises(RunAlreadyRegisteredError):
-        store.register_run(RunRegistration(trace_id="r1", intent="other"))
-
-
-def test_resolve_missing_fails_closed(store):
-    with pytest.raises(RunNotRegisteredError):
-        store.resolve_run("missing")
-
-
-def test_begin_entry_run_binds_context(store):
-    clear()
-    bound = begin_entry_run(
-        store,
-        payload={"intent": "demo", "user_dims": {"IsFortune500": "true"}},
-        service="research",
-        trace_id="run-a",
-    )
-    assert bound.registration.trace_id == "run-a"
-    assert current_registration().intent == "demo"
-    assert current_span().service == "research"
-    clear()
-
-
-def test_begin_downstream_soft_registers_when_trace_id_missing(store, caplog):
-    clear()
-    import logging
-
-    with caplog.at_level(logging.WARNING, logger="tokenops.attribution"):
-        bound = begin_downstream_run(store, trace_id=None, service="summarize")
-    assert bound.registration.intent == "unattributed"
-    assert bound.registration.user_dims.get("tokenops_soft_run") == "1"
-    assert bound.span.service == "summarize"
-    assert any("missing_trace_id" in r.message for r in caplog.records)
-    clear()
-
-
-def test_begin_downstream_resolves_registration(store):
-    store.register_run(RunRegistration(trace_id="run-a", intent="x", user_dims={"k": "v"}))
-    clear()
-    bound = begin_downstream_run(
-        store,
-        trace_id="run-a",
-        parent_span_id="span-parent",
-        service="summarize",
-    )
-    assert bound.registration.intent == "x"
-    assert bound.span.parent_span_id == "span-parent"
-    assert bound.span.service == "summarize"
-    clear()
-
-
-def test_build_attribution_maps_service_and_user_dims(store):
+def test_build_attribution_maps_service_and_user_dims():
     reg = RunRegistration(
         trace_id="r1", intent="f500", user_dims={"user_id": "alice", "Country": "US"}
     )
@@ -101,10 +26,39 @@ def test_build_attribution_maps_service_and_user_dims(store):
     assert attr.tags["Country"] == "US"
 
 
-def test_require_registration_fail_closed():
+def test_user_defaults_to_unknown_without_a_user_dim():
+    attr = _build_attribution(RunRegistration(trace_id="r1"), service="research")
+    assert attr.user == "unknown"
+
+
+def test_agent_dims_win_over_the_payload_and_payload_fills_the_allow_list():
+    dims = merge_registration_dims(
+        {"user_id": "agent-user", "Country": "US"},
+        {"user_id": "payload-user", "user": "u2", "other": "ignored"},
+    )
+    assert dims["user_id"] == "agent-user"
+    assert dims["user"] == "u2"
+    assert dims["Country"] == "US"
+    assert "other" not in dims
+
+
+def test_payload_user_dims_fill_gaps_only_for_allow_listed_keys():
+    dims = merge_registration_dims(None, {"user_dims": {"user_id": "p", "secret": "x"}})
+    assert dims == {"user_id": "p"}
+
+
+def test_require_registration_fails_closed_outside_a_scope():
     clear()
     with pytest.raises(RunNotRegisteredError):
         require_registration()
+
+
+def test_require_registration_inside_a_scope():
+    clear()
+    reg = RunRegistration(trace_id="r1", intent="demo")
+    with run_scope(reg, SpanContext(span_id="s1", service="research")):
+        assert require_registration().trace_id == "r1"
+    clear()
 
 
 def test_step_to_observation_boundary_tags():

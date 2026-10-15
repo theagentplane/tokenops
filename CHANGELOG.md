@@ -13,11 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#162](https://github.com/theagentplane/tokenops/issues/162)): governance with `ETag` /
   `If-None-Match` (the last known configuration is returned, flagged `stale`, when the plane is
   unreachable and one was already fetched), `precheck`, `events:batch`, halt get/set/clear and
-  the trace list. Writes are attempted once and never retried (ADR 0002). It is not wired into
-  the governors yet; that follows with the removal of the 0.2 store and backends.
-- `tests/contract`: contract tests against a real control plane 1.x, run by a separate CI job.
+  the trace list. Writes are attempted once and never retried (ADR 0002). The governors now run
+  on it (see "Changed (breaking)").
+- `tests/contract`: contract tests against a real control plane 1.x, run in the CI matrix; the
+  same ledger scenarios run against an in-memory fake (`tests/fake_plane.py`) so it cannot drift.
 
 ### Changed (breaking)
+
+- **The governors run on control plane 1.0** ([#162](https://github.com/theagentplane/tokenops/issues/162)).
+  - `tokenops_run` takes `client=` (a `tokenops.repositories.ControlPlaneClient`, default from
+    `CONTROL_PLANE_URL` / `CONTROL_PLANE_API_KEY`) or `config=` (a governance dict, run in
+    process with no plane). `store=` is gone. Nothing is registered with the plane: a hop joins
+    the Chronicle trace and builds its attribution in memory from its own `intent`,
+    `user_dims` and `mode`, so a downstream hop no longer inherits the entry hop's intent.
+  - Governance is pulled with an `ETag`. Failure behaviour is explicit: an unreachable plane
+    with a configuration already fetched uses that one (logged at WARNING); unreachable with
+    none, or no plane and no `config=`, raises, so a hop never runs ungoverned. A failed ledger
+    write raises to the caller and is never retried.
+  - Budget dimension `run` is now `trace` and the segment key `run:<id>` is `trace:<id>`
+    (config, `Budget`, `segment_key`, `concurrency_cap`). Update `dimension: run` in your
+    governance YAML.
+  - The ledger writes only `spent_add`, `admit`, `complete`, `halt_mark` and `halt_clear`
+    (no `step`, no idempotency key). The step window stays in process (control-plane ADR 0009),
+    so per-policy statistics such as `context_compaction` savings are visible on the
+    `Observation`, not stored by the plane.
+  - `python -m tokenops.demo` runs in process; it no longer launches a plane.
 
 - Chronicle 1.0 integration ([#162](https://github.com/theagentplane/tokenops/issues/162)):
   requires `agent-chronicle>=1.0,<2` (pulls `agentplane-primitives==0.2.*`); 0.5 is no longer
@@ -54,6 +74,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays Chronicle's.
 
 ### Removed (breaking)
+
+- The SQLite store (`tokenops.control.store`), `http_store`, the 0.2 `LedgerBackend` /
+  `HttpLedgerBackend`, the old `tokenops.control.client.ControlPlaneClient`
+  (`from_env`/`register_run`/`require_store`), `tokenops.control.dev_plane`,
+  `governance_cache`, run registration (`begin_entry_run`, `begin_downstream_run`,
+  `begin_entry_task_run`, `mount_run_registration`, `post_run`), `RunRecord`, `Segment`,
+  `BudgetSpec`, `PolicyInstance` and the `contract` extra's `<1.0` pin. Use
+  `tokenops.repositories.ControlPlaneClient`; configuration lives in the control plane.
+- `tokenops.control.trajectory` and the `trajectory_hint` implementation. The template stays
+  known and disabled (it already could not be built); its cross-run index lived in the SQLite
+  store and is decided with the policies rework.
+- `uvicorn` from the runtime dependencies.
 
 Part of the 1.0 rework ([#162](https://github.com/theagentplane/tokenops/issues/162)). These
 duplicated the AgentPlane control plane, which is now the plane and the UI.

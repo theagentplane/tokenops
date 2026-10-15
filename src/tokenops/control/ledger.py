@@ -4,7 +4,7 @@ State is exactly the LLD's three maps. They are separate on purpose: one boundar
 crossing can increment *many* budget accumulators at once, so spend cannot live inside
 a single run object.
 
-    runs:     trace_id      -> LocalRunState      (per-run ephemeral: steps, window, halted)
+    runs:     trace_id      -> LocalRunState      (per-trace ephemeral: steps, window, halted)
     spent:    (budget_id, segment_key, period) -> micros   (one budget bound to a segment)
     inflight: segment_key -> int               (concurrent calls in flight, admit/complete)
 
@@ -16,12 +16,12 @@ Why three maps, not fields on LocalRunState:
 
 Single source of spend truth (Design A): the run total is NOT a separate counter — it
 lives in the ``spent`` map under a canonical, always-present run-scoped accumulator
-(``RUN_TOTAL_BUDGET``). ``cost_micros`` and each ``BoundaryStep.cum_spent_micros`` are
+(``TRACE_TOTAL_BUDGET``). ``cost_micros`` and each ``BoundaryStep.cum_spent_micros`` are
 reads of that one accumulator, so the map is the only place spend is ever written.
 
-Invariant — *every run has a run budget*: structurally guaranteed, because a
-``dimension="run"`` budget resolves a fresh ``segment_key`` per run, so one system
-budget definition covers every run without you configuring anything.
+Invariant — *every trace has a trace budget*: structurally guaranteed, because a
+``dimension="trace"`` budget resolves a fresh ``segment_key`` per trace, so one system
+budget definition covers every trace without you configuring anything.
 
 Concurrency
 -----------
@@ -33,10 +33,10 @@ maps (``runs`` / ``_spent`` / ``_inflight``) are serialized on an internal RLock
 * **Same ``trace_id``**: also safe — calls serialize; halt flags are not torn. Prefer one
   writer per run when possible (typical: per-request Governor), but re-entrancy from
   multiple threads will not corrupt counters.
-* **Store-backed Ledger**: spend / inflight / halt go through :class:`~tokenops.control.store.Store`
-  (itself thread-safe). Multiple Ledgers / Governors in one process sharing one Store are
-  safe for those shared accumulators; each Ledger's step window remains local to that
-  Ledger instance.
+* **Plane-backed Ledger**: spend / inflight / halt go through the control plane
+  (:class:`~tokenops.repositories.ControlPlaneClient`). Multiple Ledgers / Governors sharing one
+  plane share those accumulators; each Ledger's step window stays local to that Ledger
+  instance (the plane stores no step window, control-plane ADR 0009).
 
 See ``docs/concurrency.md``.
 """
@@ -44,11 +44,10 @@ See ``docs/concurrency.md``.
 from __future__ import annotations
 
 import threading
-import uuid
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from tokenops.control.core import (
     Attribution,
@@ -56,16 +55,18 @@ from tokenops.control.core import (
     Micros,
     Observation,
 )
-from tokenops.control.ledger_backend import LedgerBackend, LedgerEvent, PrecheckRequest
-
-if TYPE_CHECKING:
-    from tokenops.control.store import Store
+from tokenops.repositories import (
+    BudgetTarget,
+    ControlPlaneClient,
+    LedgerEvent,
+    PrecheckRequest,
+)
 
 #: Resolve a call's price. Injected (the Instrument module owns the price book). Must
 #: fail closed: an unknown (provider, model) raises rather than returning 0.
 PriceFn = Callable[[str, str, "object"], Micros]
 
-Dimension = Literal["run", "user", "agent", "tenant", "tag"]
+Dimension = Literal["trace", "user", "agent", "tenant", "tag"]
 
 #: Period label for the run-total accumulator and v1 budgets (whole-run / lifetime).
 LIFETIME = "lifetime"
@@ -95,7 +96,7 @@ class Budget:
 
     budget_id: str
     limit_micros: Micros | None
-    dimension: Dimension = "run"
+    dimension: Dimension = "trace"
     tag_key: str | None = None
     period: str = "lifetime"
 
@@ -103,8 +104,8 @@ class Budget:
 #: The canonical run-total accumulator (Design A). Always present, unlimited, run-scoped —
 #: so the run total has exactly one home in ``spent`` and every run is covered by one
 #: definition. Never enforced against; ``cost_micros`` and ``cum_spent_micros`` read it.
-RUN_TOTAL_BUDGET = Budget(
-    budget_id="__run_total__", limit_micros=None, dimension="run", period=LIFETIME
+TRACE_TOTAL_BUDGET = Budget(
+    budget_id="__trace_total__", limit_micros=None, dimension="trace", period=LIFETIME
 )
 
 
@@ -117,8 +118,8 @@ def segment_key_for(
     Returns ``None`` when the attribution does not carry the dimension (e.g. a tenant scope
     on an event with no tenant) — that event simply does not match.
     """
-    if dimension == "run":
-        return f"run:{attr.trace_id}"
+    if dimension == "trace":
+        return f"trace:{attr.trace_id}"
     if dimension == "user":
         return f"user:{attr.user}"
     if dimension == "agent":
@@ -138,103 +139,41 @@ def segment_key(attr: Attribution, budget: Budget) -> str | None:
 
 
 def _trace_id_from_segment_key(segment_key: str) -> str | None:
-    """Recover ``trace_id`` from a ``run:``-dimension segment key. ``None`` for any other
+    """Recover ``trace_id`` from a ``trace:``-dimension segment key. ``None`` for any other
     dimension (user/agent/tenant/tag) — those don't carry a trace_id at all.
 
-    The plane's ``precheck`` only *uses* ``trace_id`` to answer ``halt``/``window`` — a
-    ``spent`` or ``inflight`` lookup for a non-run segment is valid with an empty
-    ``trace_id`` (see ``control_plane.store.Store.precheck``), so callers pass ``"" `` when
-    this returns ``None`` rather than needing the caller's own run context threaded in.
+    The plane's ``precheck`` only *uses* ``trace_id`` to answer ``halt`` — a ``spent`` or
+    ``inflight`` lookup for a non-trace segment is valid with an empty ``trace_id``, so
+    callers pass ``""`` when this returns ``None``.
     """
-    prefix = "run:"
+    prefix = "trace:"
     return segment_key[len(prefix) :] if segment_key.startswith(prefix) else None
 
 
 # --------------------------------------------------------------------------- #
-# Backend-mode event builders (see ``ledger_backend.LedgerEvent`` / the control-plane
-# ``docs/api-contract.md`` §5-6 for the wire shape and idempotency-key recipe)
+# Event builders (control plane 1.0 wire shape; no step events, no idempotency key —
+# control-plane ADR 0007 / 0009)
 # --------------------------------------------------------------------------- #
-
-
-def _new_idempotency_key() -> str:
-    """A fresh, globally-unique key for a one-shot (non-buffered, non-retried) write.
-
-    ``admit``/``complete``/``halt_mark``/``halt_clear`` can be issued for a segment key
-    that carries no trace_id (e.g. an ``agent``-dimension concurrency cap shared across
-    many runs and processes) — the contract's deterministic ``{trace_id}:...:{seq}``
-    recipe (``docs/api-contract.md`` §6) needs a real, globally-known trace_id to stay
-    collision-free across processes, which isn't always available here. A random key is
-    always correct for a single fire-and-forget write; the deterministic recipe only
-    earns its keep once a buffered backend needs a retried flush to regenerate the same
-    key (tracked with the ``# TODO(buffering)`` seam in ``ledger_backend.py``).
-    """
-    return uuid.uuid4().hex
 
 
 def _inflight_event(
     kind: Literal["admit", "complete"], trace_id: str, segment_key: str
 ) -> LedgerEvent:
-    return {
-        "kind": kind,
-        "idempotency_key": _new_idempotency_key(),
-        "trace_id": trace_id,
-        "segment_key": segment_key,
-    }
+    return {"kind": kind, "trace_id": trace_id, "segment_key": segment_key}
 
 
 def _halt_event(
-    kind: Literal["halt_mark", "halt_clear"],
-    trace_id: str,
-    reason: str = "",
-    detector: str = "",
+    kind: Literal["halt_mark", "halt_clear"], trace_id: str, reason: str = ""
 ) -> LedgerEvent:
-    event: LedgerEvent = {
-        "kind": kind,
-        "idempotency_key": _new_idempotency_key(),
-        "trace_id": trace_id,
-    }
+    event: LedgerEvent = {"kind": kind, "trace_id": trace_id}
     if reason:
         event["reason"] = reason
-    if detector:
-        event["detector"] = detector
     return event
 
 
-def _step_event(obs: Observation, seq: int, cost: Micros) -> LedgerEvent:
-    event: LedgerEvent = {
-        "kind": "step",
-        "idempotency_key": f"{obs.attr.trace_id}:{obs.attr.agent}:{seq}:step",
-        "ts": obs.ts,
-        "trace_id": obs.attr.trace_id,
-        "agent": obs.attr.agent,
-        "seq": seq,
-        "node_type": obs.node_type,
-        "boundary_id": obs.boundary_id,
-        "cost_micros": cost,
-        "tags": {**dict(obs.boundary_tags), **dict(obs.tags)},
-    }
-    if obs.usage is not None:
-        event["usage"] = {
-            "input": obs.usage.input,
-            "output": obs.usage.output,
-            "cached": obs.usage.cached,
-            "reasoning": obs.usage.reasoning,
-        }
-    if obs.signature is not None:
-        event["tool_signature"] = obs.signature
-    if obs.result_hash is not None:
-        event["result_hash"] = obs.result_hash
-    if obs.compaction is not None:
-        event["compaction"] = dict(obs.compaction)
-    return event
-
-
-def _spent_add_event(
-    trace_id: str, agent: str, seq: int, delta: Micros, targets: list[dict[str, str]]
-) -> LedgerEvent:
+def _spent_add_event(trace_id: str, delta: Micros, targets: list[BudgetTarget]) -> LedgerEvent:
     return {
         "kind": "spent_add",
-        "idempotency_key": f"{trace_id}:{agent}:{seq}:spent_add",
         "trace_id": trace_id,
         "delta_micros": delta,
         "targets": targets,
@@ -242,7 +181,7 @@ def _spent_add_event(
 
 
 # =========================================================================== #
-# Per-run ephemeral state                                                      #
+# Per-trace ephemeral state                                                      #
 # =========================================================================== #
 
 
@@ -271,18 +210,17 @@ class LocalRunState:
 
 
 class Ledger:
-    """Attribute + LedgerView. Per-process run state (window, local step count); spend,
-    inflight, and halt may be backed by :class:`Store` (local SQLite) or a
-    :class:`~tokenops.control.ledger_backend.LedgerBackend` (the remote control plane) for
-    cross-process / cross-agent consistency. At most one of ``store``/``backend`` may be
-    given; neither means fully in-memory (single-process only, tests).
+    """Attribute + LedgerView. Per-process trace state (window, local step count); spend,
+    inflight, and halt may be backed by the control plane
+    (:class:`~tokenops.repositories.ControlPlaneClient`) for cross-process / cross-agent
+    consistency. Without a ``backend`` it is fully in-memory (single process, tests, the
+    demo).
 
-    ``backend`` mode is the target of the remote-only rewrite (tokenops#118): every write
-    goes through ``apply_events`` (one batch per crossing) and every spend/inflight/halt
-    read goes through ``read_state`` (``precheck``). There is no per-call batching across
-    detectors yet — each read is its own round trip — so a call with several ``global``-
-    scope policies costs more than one ``precheck``; that optimization (and buffering the
-    write side) are tracked follow-ups, not required for correctness.
+    ``backend`` mode: every write goes through ``apply_events`` (one batch per crossing)
+    and every spend/inflight/halt read goes through ``precheck``. A write is attempted
+    once and never retried (ADR 0002); a failed write raises to the caller. There is no
+    per-call batching across detectors yet, so a call with several ``global``-scope
+    policies costs more than one ``precheck``.
 
     Thread-safe for concurrent use from multiple threads (see module docstring).
     """
@@ -292,18 +230,14 @@ class Ledger:
         *,
         budgets: Sequence[Budget] = (),
         price: PriceFn | None = None,
-        store: Store | None = None,
-        backend: LedgerBackend | None = None,
+        backend: ControlPlaneClient | None = None,
     ) -> None:
-        if store is not None and backend is not None:
-            raise ValueError("Ledger takes at most one of store= / backend=, not both")
         self._lock = threading.RLock()
-        self._store = store
         self._backend = backend
         self.runs: dict[str, LocalRunState] = {}
         self._spent: dict[tuple[str, str, str], Micros] = defaultdict(int)
         self._inflight: dict[str, int] = defaultdict(int)
-        self._budgets: list[Budget] = [RUN_TOTAL_BUDGET, *budgets]
+        self._budgets: list[Budget] = [TRACE_TOTAL_BUDGET, *budgets]
         self._budget_by_id: dict[str, Budget] = {b.budget_id: b for b in self._budgets}
         self._price = price
 
@@ -312,7 +246,7 @@ class Ledger:
 
     def _read_spent(self, budget_id: str, segment_key: str, period: str) -> Micros:
         if self._backend is not None:
-            state = self._backend.read_state(
+            state = self._backend.precheck(
                 PrecheckRequest(
                     trace_id=_trace_id_from_segment_key(segment_key) or "",
                     budgets=[
@@ -322,8 +256,6 @@ class Ledger:
                 )
             )
             return state.spent.get(f"{budget_id}|{segment_key}|{period}", 0)
-        if self._store is not None:
-            return self._store.ledger_get_spent(budget_id, segment_key, period)
         return self._spent[self._spent_key(budget_id, segment_key, period)]
 
     def _write_spent_delta(
@@ -333,11 +265,8 @@ class Ledger:
         period: str,
         delta: Micros,
     ) -> Micros:
-        # Backend mode batches spent_add into record()'s single apply_events call
-        # (it needs to share an idempotency key/seq with that crossing's step event),
-        # so it never reaches this in-memory/Store fallback path.
-        if self._store is not None:
-            return self._store.ledger_add_spent(budget_id, segment_key, period, delta)
+        # Backend mode batches spent_add into record()'s single apply_events call, so it
+        # never reaches this in-memory path.
         key = self._spent_key(budget_id, segment_key, period)
         self._spent[key] += delta
         return self._spent[key]
@@ -364,8 +293,6 @@ class Ledger:
             if self._backend is not None:
                 trace_id = _trace_id_from_segment_key(segment_key) or ""
                 self._backend.apply_events([_inflight_event("admit", trace_id, segment_key)])
-            elif self._store is not None:
-                self._store.ledger_admit(segment_key)
             else:
                 self._inflight[segment_key] += 1
 
@@ -376,8 +303,6 @@ class Ledger:
             if self._backend is not None:
                 trace_id = _trace_id_from_segment_key(segment_key) or ""
                 self._backend.apply_events([_inflight_event("complete", trace_id, segment_key)])
-            elif self._store is not None:
-                self._store.ledger_complete(segment_key)
             else:
                 self._inflight[segment_key] = max(0, self._inflight[segment_key] - 1)
 
@@ -403,12 +328,12 @@ class Ledger:
             rs.steps += 1
 
             if self._backend is not None:
-                # One apply_events batch for both the step and the spend, so they share
-                # an idempotency seq and the ack's totals cover the run-total in one
-                # round trip (no separate read_state needed for the common case).
-                events: list[LedgerEvent] = [_step_event(obs, rs.steps, cost)]
+                # One spent_add per priced crossing; the ack's totals carry the trace total,
+                # so no separate precheck is needed for the common case. A zero-cost
+                # crossing (tool call) is a step, not spend: nothing is written, and the
+                # plane stores no step (control-plane ADR 0009).
                 if cost > 0:
-                    targets = []
+                    targets: list[BudgetTarget] = []
                     for b in self._budgets:
                         sk = segment_key(obs.attr, b)
                         if sk is None:
@@ -416,15 +341,16 @@ class Ledger:
                         targets.append(
                             {"budget_id": b.budget_id, "segment_key": sk, "period": b.period}
                         )
-                    events.append(
-                        _spent_add_event(obs.attr.trace_id, obs.attr.agent, rs.steps, cost, targets)
+                    result = self._backend.apply_events(
+                        [_spent_add_event(obs.attr.trace_id, cost, targets)]
                     )
-                result = self._backend.apply_events(events)
-                if result.halted:
-                    rs.halted = True
-                run_total_key = f"{RUN_TOTAL_BUDGET.budget_id}|run:{obs.attr.trace_id}|{LIFETIME}"
-                if run_total_key in result.totals:
-                    rs.cum_spent_cache = result.totals[run_total_key]
+                    if result.halted:
+                        rs.halted = True
+                    total_key = (
+                        f"{TRACE_TOTAL_BUDGET.budget_id}|trace:{obs.attr.trace_id}|{LIFETIME}"
+                    )
+                    if total_key in result.totals:
+                        rs.cum_spent_cache = result.totals[total_key]
                 cum = rs.cum_spent_cache
             else:
                 # One event can feed many accumulators (incl. the system run-total) —
@@ -438,8 +364,8 @@ class Ledger:
                             continue
                         self._write_spent_delta(b.budget_id, sk, b.period, cost)
                 cum = self._read_spent(
-                    RUN_TOTAL_BUDGET.budget_id,
-                    f"run:{obs.attr.trace_id}",
+                    TRACE_TOTAL_BUDGET.budget_id,
+                    f"trace:{obs.attr.trace_id}",
                     LIFETIME,
                 )
             step = BoundaryStep(
@@ -467,8 +393,6 @@ class Ledger:
             rs.halt_reason = reason or rs.halt_reason
             if self._backend is not None:
                 self._backend.apply_events([_halt_event("halt_mark", trace_id, reason=reason)])
-            elif self._store is not None:
-                self._store.ledger_mark_halted(trace_id, reason)
 
     def clear_halt(self, trace_id: str) -> None:
         """Explicit resume of the *same* run — lift the gate. Deliberately separate from
@@ -480,14 +404,12 @@ class Ledger:
                 rs.halt_reason = None
             if self._backend is not None:
                 self._backend.apply_events([_halt_event("halt_clear", trace_id)])
-            elif self._store is not None:
-                self._store.ledger_clear_halt(trace_id)
 
     # ---- read side (LedgerView) ------------------------------------------ #
 
     def cost_micros(self, trace_id: str) -> Micros:
         with self._lock:
-            return self._read_spent(RUN_TOTAL_BUDGET.budget_id, f"run:{trace_id}", LIFETIME)
+            return self._read_spent(TRACE_TOTAL_BUDGET.budget_id, f"trace:{trace_id}", LIFETIME)
 
     def step_count(self, trace_id: str) -> int:
         with self._lock:
@@ -500,15 +422,13 @@ class Ledger:
             if rs and rs.halted:
                 return True  # fast path: already known locally, no round trip
             if self._backend is not None:
-                state = self._backend.read_state(PrecheckRequest(trace_id=trace_id, want=["halt"]))
+                state = self._backend.precheck(PrecheckRequest(trace_id=trace_id, want=["halt"]))
                 if state.halted:
                     if rs is None:
                         rs = self.runs[trace_id] = LocalRunState()
                     rs.halted = True
                     rs.halt_reason = state.halt_reason
                 return state.halted
-            if self._store is not None and self._store.ledger_is_halted(trace_id):
-                return True
             return bool(rs and rs.halted)
 
     def budget_left(self, budget_id: str, segment_key: str, period: str = "lifetime") -> Micros:
@@ -525,14 +445,12 @@ class Ledger:
         with self._lock:
             if self._backend is not None:
                 trace_id = _trace_id_from_segment_key(segment_key) or ""
-                state = self._backend.read_state(
+                state = self._backend.precheck(
                     PrecheckRequest(
                         trace_id=trace_id, segment_keys=[segment_key], want=["inflight"]
                     )
                 )
                 return state.inflight.get(segment_key, 0)
-            if self._store is not None:
-                return self._store.ledger_inflight(segment_key)
             return self._inflight[segment_key]
 
     def velocity(self, trace_id: str, m: int) -> float:

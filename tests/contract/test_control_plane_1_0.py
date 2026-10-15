@@ -31,7 +31,7 @@ try:
 except PackageNotFoundError:  # pragma: no cover - environment dependent
     _PLANE_MAJOR = 0
 
-pytestmark = pytest.mark.skipif(
+_NEEDS_PLANE = pytest.mark.skipif(
     _PLANE_MAJOR < 1, reason="needs agentplane-control-plane>=1.0 installed"
 )
 
@@ -41,6 +41,8 @@ TRACE = "c" * 32
 
 @pytest.fixture(scope="module")
 def plane_url() -> Iterator[str]:
+    if _PLANE_MAJOR < 1:
+        pytest.skip("needs agentplane-control-plane>=1.0 installed")
     import uvicorn
     from control_plane.api import create_app
     from control_plane.settings import Settings
@@ -83,12 +85,23 @@ def client(plane_url: str) -> Iterator[ControlPlaneClient]:
         yield c
 
 
+@pytest.fixture(params=["fake", "real"])
+def ledger_client(request: pytest.FixtureRequest) -> ControlPlaneClient:
+    """The ledger scenarios run against the fake plane and a real one (verified fake)."""
+    if request.param == "fake":
+        from fake_plane import FakePlane
+
+        return FakePlane().client()
+    return request.getfixturevalue("client")
+
+
 def _admin(plane_url: str) -> httpx.Client:
     return httpx.Client(
         base_url=plane_url, headers={"Authorization": f"Bearer {API_KEY}"}, timeout=10
     )
 
 
+@_NEEDS_PLANE
 def test_governance_is_pulled_with_an_etag_and_revalidated_with_304(
     plane_url: str, client: ControlPlaneClient
 ):
@@ -118,7 +131,8 @@ def test_governance_is_pulled_with_an_etag_and_revalidated_with_304(
     assert revalidated.stale is False
 
 
-def test_spent_add_is_visible_in_precheck_and_halt_round_trips(client: ControlPlaneClient):
+def test_spent_add_is_visible_in_precheck_and_halt_round_trips(ledger_client: ControlPlaneClient):
+    client = ledger_client
     segment = f"trace:{TRACE}"
     target = {"budget_id": "run_llm_cap", "segment_key": segment, "period": "lifetime"}
 
@@ -147,13 +161,15 @@ def test_spent_add_is_visible_in_precheck_and_halt_round_trips(client: ControlPl
     assert client.halt_status(TRACE).halted is False
 
 
-def test_unknown_event_kind_is_a_400(client: ControlPlaneClient):
+def test_unknown_event_kind_is_a_400(ledger_client: ControlPlaneClient):
+    client = ledger_client
     with pytest.raises(ControlPlaneError) as caught:
         client.apply_events([{"kind": "step", "trace_id": TRACE}])  # type: ignore[list-item]
     assert caught.value.status_code == 400
 
 
-def test_events_are_not_deduplicated(client: ControlPlaneClient):
+def test_events_are_not_deduplicated(ledger_client: ControlPlaneClient):
+    client = ledger_client
     trace = "d" * 32
     segment = f"trace:{trace}"
     target = {"budget_id": "dedupe_probe", "segment_key": segment, "period": "lifetime"}

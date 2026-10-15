@@ -17,7 +17,7 @@ from tokenops.control import (
 )
 from tokenops.control.policies import pre_call_worst_case as pcwc
 
-CAP = Budget(budget_id="run_llm_cap", limit_micros=1_000_000, dimension="run")
+CAP = Budget(budget_id="run_llm_cap", limit_micros=1_000_000, dimension="trace")
 
 
 def _req(est_in=1000, max_out=None):

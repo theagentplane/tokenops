@@ -13,9 +13,8 @@ from tokenops.control import (
 )
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import GovernanceMode, PolicyInstance, RunRegistration
+from tokenops.control.models import GovernanceMode, RunRegistration
 from tokenops.control.pricing import build_price_book
-from tokenops.control.store import Store
 
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
@@ -28,30 +27,14 @@ def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
     )
 
 
-@pytest.fixture
-def store(tmp_path):
-    s = Store(str(tmp_path / "preview.db"))
-    s.upsert_policy_instance(
-        PolicyInstance(
-            id="pi_step",
-            template="step_cap",
-            params={"max_steps": 2},
-            agent="research",
-        )
-    )
-    yield s
-    s.close()
+CONFIG = {"governance": {"budgets": [], "policies": {"step_cap": {"max_steps": 2}}}}
 
 
-def test_preview_mode_records_actions_without_halting(store):
-    reg = store.register_run(
-        RunRegistration(trace_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW),
-    )
-    cfg = store.governance_config_for("research")
+def test_preview_mode_records_actions_without_halting():
+    reg = RunRegistration(trace_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW)
     gov, controls = build_governance_stack(
-        cfg,
+        CONFIG,
         build_price_book(),
-        store=store,
         mode=GovernanceMode.PREVIEW,
     )
     assert isinstance(controls, PreviewControls)
@@ -78,13 +61,11 @@ def test_preview_mode_records_actions_without_halting(store):
     assert controls.preview_summary()
 
 
-def test_enforce_mode_still_halts(store):
-    reg = store.register_run(RunRegistration(trace_id="enforce-run", intent="demo"))
-    cfg = store.governance_config_for("research")
+def test_enforce_mode_still_halts():
+    reg = RunRegistration(trace_id="enforce-run", intent="demo")
     gov, controls = build_governance_stack(
-        cfg,
+        CONFIG,
         build_price_book(),
-        store=store,
         mode=GovernanceMode.ENFORCE,
     )
     gov.ledger.open_run("enforce-run")
@@ -107,14 +88,6 @@ def test_enforce_mode_still_halts(store):
                     governed("openai", "gpt-4o-mini", [{"role": "user", "content": "task"}])
 
     assert gov.ledger.is_halted("enforce-run")
-
-
-def test_registration_persists_mode(store):
-    store.register_run(
-        RunRegistration(trace_id="r-mode", intent="x", mode=GovernanceMode.PREVIEW),
-    )
-    loaded = store.resolve_run("r-mode")
-    assert loaded.mode is GovernanceMode.PREVIEW
 
 
 def test_parse_governance_mode_invalid():

@@ -1,70 +1,24 @@
-"""TokenOps HTTP wiring for A2A apps (run registration + governance errors).
+"""HTTP mapping of governance outcomes for agent apps.
 
-A2A stays protocol-only (`create_a2a_app`); entry agents mount registration and
-wrap handlers here so Halt/Throttled map to HTTP responses.
+A ``Halt`` becomes a ``200`` ``halted`` body and a ``Throttled`` a ``429`` with
+``Retry-After``, so an agent's task endpoint does not surface them as a ``500``.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
-import httpx
-from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from tokenops.control.core import Halt
 from tokenops.control.engine import Throttled
-from tokenops.control.models import (
-    RunAlreadyRegisteredError,
-    RunRegistration,
-    parse_governance_mode,
-)
-from tokenops.control.store import Store, new_id
 
 Handler = Callable[[dict[str, Any], Mapping[str, str]], Awaitable[dict[str, Any] | Response]]
 
 
-def _coerce_user_dims(raw: object) -> dict[str, str]:
-    if not isinstance(raw, dict):
-        return {}
-    return {str(k): str(v) for k, v in raw.items()}
-
-
-def mount_run_registration(app: FastAPI, store: Store) -> None:
-    """Mount ``POST /v1/runs`` (run registration)."""
-
-    @app.post("/v1/runs")
-    async def register_run(request: Request) -> JSONResponse:
-        """Entry registration — required before ``POST /v1/tasks`` (#2 split endpoint)."""
-        payload = await request.json()
-        trace_id = str(payload.get("run_id") or "").strip() or new_id("run")
-        intent = str(payload.get("intent", ""))
-        user_dims = _coerce_user_dims(payload.get("user_dims"))
-        try:
-            mode = parse_governance_mode(payload.get("mode") or payload.get("governance_mode"))
-        except ValueError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=400)
-        try:
-            reg = store.register_run(
-                RunRegistration(
-                    trace_id=trace_id,
-                    intent=intent,
-                    user_dims=user_dims,
-                    mode=mode,
-                )
-            )
-        except RunAlreadyRegisteredError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=409)
-        return JSONResponse(
-            {"run_id": reg.trace_id, "status": "registered", "mode": reg.mode.value},
-            status_code=201,
-        )
-
-
 def with_governance_errors(handler: Handler) -> Handler:
-    """Wrap a task handler so Halt → 200 halted and Throttled → 429."""
+    """Wrap a task handler so Halt -> 200 halted and Throttled -> 429."""
 
     async def wrapped(
         payload: dict[str, Any],
@@ -86,66 +40,3 @@ def with_governance_errors(handler: Handler) -> Handler:
             )
 
     return wrapped
-
-
-def _raise_for_response(response: httpx.Response) -> None:
-    try:
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        detail = ""
-        try:
-            body = response.json()
-            if isinstance(body, dict) and body.get("error"):
-                detail = f": {body['error']}"
-        except Exception:
-            pass
-        raise httpx.HTTPStatusError(
-            f"{exc}{detail}",
-            request=exc.request,
-            response=exc.response,
-        ) from exc
-
-
-def _from_wire(body: dict[str, Any]) -> dict[str, Any]:
-    """Control-plane 0.2 names the trace key ``trace_id`` on the wire (removed with the 1.0 client)."""
-    if "run_id" in body:
-        body = {**body, "trace_id": body["run_id"]}
-        del body["run_id"]
-    return body
-
-
-def _plane_auth_headers() -> dict[str, str]:
-    key = (
-        os.environ.get("CONTROL_PLANE_API_KEY") or os.environ.get("TOKENOPS_API_KEY") or ""
-    ).strip()
-    if not key:
-        return {}
-    return {"Authorization": f"Bearer {key}"}
-
-
-async def post_run(
-    url: str,
-    payload: dict[str, Any],
-    *,
-    timeout: float = 30.0,
-) -> dict[str, Any]:
-    """POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
-    base = url.rstrip("/")
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f"{base}/v1/runs", json=payload, headers=_plane_auth_headers())
-        _raise_for_response(response)
-        return _from_wire(response.json())
-
-
-def post_run_sync(
-    url: str,
-    payload: dict[str, Any],
-    *,
-    timeout: float = 30.0,
-) -> dict[str, Any]:
-    """Sync POST ``/v1/runs`` at *url*. Prefer :class:`~tokenops.control.client.ControlPlaneClient`."""
-    base = url.rstrip("/")
-    with httpx.Client(timeout=timeout) as client:
-        response = client.post(f"{base}/v1/runs", json=payload, headers=_plane_auth_headers())
-        _raise_for_response(response)
-        return _from_wire(response.json())

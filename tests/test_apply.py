@@ -74,7 +74,7 @@ def _record_dispatch():
 
 
 def test_worst_case_caps_the_dispatched_call():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000_000, dimension="trace")
     controls = ApplyControls()
     ledger = Ledger(budgets=[cap], price=toy_price)
     gov = Governor(ledger, controls)
@@ -111,7 +111,7 @@ def test_inject_message_appended_to_next_dispatch():
 
 
 def test_pre_call_halt_blocks_dispatch():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=1_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=1_000, dimension="trace")
     controls = ApplyControls()
     ledger = Ledger(budgets=[cap], price=toy_price)
     gov = Governor(ledger, controls)
@@ -137,7 +137,7 @@ def test_concurrency_cap_throttles_through_wrap():
     gov.register(*concurrency_cap.build(max_concurrent=1, mode="reject"))
     attr = make_attr()
     ledger.open_run("run-1")
-    ledger.admit("run:run-1")  # one call already in flight for this segment
+    ledger.admit("trace:run-1")  # one call already in flight for this segment
 
     dispatch, calls = _record_dispatch()
     governed = wrap_complete(

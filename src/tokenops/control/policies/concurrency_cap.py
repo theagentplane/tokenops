@@ -36,7 +36,7 @@ class ConcurrencyCapDetector(Detector):
     name = "concurrency_cap"
 
     def __init__(
-        self, max_concurrent: int, dimension: Dimension = "run", tag_key: str | None = None
+        self, max_concurrent: int, dimension: Dimension = "trace", tag_key: str | None = None
     ) -> None:
         self.max_concurrent = max_concurrent
         self.dimension = dimension
@@ -87,7 +87,7 @@ class ConcurrencyCapPolicy(Policy):
 def build(
     max_concurrent: int,
     *,
-    dimension: Dimension = "run",
+    dimension: Dimension = "trace",
     tag_key: str | None = None,
     mode: Mode = "reject",
     retry_after_s: float = 1.0,

@@ -10,14 +10,6 @@ from tokenops.control import ApplyControls, build_governor, install_crossing_hoo
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.models import RunRegistration
-from tokenops.control.store import Store
-
-
-@pytest.fixture
-def store(tmp_path):
-    s = Store(str(tmp_path / "c.db"))
-    yield s
-    s.close()
 
 
 @pytest.fixture(autouse=True)
@@ -36,12 +28,12 @@ def test_chronicle_live_records_envelope(chronicle_envelopes):
     assert chronicle_envelopes[0].name == "search"
 
 
-def test_boundary_tokenops_observe_when_governed(store):
+def test_boundary_tokenops_observe_when_governed():
     clear()
-    reg = store.register_run(RunRegistration(trace_id="r1"))
+    reg = RunRegistration(trace_id="r1")
     config = {
         "governance": {
-            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],
+            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
             "policies": {"step_cap": {"max_steps": 100}},
         }
     }

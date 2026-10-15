@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from chronicle import Input, boundary
+from chronicle import boundary
 from langchain_core.tools import StructuredTool
 
 from examples.agents.research.tools import core
@@ -17,9 +17,7 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: Input(
-            arguments={"name": "search", "args": {"query": query}}, messages=[]
-        ),
+        extract_input=lambda query: {"name": "search", "args": {"query": query}},
     )
     def search_impl(query: str) -> dict:
         result = core.search(query, profile)
@@ -54,9 +52,7 @@ def make_fetch_tool(
     @boundary(
         "fetch",
         kind="tool",
-        extract_input=lambda query: Input(
-            arguments={"name": "fetch", "args": {"query": query}}, messages=[]
-        ),
+        extract_input=lambda query: {"name": "fetch", "args": {"query": query}},
     )
     def fetch_impl(query: str) -> dict:
         result = core.search(query, profile)

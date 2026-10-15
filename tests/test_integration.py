@@ -22,7 +22,7 @@ def test_budget_halts_governed_complete():
 
     config = {
         "governance": {
-            "budgets": [{"id": "run_llm_cap", "limit_micros": 20_000, "dimension": "run"}],
+            "budgets": [{"id": "run_llm_cap", "limit_micros": 20_000, "dimension": "trace"}],
             "policies": {"cost_budget": {"budget": "run_llm_cap"}},
         }
     }

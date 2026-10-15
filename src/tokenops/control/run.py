@@ -1,9 +1,19 @@
-"""Unified run + governance scope (design notes §5, §8, §9, §1, §7, §6).
+"""Unified trace + governance scope for one hop.
 
-Prefer :func:`tokenops_run` (alias :func:`agentplane_run_scope`) for every hop.
-Happy path uses :class:`~tokenops.control.client.ControlPlaneClient` only —
-callers need not pass ``store=`` (§6). Governance config is read via the client
-(process-cached; §10); a fresh Governor is built each run from that config.
+Prefer :func:`tokenops_run` (alias :func:`agentplane_run_scope`) for every hop. A run is a
+Chronicle trace: the hop joins the trace of the active (or inbound ``traceparent``) Chronicle
+span, attribution is built in memory from the call's own ``intent`` / ``user_dims`` / ``mode``,
+and nothing is registered with the control plane.
+
+Governance configuration comes from the control plane (``ControlPlaneClient.governance``,
+``ETag`` cached) or from an explicit ``config=``. A fresh Governor is built for each hop.
+
+Failure behaviour (explicit):
+
+- No control plane configured and no ``config=``: raises :class:`RuntimeError`.
+- Plane unreachable with a configuration already fetched: the last known configuration is used
+  (logged at WARNING). Unreachable with none: :class:`ControlPlaneUnavailable` is raised, so the
+  hop does not run ungoverned.
 """
 
 from __future__ import annotations
@@ -12,19 +22,16 @@ import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any
 
-from tokenops.control.attribution import (
-    _build_attribution,
-    begin_entry_task_run,
-    merge_registration_dims,
-)
+from tokenops.control.attribution import _build_attribution, merge_registration_dims
 from tokenops.control.chronicle_trace_utils import chronicle_span
-from tokenops.control.client import ControlPlaneClient
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
-    BoundRun,
     SpanContext,
     _governance_scope,
+    bind_registration,
+    bind_span,
     run_scope,
 )
 from tokenops.control.context import (
@@ -37,7 +44,7 @@ from tokenops.control.ledger import PriceFn
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 from tokenops.control.pricing import build_price_book
 from tokenops.control.request_context import current_request_context
-from tokenops.control.store import Store
+from tokenops.repositories import ControlPlaneClient
 
 logger = logging.getLogger("tokenops.run")
 
@@ -51,23 +58,7 @@ class TokenOpsBound:
     attr: Attribution
     governor: Governor
     controls: ApplyControls | PreviewControls
-    client: ControlPlaneClient
-    store: Store  # escape hatch — prefer client APIs (§6)
-
-
-def _obtain_client(
-    *,
-    store: Store | None,
-    client: ControlPlaneClient | None,
-) -> ControlPlaneClient:
-    if client is not None:
-        if store is not None and client.embedded and client.store is not store:
-            # Tests often pass an explicit Store; prefer it for registration visibility.
-            return ControlPlaneClient(store=store)
-        return client
-    if store is not None:
-        return ControlPlaneClient(store=store)
-    return ControlPlaneClient.from_env()
+    client: ControlPlaneClient | None
 
 
 def _resolve_ambient(
@@ -115,7 +106,7 @@ def _resolve_ambient(
             "(via instrument_app / bind_request_context)"
         )
 
-    # §1: agent kwargs / instrument defaults beat payload for intent & mode.
+    # Agent kwargs / instrument defaults beat payload for intent & mode.
     if intent is not None:
         resolved_intent = intent
     elif rc is not None and rc.intent is not None:
@@ -148,7 +139,7 @@ def _resolve_ambient(
 def tokenops_run(
     *,
     client: ControlPlaneClient | None = None,
-    store: Store | None = None,
+    config: Mapping[str, Any] | None = None,
     headers: Mapping[str, str] | None = None,
     payload: Mapping[str, object] | None = None,
     service: str | None = None,
@@ -162,15 +153,16 @@ def tokenops_run(
     controls: ApplyControls | PreviewControls | None = None,
     open_ledger_run: bool = True,
 ) -> Iterator[TokenOpsBound]:
-    """One hop under a governed run: register-or-join, bind span + governance.
+    """One hop under a governed trace: join the trace, bind span + governance.
 
     Happy path (with :func:`~tokenops.control.instrument.instrument_app`)::
 
         with tokenops_run():
             ...
 
-    Does not require the caller to pass ``store=`` or build ``Attribution``.
-    Optional ``store=`` remains for tests; prefer ``client=`` / ``from_env``.
+    ``client`` is the control plane (default: built from ``CONTROL_PLANE_URL``). Pass
+    ``config=`` (a governance dict) to run in process with no control plane: spend, in-flight
+    and halt are then kept in this process only.
     """
     install_crossing_hook()
 
@@ -184,71 +176,37 @@ def tokenops_run(
         provider=provider,
         model=model,
     )
-    client_obj = _obtain_client(store=store, client=client)
-    store_obj = store if store is not None else client_obj.require_store()
+    if governor is None and client is None and config is None:
+        client_obj: ControlPlaneClient | None = ControlPlaneClient.from_env()
+    else:
+        client_obj = client
 
     with chronicle_span(hdrs, service=svc) as trace:
-        bound: BoundRun = begin_entry_task_run(
-            store_obj,
+        reg = RunRegistration(
             trace_id=trace.trace_id,
-            parent_span_id=trace.parent_id,
-            span_id=trace.span_id,
-            payload=body,
-            service=svc,
             intent=resolved_intent,
-            user_dims=resolved_dims,
-            mode=resolved_mode,
-            client=client_obj,
-            scrape_payload_dims=False,
+            user_dims=dict(resolved_dims),
+            mode=(
+                parse_governance_mode(resolved_mode)
+                if resolved_mode not in (None, "")
+                else GovernanceMode.ENFORCE
+            ),
         )
-
-        reg = bound.registration
+        span = SpanContext(span_id=trace.span_id, service=svc, parent_span_id=trace.parent_id)
         attr = _build_attribution(reg, service=svc)
-
-        # Mode: explicit override → registration → enforce.
-        if resolved_mode is not None and resolved_mode != "":
-            gov_mode = (
-                resolved_mode
-                if isinstance(resolved_mode, GovernanceMode)
-                else parse_governance_mode(resolved_mode)
-            )
-        else:
-            gov_mode = reg.mode
 
         if governor is None:
             price_fn = price if price is not None else build_price_book()
-            # §10: cached config (via Store / client); fresh Governor each run — no clone.
-            # Ledger construction follows client_obj (not the local store= param): an
-            # embedded test client built from an explicit store=, whether passed to
-            # tokenops_run() directly or already embedded in a client= the caller built,
-            # keeps using that Store. Everything else (from_env(), always remote — there
-            # is no local ledger to fall back to, tokenops#118) uses the plane's
-            # LedgerBackend (precheck/events:batch) — never store_obj, which in that case
-            # is registration/dashboard HTTP only (HttpStore).
-            if client_obj.embedded:
-                config = store_obj.governance_config_for(svc)
-                ledger_store, ledger_backend = store_obj, None
-            else:
-                config = client_obj.governance_config_for(svc)
-                ledger_store, ledger_backend = None, client_obj.backend
+            gov_config = _governance_config(client_obj, config, svc)
+            enforce = reg.mode is not GovernanceMode.PREVIEW
             if controls is not None:
-                enforce = gov_mode is not GovernanceMode.PREVIEW
                 gov = build_governor(
-                    config,
-                    price_fn,
-                    controls,
-                    store=ledger_store,
-                    backend=ledger_backend,
-                    enforce=enforce,
+                    gov_config, price_fn, controls, backend=client_obj, enforce=enforce
                 )
-                ctrl = controls
+                ctrl: ApplyControls | PreviewControls = controls
             else:
                 gov, ctrl = build_governance_stack(
-                    config,
-                    price_fn,
-                    store=ledger_store,
-                    backend=ledger_backend,
-                    mode=gov_mode,
+                    gov_config, price_fn, backend=client_obj, mode=reg.mode
                 )
         else:
             gov = governor
@@ -257,26 +215,42 @@ def tokenops_run(
         if open_ledger_run:
             gov.ledger.open_run(reg.trace_id)
 
-        # begin_* binds registration before run_scope; run_scope.reset restores that
-        # bind on exit — clear hop leftovers so ambient context does not leak.
+        bind_registration(reg)
+        bind_span(span)
         try:
-            with run_scope(reg, bound.span):
+            with run_scope(reg, span):
                 with _governance_scope(gov, attr, provider=prov or "", model=mdl or ""):
                     yield TokenOpsBound(
                         registration=reg,
-                        span=bound.span,
+                        span=span,
                         attr=attr,
                         governor=gov,
                         controls=ctrl,
                         client=client_obj,
-                        store=store_obj,
                     )
         finally:
             clear_run_context()
             if open_ledger_run:
                 # Drop this process's LocalRunState so a long-lived / shared-governor process
-                # does not leak per-run window state.
+                # does not leak per-trace window state.
                 gov.ledger.close_run(reg.trace_id)
+
+
+def _governance_config(
+    client: ControlPlaneClient | None, config: Mapping[str, Any] | None, agent: str
+) -> Mapping[str, Any]:
+    if config is not None:
+        return config
+    if client is None:
+        raise RuntimeError("no governance config: pass config= or point at a control plane")
+    result = client.governance(agent)
+    if result.stale:
+        logger.warning(
+            "tokenops.governance_stale agent=%s: control plane unreachable, using the last "
+            "known configuration",
+            agent,
+        )
+    return result.config
 
 
 # Preferred alternate name from design notes §5.

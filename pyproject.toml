@@ -41,7 +41,6 @@ dependencies = [
   "python-dotenv>=1.0",
   "httpx>=0.27",
   "fastapi>=0.115",
-  "uvicorn>=0.32",
 ]
 
 # Developer tooling is a PEP 735 dependency group, not published package metadata.
@@ -64,7 +63,7 @@ dev = [
 # The tests that need it `pytest.importorskip("control_plane")`, so a plain `dev` install
 # stays green. To run them: `pip install -e ".[contract]"`.
 contract = [
-  "agentplane-control-plane>=0.2.0,<1.0",
+  "agentplane-control-plane>=1.0",
 ]
 examples = [
   "ddgs>=9.0",

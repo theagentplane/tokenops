@@ -23,7 +23,7 @@ governance:
   budgets:
     - id: run_llm_cap
       limit_micros: 2000000
-      dimension: run
+      dimension: trace
   policies:
     cost_budget:
       budget: run_llm_cap

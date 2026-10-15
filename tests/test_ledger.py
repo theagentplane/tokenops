@@ -6,11 +6,11 @@ import pytest
 
 from conftest import make_attr, toy_price
 from tokenops.control.core import Observation, Usage
-from tokenops.control.ledger import RUN_TOTAL_BUDGET, UNLIMITED_LEFT, Budget, Ledger, segment_key
+from tokenops.control.ledger import TRACE_TOTAL_BUDGET, UNLIMITED_LEFT, Budget, Ledger, segment_key
 
 
 def _ledger():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=1_000_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=1_000_000, dimension="trace")
     return Ledger(budgets=[cap], price=toy_price), cap
 
 
@@ -109,18 +109,19 @@ def test_budget_left_real_cap_and_unlimited_run_total():
     )
     assert ledger.budget_left("run_llm_cap", segment_key(attr, cap)) == 1_000_000 - 10_000
     assert (
-        ledger.budget_left("__run_total__", segment_key(attr, RUN_TOTAL_BUDGET)) == UNLIMITED_LEFT
+        ledger.budget_left("__trace_total__", segment_key(attr, TRACE_TOTAL_BUDGET))
+        == UNLIMITED_LEFT
     )
 
 
 def test_inflight_admit_complete_floored():
     ledger, _ = _ledger()
-    ledger.admit("run:run-1")
-    ledger.admit("run:run-1")
-    assert ledger.inflight("run:run-1") == 2
+    ledger.admit("trace:run-1")
+    ledger.admit("trace:run-1")
+    assert ledger.inflight("trace:run-1") == 2
     for _ in range(3):
-        ledger.complete("run:run-1")
-    assert ledger.inflight("run:run-1") == 0
+        ledger.complete("trace:run-1")
+    assert ledger.inflight("trace:run-1") == 0
 
 
 def test_halt_sticky_and_clear():
@@ -188,4 +189,4 @@ def test_zero_cost_crossing_writes_no_spend():
     )
     assert step.step == 1  # step still counted
     assert ledger.cost_micros("run-1") == 0  # run total untouched
-    assert ledger.budget_left(cap.budget_id, "run:run-1") == cap.limit_micros
+    assert ledger.budget_left(cap.budget_id, "trace:run-1") == cap.limit_micros

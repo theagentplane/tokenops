@@ -1,15 +1,14 @@
-"""Cross-process budget gating — shared SQLite ledger across independent Governor instances."""
+"""Cross-process budget gating: independent Governors sharing one control plane."""
 
 from __future__ import annotations
 
 from conftest import make_attr, toy_price
 from tokenops.control import Observation, Usage, build_governor
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.store import Store
 
 GOV = {
     "governance": {
-        "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "run"}],
+        "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "trace"}],
         "policies": {},
     }
 }
@@ -32,7 +31,7 @@ def test_in_memory_ledgers_do_not_share_spend():
     gov_a = build_governor(GOV, toy_price)
     gov_b = build_governor(GOV, toy_price)
     trace_id = "run-1"
-    sk = f"run:{trace_id}"
+    sk = f"trace:{trace_id}"
 
     gov_a.ledger.open_run(trace_id)
     gov_b.ledger.open_run(trace_id)
@@ -45,15 +44,12 @@ def test_in_memory_ledgers_do_not_share_spend():
     assert gov_b.ledger.budget_left("run_llm_cap", sk, LIFETIME) == 2_000_000
 
 
-def test_shared_store_ledgers_share_spend(tmp_path):
-    """Two Governor instances backed by one Store share run-scoped spend."""
-    db = tmp_path / "shared.db"
-    store = Store(str(db), auto_seed=False)
-
-    gov_research = build_governor(GOV, toy_price, store=store)
-    gov_summarize = build_governor(GOV, toy_price, store=store)
+def test_shared_plane_ledgers_share_spend(fake_plane):
+    """Two Governor instances on one control plane share trace-scoped spend."""
+    gov_research = build_governor(GOV, toy_price, backend=fake_plane.client())
+    gov_summarize = build_governor(GOV, toy_price, backend=fake_plane.client())
     trace_id = "shared-run"
-    sk = f"run:{trace_id}"
+    sk = f"trace:{trace_id}"
 
     gov_research.ledger.open_run(trace_id)
     gov_summarize.ledger.open_run(trace_id)
@@ -65,12 +61,11 @@ def test_shared_store_ledgers_share_spend(tmp_path):
     assert gov_summarize.ledger.cost_micros(trace_id) == 1_900_000
 
 
-def test_shared_store_exhausted_budget_visible_to_second_process(tmp_path):
-    store = Store(str(tmp_path / "exhaust.db"), auto_seed=False)
-    gov_a = build_governor(GOV, toy_price, store=store)
-    gov_b = build_governor(GOV, toy_price, store=store)
+def test_shared_plane_exhausted_budget_visible_to_second_process(fake_plane):
+    gov_a = build_governor(GOV, toy_price, backend=fake_plane.client())
+    gov_b = build_governor(GOV, toy_price, backend=fake_plane.client())
     trace_id = "cap-run"
-    sk = f"run:{trace_id}"
+    sk = f"trace:{trace_id}"
 
     gov_a.ledger.open_run(trace_id)
     gov_b.ledger.open_run(trace_id)
@@ -82,13 +77,31 @@ def test_shared_store_exhausted_budget_visible_to_second_process(tmp_path):
     assert gov_b.ledger.budget_left("run_llm_cap", sk, LIFETIME) <= 0
 
 
-def test_shared_halt_flag_cross_process(tmp_path):
-    store = Store(str(tmp_path / "halt.db"), auto_seed=False)
-    gov_a = build_governor(GOV, toy_price, store=store)
-    gov_b = build_governor(GOV, toy_price, store=store)
+def test_shared_halt_flag_cross_process(fake_plane):
+    gov_a = build_governor(GOV, toy_price, backend=fake_plane.client())
+    gov_b = build_governor(GOV, toy_price, backend=fake_plane.client())
     trace_id = "halt-run"
 
     gov_a.ledger.open_run(trace_id)
     gov_a.ledger.mark_halted(trace_id, "budget exhausted")
 
     assert gov_b.ledger.is_halted(trace_id)
+    assert fake_plane.halts[trace_id] == "budget exhausted"
+
+
+def test_spend_is_written_once_per_priced_crossing(fake_plane):
+    """A spent_add per priced crossing and no step event (the plane stores none)."""
+    import json
+
+    gov = build_governor(GOV, toy_price, backend=fake_plane.client())
+    gov.ledger.open_run("once")
+    gov.ledger.record(_llm_obs("once", inp=1_000))
+
+    batches = [
+        json.loads(r.content)["events"]
+        for r in fake_plane.requests
+        if r.url.path == "/v1/ledger/events:batch"
+    ]
+    assert len(batches) == 1
+    assert [e["kind"] for e in batches[0]] == ["spent_add"]
+    assert "idempotency_key" not in batches[0][0]

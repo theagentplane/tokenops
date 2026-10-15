@@ -1,4 +1,4 @@
-"""Canonical policy names agree across registration, YAML, persistence, UI, and docs."""
+"""Canonical policy names agree across registration, YAML, and docs."""
 
 from __future__ import annotations
 
@@ -14,10 +14,8 @@ from tokenops.config.loader import DEFAULT_CONFIG, load_governance_yaml
 from tokenops.control import build_governor, policies
 from tokenops.control import config as config_module
 from tokenops.control.config import POLICY_TEMPLATES, policy_template_ids
-from tokenops.control.models import PolicyInstance
-from tokenops.control.policies import tool_output_cap, trajectory_hint
+from tokenops.control.policies import tool_output_cap
 from tokenops.control.policy_labels import policy_label
-from tokenops.control.store import Store
 
 ROOT = Path(__file__).resolve().parents[1]
 YAML_CONFIGS = sorted(
@@ -32,7 +30,9 @@ def test_registry_matches_policy_modules_exports_and_doc_slugs():
         if not path.name.startswith("_")
     }
     doc_ids = {path.stem for path in (ROOT / "docs/policies").glob("*.md")}
-    assert module_ids == doc_ids == set(POLICY_TEMPLATES)
+    disabled = {name for name, t in POLICY_TEMPLATES.items() if t.factory is None}
+    assert module_ids | disabled == doc_ids == set(POLICY_TEMPLATES)
+    assert module_ids.isdisjoint(disabled)
     assert set(policies.__all__) == set(policy_template_ids())
     assert all(re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", name) for name in module_ids)
     assert len({template.display_name for template in POLICY_TEMPLATES.values()}) == len(
@@ -93,46 +93,12 @@ def test_compose_tool_policy_keeps_its_parameters_under_the_canonical_key(filena
     assert detector.k == k
 
 
-def test_default_seed_preserves_policy_keys_parameters_and_instance_ids(tmp_path, monkeypatch):
-    monkeypatch.delenv("TOKENOPS_SKIP_GOVERNANCE_SEED", raising=False)
+def test_default_config_builds_every_configured_policy():
     governance = load_governance_yaml(DEFAULT_CONFIG)
     configured_ids = set(governance["policies"])
     assert configured_ids == set(policy_template_ids()) - {"time_budget"}
-    store = Store(str(tmp_path / "seed.db"), auto_seed=False)
-    try:
-        assert store.seed_default_governance_if_empty(governance)
-        instances = store.list_policy_instances()
-        assert {instance.id for instance in instances} == {
-            f"seed_{policy_id}" for policy_id in configured_ids
-        }
-        assert {instance.template for instance in instances} == configured_ids
-        for instance in instances:
-            original = governance["policies"][instance.template]
-            assert instance.budget_id == original.get("budget")
-            assert instance.params == {
-                key: value for key, value in original.items() if key != "budget"
-            }
-        effective = store.governance_config_for("research")
-        assert set(build_governor(effective, toy_price)._policy_by_name) == configured_ids
-        assert not store.seed_default_governance_if_empty(governance)
-    finally:
-        store.close()
-
-
-@pytest.mark.parametrize("instance_id", ["customer-policy-17", "seed_tool_fix", "cost_budget"])
-def test_configurable_instance_id_does_not_rename_template(tmp_path, instance_id):
-    store = Store(str(tmp_path / "instance.db"), auto_seed=False)
-    try:
-        instance = PolicyInstance(
-            id=instance_id, template="step_cap", params={"max_steps": 7}, agent="research"
-        )
-        store.upsert_policy_instance(instance)
-        assert store.get_policy_instance(instance_id) == instance
-        effective = store.governance_config_for("research")
-        assert set(effective["governance"]["policies"]) == {"step_cap"}
-        assert set(build_governor(effective, toy_price)._policy_by_name) == {"step_cap"}
-    finally:
-        store.close()
+    effective = {"governance": governance}
+    assert set(build_governor(effective, toy_price)._policy_by_name) == configured_ids
 
 
 @pytest.mark.parametrize(
@@ -146,16 +112,9 @@ def test_configurable_instance_id_does_not_rename_template(tmp_path, instance_id
         "seed_tool_fix",
     ],
 )
-def test_unsupported_spellings_are_not_config_or_store_aliases(tmp_path, unsupported):
+def test_unsupported_spellings_are_not_config_aliases(unsupported):
     with pytest.raises(ValueError, match="unknown policy"):
         build_governor({"policies": {unsupported: {}}}, toy_price)
-    store = Store(str(tmp_path / "unsupported.db"), auto_seed=False)
-    try:
-        with pytest.raises(ValueError, match="unknown policy template"):
-            store.upsert_policy_instance(PolicyInstance(id="custom-id", template=unsupported))
-        assert store.list_policy_instances() == []
-    finally:
-        store.close()
 
 
 @pytest.mark.parametrize("params", [{}, {"enabled": True}, {"enabled": False}])
@@ -166,33 +125,6 @@ def test_trajectory_hint_remains_known_but_unavailable(params):
     assert "temporarily disabled" in policy_label("trajectory_hint")
     with pytest.raises(ValueError, match="trajectory_hint is temporarily disabled"):
         build_governor({"policies": {"trajectory_hint": params}}, toy_price)
-
-
-def test_retained_trajectory_builder_keeps_its_canonical_name(tmp_path):
-    store = Store(str(tmp_path / "trajectory-builder.db"), auto_seed=False)
-    try:
-        detector, policy = trajectory_hint.build(store, enabled=False)
-        assert detector.name == policy.name == "trajectory_hint"
-        assert type(detector).__module__ == type(policy).__module__ == trajectory_hint.__name__
-    finally:
-        store.close()
-
-
-def test_disabled_stored_trajectory_instance_keeps_its_identity(tmp_path):
-    store = Store(str(tmp_path / "trajectory.db"), auto_seed=False)
-    try:
-        instance = PolicyInstance(
-            id="existing-trajectory-instance", template="trajectory_hint", enabled=False
-        )
-        store.upsert_policy_instance(instance)
-        assert store.get_policy_instance(instance.id) == instance
-        assert build_governor(store.governance_config_for("research"), toy_price)._detectors == []
-        instance.enabled = True
-        store.upsert_policy_instance(instance)
-        with pytest.raises(ValueError, match="trajectory_hint is temporarily disabled"):
-            build_governor(store.governance_config_for("research"), toy_price)
-    finally:
-        store.close()
 
 
 def test_template_adapter_cannot_register_a_different_policy_name(monkeypatch):
@@ -240,21 +172,13 @@ def test_context_compaction_admin_defaults_do_not_reintroduce_removed_capability
     assert POLICY_TEMPLATES["context_compaction"].default_params == {"ctx_max": 100000}
 
 
-def test_time_budget_is_available_without_being_seeded(tmp_path):
+def test_time_budget_is_available_without_being_seeded():
     assert "time_budget" in policy_template_ids()
     assert "time_budget" not in load_governance_yaml(DEFAULT_CONFIG)["policies"]
-    store = Store(str(tmp_path / "time-budget.db"), auto_seed=False)
-    try:
-        instance = PolicyInstance(
-            id="customer-latency-limit", template="time_budget", params={"max_seconds": 2.0}
-        )
-        store.upsert_policy_instance(instance)
-        governor = build_governor(store.governance_config_for("research"), toy_price)
-        assert store.get_policy_instance(instance.id) == instance
-        assert set(governor._policy_by_name) == {"time_budget"}
-        assert governor._detectors[0].max_seconds == 2.0
-    finally:
-        store.close()
+    config = {"governance": {"budgets": [], "policies": {"time_budget": {"max_seconds": 2.0}}}}
+    governor = build_governor(config, toy_price)
+    assert set(governor._policy_by_name) == {"time_budget"}
+    assert governor._detectors[0].max_seconds == 2.0
 
 
 @pytest.mark.parametrize("name", ["custom_policy", "tool_freq", "historical-unknown"])

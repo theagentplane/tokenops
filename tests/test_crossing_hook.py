@@ -14,7 +14,6 @@ from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.crossing import TokenOpsHook
 from tokenops.control.models import RunRegistration
-from tokenops.control.store import Store
 
 
 def test_install_crossing_hook_is_idempotent():
@@ -47,14 +46,13 @@ def test_on_crossing_noop_when_unbound():
     clear()
 
 
-def test_on_crossing_observes_when_governed(tmp_path):
+def test_on_crossing_observes_when_governed():
     clear()
     install_crossing_hook()
-    store = Store(str(tmp_path / "hook.db"))
-    reg = store.register_run(RunRegistration(trace_id="hook-1", intent="demo"))
+    reg = RunRegistration(trace_id="hook-1", intent="demo")
     config = {
         "governance": {
-            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],
+            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
             "policies": {"step_cap": {"max_steps": 100}},
         }
     }
@@ -75,5 +73,4 @@ def test_on_crossing_observes_when_governed(tmp_path):
             search("pricing")
 
     clear()
-    store.close()
     assert gov.ledger.step_count("hook-1") == 1

@@ -1,18 +1,16 @@
-"""Persisted models for the admin store (goal 3) and the run dashboard (goal 4).
+"""In-process vocabulary shared by the run scope and the governors.
 
-Plain dataclasses — the storage shape, kept separate from the runtime vocabulary in
-``core.py``/``ledger.py``. The store (``store.py``) turns rows into these and back, and
-assembles ``governance_config_for(agent)`` into the exact dict ``build_governor`` consumes.
+Plain data only. The control plane owns configuration storage (segments, budgets, policy
+instances) and the trace list; nothing here is persisted by TokenOps.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal
+from typing import Literal
 
-Dimension = Literal["run", "user", "agent", "tenant", "tag"]
-RunStatus = Literal["running", "completed", "halted", "throttled", "error"]
+Dimension = Literal["trace", "user", "agent", "tenant", "tag"]
 
 
 class GovernanceMode(str, Enum):
@@ -35,10 +33,11 @@ def parse_governance_mode(value: object) -> GovernanceMode:
 
 @dataclass(frozen=True, kw_only=True)
 class RunRegistration:
-    """Frozen trace dims registered before any telemetry for a ``trace_id``.
+    """The attribution of one hop under a trace: who, why and in which mode.
 
-    See ``docs/run-attribution.md``. Registration is required and immutable for
-    the life of the run.
+    Built in memory by ``tokenops_run`` from the Chronicle trace id and the hop's own
+    ``intent`` / ``user_dims`` / ``mode``. Nothing is registered with, or persisted by, the
+    control plane: a run is a Chronicle trace.
     """
 
     trace_id: str
@@ -48,83 +47,4 @@ class RunRegistration:
 
 
 class RunNotRegisteredError(LookupError):
-    """Telemetry references a ``trace_id`` that was never registered."""
-
-
-class RunAlreadyRegisteredError(ValueError):
-    """``register_run`` was called twice for the same ``trace_id``."""
-
-
-@dataclass
-class Segment:
-    """A named, reusable matcher — generalizes ``Budget.dimension/tag_key`` into a thing a
-    user can create once and attach to budgets/policies."""
-
-    id: str
-    name: str
-    dimension: Dimension = "run"
-    tag_key: str | None = None
-    match_value: str | None = None  # for a tag segment, the value to match (optional)
-
-
-@dataclass
-class BudgetSpec:
-    """A persisted ``ledger.Budget``. ``limit_micros=None`` means unlimited (accumulator only)."""
-
-    id: str
-    limit_micros: int | None
-    dimension: Dimension = "run"
-    tag_key: str | None = None
-    period: str = "lifetime"
-
-
-DataScope = Literal["local", "global"]
-
-
-@dataclass
-class PolicyInstance:
-    """One configured policy = a template + params, optionally scoped to an agent and
-    attached to a budget and/or segment.
-
-    ``template`` is the canonical policy ID (the YAML key); ``id`` identifies this
-    stored configuration, such as ``seed_cost_budget`` or a user-chosen ID.
-
-    ``data_scope`` says which tier its detector reads: ``local`` (Tier-1
-    ``LocalRunState`` cache, no round trip) or ``global`` (the plane's authoritative
-    `run_state`/spend via `precheck`, needed for anything that must be correct across
-    processes — e.g. cost budgets). The Governor groups detectors by this field so a
-    call needs at most one `precheck` regardless of how many `global` policies it has."""
-
-    id: str
-    template: str  # a key of control.config.POLICY_TEMPLATES
-    params: dict[str, Any] = field(default_factory=dict)
-    agent: str | None = None  # None = applies to every agent
-    budget_id: str | None = None
-    segment_id: str | None = None
-    enabled: bool = True
-    data_scope: DataScope = "local"
-
-
-@dataclass
-class RunRecord:
-    """A persisted run for the dashboard — survives process restarts (unlike the in-memory
-    ledger). Written by the server handler; read by the dashboard."""
-
-    trace_id: str
-    agent: str
-    status: RunStatus = "running"
-    parent_run: str | None = None
-    parent_span: str | None = None
-    halt_reason: str | None = None
-    detector: str | None = None
-    cost_micros: int = 0
-    steps: int = 0
-    started_at: float = 0.0
-    ended_at: float | None = None
-    task: str | None = None
-    dims: dict[str, str] = field(default_factory=dict)  # segment dims (tags) for grouping/filtering
-    governance_events: list[dict[str, Any]] = field(default_factory=list)
-
-    @property
-    def problematic(self) -> bool:
-        return self.status in ("halted", "throttled", "error")
+    """Telemetry was produced outside a bound ``tokenops_run`` scope."""

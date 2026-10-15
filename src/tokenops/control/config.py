@@ -10,7 +10,7 @@ Config shape (dict, typically parsed from YAML)::
       budgets:
         - id: run_llm_cap
           limit_micros: 1_000_000     # null/omitted → unlimited accumulator
-          dimension: run              # run | user | agent | tenant | tag
+          dimension: trace            # trace | user | agent | tenant | tag
       policies:
         cost_budget:        { budget: run_llm_cap }
         pre_call_worst_case:{ budget: run_llm_cap, default_max_output: 1024 }
@@ -32,12 +32,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from tokenops.control.core import Detector, Policy
 from tokenops.control.engine import AgentControls, ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import Budget, Ledger, PriceFn
-from tokenops.control.ledger_backend import LedgerBackend
 from tokenops.control.models import GovernanceMode
 from tokenops.control.policies import (
     concurrency_cap,
@@ -52,9 +51,7 @@ from tokenops.control.policies import (
     tool_fix,
     tool_output_cap,
 )
-
-if TYPE_CHECKING:
-    from tokenops.control.store import Store
+from tokenops.repositories import ControlPlaneClient
 
 
 @dataclass
@@ -123,7 +120,7 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
             display_name="Concurrency cap",
             factory=lambda p, c: concurrency_cap.build(
                 p["max_concurrent"],
-                dimension=p.get("dimension", "run"),
+                dimension=p.get("dimension", "trace"),
                 tag_key=p.get("tag_key"),
                 mode=p.get("mode", "reject"),
                 retry_after_s=p.get("retry_after_s", 1.0),
@@ -212,7 +209,7 @@ def parse_budgets(specs) -> dict[str, Budget]:
         b = Budget(
             budget_id=spec["id"],
             limit_micros=spec.get("limit_micros"),  # None → unlimited
-            dimension=spec.get("dimension", "run"),
+            dimension=spec.get("dimension", "trace"),
             tag_key=spec.get("tag_key"),
             period=spec.get("period", "lifetime"),
         )
@@ -225,22 +222,20 @@ def build_governor(
     price: PriceFn,
     controls: AgentControls | None = None,
     *,
-    store: Store | None = None,
-    backend: LedgerBackend | None = None,
+    backend: ControlPlaneClient | None = None,
     enforce: bool = True,
 ) -> Governor:
     """Build a fully-registered Governor (and its Ledger, on ``governor.ledger``) from a
     declarative governance config. ``config`` is the ``governance:`` block (or a mapping
     that contains ``budgets`` / ``policies``).
 
-    Pass exactly one of ``store`` (local Store — tests only) or ``backend`` (a
-    :class:`~tokenops.control.ledger_backend.LedgerBackend` — the control plane, direct
-    or fake) to share spend, inflight, and halt state across A2A agent processes.
-    Neither means a fully in-memory, single-process Ledger."""
+    Pass ``backend`` (a :class:`~tokenops.repositories.ControlPlaneClient`) to share spend,
+    inflight, and halt state across agent processes. Without it the Ledger is fully
+    in-memory and single-process."""
     gov_cfg = config.get("governance", config)
     budgets = parse_budgets(gov_cfg.get("budgets"))
 
-    ledger = Ledger(budgets=list(budgets.values()), price=price, store=store, backend=backend)
+    ledger = Ledger(budgets=list(budgets.values()), price=price, backend=backend)
     governor = Governor(ledger, controls, enforce=enforce)
     ctx = _Ctx(budgets=budgets, price=price)
 
@@ -265,15 +260,12 @@ def build_governance_stack(
     config: Mapping[str, Any],
     price: PriceFn,
     *,
-    store: Store | None = None,
-    backend: LedgerBackend | None = None,
+    backend: ControlPlaneClient | None = None,
     mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[Governor, ApplyControls | PreviewControls]:
     """Wire a Governor + OUT connector for enforce or preview mode."""
     enforce = mode is not GovernanceMode.PREVIEW
     controls: ApplyControls | PreviewControls
     controls = ApplyControls() if enforce else PreviewControls()
-    governor = build_governor(
-        config, price, controls, store=store, backend=backend, enforce=enforce
-    )
+    governor = build_governor(config, price, controls, backend=backend, enforce=enforce)
     return governor, controls

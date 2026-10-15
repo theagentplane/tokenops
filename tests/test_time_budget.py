@@ -49,7 +49,7 @@ def test_e2e_halts_when_time_exceeded():
     # step. With max_seconds=0.5: tool(0.0) → elapsed=0.0 < 0.5 (allow);
     # tool(1.0) → elapsed=1.0 - 0.0 = 1.0 >= 0.5 (HALT).
     ledger = Ledger(
-        budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="run")], price=toy_price
+        budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="trace")], price=toy_price
     )
     gov = Governor(ledger)
     gov.register(*time_budget.build(max_seconds=0.5))

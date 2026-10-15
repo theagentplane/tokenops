@@ -61,7 +61,7 @@ def test_governor_events_use_policy_id(policy_id, params, moment, kind, mode):
     attr = make_attr()
     governor.ledger.open_run(attr.trace_id)
     if policy_id == "concurrency_cap":
-        governor.ledger.admit(f"run:{attr.trace_id}")
+        governor.ledger.admit(f"trace:{attr.trace_id}")
     if policy_id == "context_compaction":
         controls.compaction_supported = True
     if policy_id == "time_budget":

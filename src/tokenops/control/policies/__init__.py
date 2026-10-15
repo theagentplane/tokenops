@@ -7,8 +7,8 @@ Canonical IDs and display labels are registered in ``control.config.POLICY_TEMPL
 The naming glossary is ``docs/product/policies-index.md``; policy behavior is documented
 in ``docs/policies/<id>.md``.
 
-``trajectory_hint`` is known but temporarily disabled in ``build_governor``. Its
-standalone module is retained for research/tests and is not exported here.
+``trajectory_hint`` is a known template that is disabled in ``build_governor``; it has no
+implementation module (its cross-run index lived in the removed SQLite store).
 """
 
 from tokenops.control.policies import (

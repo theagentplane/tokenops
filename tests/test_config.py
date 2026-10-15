@@ -10,7 +10,7 @@ from tokenops.control import Halt, Observation, Usage, build_governor
 CONFIG = {
     "governance": {
         "budgets": [
-            {"id": "run_llm_cap", "limit_micros": 20_000, "dimension": "run"},
+            {"id": "run_llm_cap", "limit_micros": 20_000, "dimension": "trace"},
         ],
         "policies": {
             "cost_budget": {"budget": "run_llm_cap"},
@@ -31,7 +31,7 @@ def test_builds_and_registers_all_policies():
         "output_runaway",
     }
     # the budget the config declared is in the ledger
-    assert gov.ledger.budget_left("run_llm_cap", "run:run-1") == 20_000
+    assert gov.ledger.budget_left("run_llm_cap", "trace:run-1") == 20_000
 
 
 def test_e2e_cost_budget_from_config_halts():

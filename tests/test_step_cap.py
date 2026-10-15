@@ -28,7 +28,7 @@ def test_policy_halts():
 def test_e2e_halts_on_third_step():
     # tool crossings carry no cost, so this isolates step counting from budget.
     ledger = Ledger(
-        budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="run")], price=toy_price
+        budgets=[Budget(budget_id="c", limit_micros=10**9, dimension="trace")], price=toy_price
     )
     gov = Governor(ledger)
     gov.register(*step_cap.build(max_steps=3))

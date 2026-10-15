@@ -44,7 +44,7 @@ governance:
   budgets:
     - id: run_llm_cap
       limit_micros: 500000          # $0.50 per run — easier to demo cost_budget than $2
-      dimension: run
+      dimension: trace
   policies:
     cost_budget:
       budget: run_llm_cap

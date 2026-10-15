@@ -1,4 +1,4 @@
-"""TokenOps control plane and SDK."""
+"""TokenOps: run-aware token governance for agents."""
 
 from tokenops.env import load_env
 
@@ -20,7 +20,6 @@ def init() -> None:
 
 
 # First-class SDK surface for agents / UIs talking to the plane.
-from tokenops.control.client import ControlPlaneClient as ControlPlaneClient
 from tokenops.control.instrument import instrument_app as instrument_app
 from tokenops.control.request_context import (
     RequestContext as RequestContext,
@@ -43,6 +42,7 @@ from tokenops.control.run import (
 from tokenops.control.run import (
     tokenops_run as tokenops_run,
 )
+from tokenops.repositories import ControlPlaneClient as ControlPlaneClient
 
 __all__ = [
     "ControlPlaneClient",

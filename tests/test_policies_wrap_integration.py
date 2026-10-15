@@ -8,8 +8,6 @@ exercises the full detect → decide → apply path — still offline / no API k
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from conftest import toy_price
@@ -96,7 +94,7 @@ def _with_scope(gov, attr, trace_id: str, fn):
 
 
 def test_it_pre_call_worst_case_mutates_uncapped_output():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000_000, dimension="trace")
     controls = ApplyControls()
     gov = Governor(Ledger(budgets=[cap], price=toy_price), controls)
     gov.register(*pre_call_worst_case.build(cap, toy_price, default_max_output=1024))
@@ -116,7 +114,7 @@ def test_it_pre_call_worst_case_mutates_uncapped_output():
 
 def test_it_pre_call_worst_case_halts_when_projected_over_budget():
     # Tiny budget: even capped worst-case cannot fit.
-    cap = Budget(budget_id="run_llm_cap", limit_micros=50, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=50, dimension="trace")
     controls = ApplyControls()
     gov = Governor(Ledger(budgets=[cap], price=toy_price), controls)
     gov.register(*pre_call_worst_case.build(cap, toy_price, default_max_output=1024))
@@ -136,7 +134,7 @@ def test_it_pre_call_worst_case_halts_when_projected_over_budget():
 
 
 def test_it_cost_budget_halts_after_spend_crosses_cap():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="trace")
     controls = ApplyControls()
     gov = Governor(Ledger(budgets=[cap], price=toy_price), controls)
     gov.register(*cost_budget.build(cap))
@@ -157,7 +155,7 @@ def test_it_cost_budget_halts_after_spend_crosses_cap():
 
 
 def test_it_cost_guard_injects_near_threshold():
-    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000, dimension="run")
+    cap = Budget(budget_id="run_llm_cap", limit_micros=10_000, dimension="trace")
     controls = ApplyControls()
     gov = Governor(Ledger(budgets=[cap], price=toy_price), controls)
     gov.register(*cost_guard.build(cap, threshold=0.5, mode="minimize"))
@@ -230,7 +228,7 @@ def test_it_concurrency_cap_rejects_when_inflight_saturated():
     gov.register(*concurrency_cap.build(max_concurrent=1, mode="reject"))
     attr = _attr("r-cc")
     gov.ledger.open_run("r-cc")
-    gov.ledger.admit("run:r-cc")  # one slot taken
+    gov.ledger.admit("trace:r-cc")  # one slot taken
     dispatch, calls = _dispatch()
     governed = _governed(gov, attr, dispatch, trace_id="r-cc")
 
@@ -373,15 +371,21 @@ def test_it_context_compaction_rewrites_messages_via_wrap():
     assert any(m.get("content") == "unique" for m in sent)
 
 
-def test_it_context_compaction_records_tokens_in_ledger_event():
+def test_it_context_compaction_records_tokens_on_the_observation():
     """Compaction metadata (tokens_before / tokens_after / tokens_saved) flows through
-    wrap_complete → crossing hook → Observation → step event in the ledger."""
-    from fakes import FakeLedgerBackend
-
-    backend = FakeLedgerBackend()
+    wrap_complete -> crossing hook -> Observation. The plane stores no per-policy statistics
+    (control-plane ADR 0009), so the observation is where it is visible."""
     controls = ApplyControls()
-    gov = Governor(Ledger(price=toy_price, backend=backend), controls)
-    gov.register(*context_compaction.build(ctx_max=10))  # tiny ctx → always trips
+    gov = Governor(Ledger(price=toy_price), controls)
+    gov.register(*context_compaction.build(ctx_max=10))  # tiny ctx -> always trips
+    observed = []
+    original = gov.observe
+
+    def spy(obs):
+        observed.append(obs)
+        return original(obs)
+
+    gov.observe = spy  # type: ignore[method-assign]
     attr = _attr("r-cc-meta")
     gov.ledger.open_run("r-cc-meta")
     dispatch, calls = _dispatch(inp=80, out=20)
@@ -398,15 +402,10 @@ def test_it_context_compaction_records_tokens_in_ledger_event():
 
     _with_scope(gov, attr, "r-cc-meta", run)
 
-    # Verify the step event in the backend carries compaction metadata
-    state = backend._run_state.get("r-cc-meta")
-    assert state is not None
-    recent = state["recent"]
-    assert len(recent) >= 1
-    llm_step = recent[-1]
-    assert llm_step.get("node_type") == "llm"
-    comp = llm_step.get("compaction")
-    assert comp is not None, "compaction metadata missing from step event"
+    llm = [o for o in observed if o.node_type == "llm"]
+    assert llm, "no llm observation reached the governor"
+    comp = llm[-1].compaction
+    assert comp is not None, "compaction metadata missing from the observation"
     assert any(
         action.policy_id == "context_compaction" and action.compact for action in controls.event_log
     )
@@ -443,79 +442,3 @@ def test_it_output_runaway_retries_then_succeeds():
     resp = _with_scope(gov, attr, "r-or", run)
     assert resp.content == "unique clean answer"
     assert len(scripted.calls) == 3
-
-
-@pytest.mark.skip(
-    reason="trajectory_hint disabled during remote-only control-plane work; "
-    "see config.build_governor"
-)
-def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
-    """trajectory_hint is opt-in + store-backed; seed index then wrap_complete."""
-    from tokenops.control.models import RunRecord
-    from tokenops.control.policies.trajectory_hint import build as build_hint
-    from tokenops.control.store import Store
-    from tokenops.control.trajectory.scope import (
-        input_hash,
-        input_simhash,
-        scope_key,
-        simhash_as_sqlite,
-    )
-
-    store = Store(str(tmp_path / "hint.db"))
-    task = "why shared run budgets matter for multi-agent systems please explain"
-    reg = store.register_run(
-        RunRegistration(trace_id="r-th", intent="policy_it", user_dims={"user_id": "alice"}),
-    )
-    # Detector reads task text from the store run record (not the LLM messages).
-    store.create_run(
-        RunRecord(
-            trace_id="r-th",
-            agent="research",
-            status="running",
-            task=task,
-            started_at=time.time(),
-        ),
-    )
-    sk = scope_key(reg, "research", ["intent", "agent"])
-    store._insert_trajectory_index(
-        scope_key=sk,
-        input_hash=input_hash(task),
-        input_simhash=simhash_as_sqlite(input_simhash(task)),
-        input_preview=task[:80],
-        source_trace_id="prior",
-        step_summary="1. search 2. write brief answer",
-        tool_sequence='["search"]',
-        cost_micros=100,
-        step_count=5,
-        quality_score=1.0,
-    )
-
-    controls = ApplyControls()
-    gov = Governor(Ledger(price=toy_price, store=store), controls)
-    gov.register(
-        *build_hint(
-            store,
-            enabled=True,
-            scope_dims=["intent", "agent"],
-            min_index_steps=1,
-            min_input_chars=10,
-        )
-    )
-    attr = _build_attribution(reg, service="research")
-    gov.ledger.open_run("r-th")
-    dispatch, calls = _dispatch()
-    governed = _governed(gov, attr, dispatch, trace_id="r-th")
-
-    def run():
-        governed("openai", "gpt-4o-mini", [{"role": "user", "content": task}])
-
-    try:
-        with run_scope(reg, SpanContext(span_id="s1", service="research")):
-            with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
-                run()
-    finally:
-        store.close()
-
-    assert len(calls) == 1
-    assert any(a.kind is ActionKind.INJECT for a in controls.event_log)
-    assert any("search" in m.get("content", "").lower() for m in calls[0]["messages"])

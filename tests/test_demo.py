@@ -14,23 +14,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO = REPO_ROOT / "src" / "tokenops" / "demo.py"
 
 
 def test_demo_shows_the_governed_run_halting(tmp_path):
-    """It runs standalone, spends, and stops itself. No API keys, no server to run
-    yourself — it launches a real, throwaway control plane in-process (tokenops#118:
-    no embedded ledger to fall back to instead)."""
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
+    """It runs standalone, spends, and stops itself. No API keys and no server: governance
+    runs in process from an explicit config."""
     env = dict(os.environ)
-    # A user's shell has none of these. conftest sets SKIP_GOVERNANCE_SEED for the
-    # suite; the demo seeds its own budget/policy via the plane's HTTP API regardless.
+    # A user's shell has no control plane configured.
     env.pop("CONTROL_PLANE_URL", None)
-    env.pop("TOKENOPS_URL", None)
-    env.pop("TOKENOPS_SKIP_GOVERNANCE_SEED", None)
     env.update(
         {
             # cp1252 is the default Windows console encoding; a non-ASCII byte in
@@ -58,7 +51,7 @@ def test_demo_uses_only_public_api():
     """Guard the snippet the README inlines: these imports are the contract."""
     source = DEMO.read_text(encoding="utf-8")
     for expected in (
-        "from tokenops import ControlPlaneClient, tokenops_run",
+        "from tokenops import tokenops_run",
         "from tokenops.control import Halt, wrap_complete",
         "from tokenops.providers.types import ModelResponse",
     ):

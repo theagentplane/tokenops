@@ -6,21 +6,7 @@ from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage
 from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.triad.messages import research_request, write_request
-from tokenops.control.client import ControlPlaneClient
 from tokenops.control.models import GovernanceMode
-
-
-def _register(
-    *,
-    intent: str = "",
-    user_dims: dict[str, str] | None = None,
-    mode: GovernanceMode | str | None = None,
-) -> dict:
-    return ControlPlaneClient.from_env().register_run(
-        intent=intent,
-        user_dims=user_dims or {},
-        mode=mode,
-    )
 
 
 def _parse_result(data: dict) -> RunResult:

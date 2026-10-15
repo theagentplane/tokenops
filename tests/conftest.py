@@ -102,122 +102,18 @@ class CollectingControls:
 
 
 # --------------------------------------------------------------------------- #
-# LedgerBackend fixtures (remote-only rewrite)                                 #
+# Control plane fixtures                                                       #
 # --------------------------------------------------------------------------- #
-
-import gc
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture
-def fake_backend():
-    """In-memory FakeLedgerBackend — the unit-test backend."""
-    from fakes import FakeLedgerBackend
+def fake_plane():
+    """An in-memory control plane 1.0 (``tests/fake_plane.py``), verified by tests/contract."""
+    from fake_plane import FakePlane
 
-    return FakeLedgerBackend()
-
-
-@pytest.fixture
-def plane_app_factory():
-    """Build a real control_plane.app over a throwaway SQLite file.
-
-    Skips the whole test when ``agentplane-control-plane`` (>= 0.2.0) is not installed
-    — it is not a hard dev dep (not on PyPI yet); ``pip install -e ".[contract]" --group dev``
-    to run these. Yields a callable; every app it makes is torn down (connections
-    closed before the temp dir is removed — open SQLite handles block unlink on Windows).
-    """
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
-    made: list[tuple] = []
-
-    def _make(**settings_kw):
-        from control_plane.app import create_app
-        from control_plane.envelope_store import EnvelopeStore
-        from control_plane.settings import Settings
-        from control_plane.store import SqliteStore
-
-        td = tempfile.mkdtemp()
-        db = str(Path(td) / "cp.db")
-        store = SqliteStore(db, auto_seed=False)
-        env = EnvelopeStore(db)
-        app = create_app(store=store, envelopes=env, settings=Settings(db_path=db, **settings_kw))
-        made.append((store, env, td))
-        return app
-
-    yield _make
-
-    for store, env, td in made:
-        store.close()
-        env.close()
-        gc.collect()
-        shutil.rmtree(td, ignore_errors=True)
-
-
-def _asgi_backend(app):
-    """HttpLedgerBackend over an in-process control_plane.app.
-
-    ``httpx.ASGITransport`` is async-only, so we drive the app through FastAPI's
-    ``TestClient`` (a sync ``httpx.Client`` subclass backed by a portal).
-    """
-    from fastapi.testclient import TestClient
-
-    from tokenops.control.ledger_backend import HttpLedgerBackend
-
-    client = TestClient(app)
-    return HttpLedgerBackend("http://testserver", client=client), client
-
-
-@pytest.fixture
-def http_backend(plane_app_factory):
-    backend, client = _asgi_backend(plane_app_factory())
-    try:
-        yield backend
-    finally:
-        client.close()
-
-
-@pytest.fixture
-def live_plane_url(monkeypatch):
-    """A real control plane on a real localhost TCP port, with ``CONTROL_PLANE_URL``
-    pointed at it — for tests that must exercise ``ControlPlaneClient.from_env()``
-    itself (no ``store=``/injected-client escape hatch reaches ``from_env()`` by
-    design — tokenops#118: no env var may select a local ledger). An in-process ASGI
-    app (``plane_app_factory``/``http_backend``) isn't reachable this way since
-    ``from_env()`` builds its own plain ``httpx.Client(base_url=...)``.
-    """
-    pytest.importorskip("control_plane", reason="install agentplane-control-plane>=0.2.0")
-    from tokenops.control.dev_plane import launch
-
-    db = str(Path(tempfile.mkdtemp()) / "cp.db")
-    plane = launch(db)
-    monkeypatch.setenv("CONTROL_PLANE_URL", plane.url)
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.delenv("TOKENOPS_CONTROL_PLANE_URL", raising=False)
-    yield plane.url
-    plane.stop()
-
-
-@pytest.fixture(params=["fake", "http"])
-def any_backend(request):
-    """Parametrised over both backends — for the verified-fake contract suite.
-
-    The ``fake`` param always runs; the ``http`` param resolves ``plane_app_factory``
-    lazily, so it skips (not errors) when the real plane is not installed.
-    """
-    if request.param == "fake":
-        from fakes import FakeLedgerBackend
-
-        yield FakeLedgerBackend()
-        return
-    factory = request.getfixturevalue("plane_app_factory")
-    backend, client = _asgi_backend(factory())
-    try:
-        yield backend
-    finally:
-        client.close()
+    return FakePlane()
 
 
 @pytest.fixture

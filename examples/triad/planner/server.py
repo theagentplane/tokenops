@@ -12,7 +12,6 @@ Seams (Wave 1–2 happy path):
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Mapping
 
 from examples.a2a.messages import bench_corpus_profile
@@ -28,15 +27,11 @@ from tokenops.control import (
     ActionKind,
     Halt,
     governance_events_payload,
-    halt_detector_from_events,
-    mount_run_registration,
-    should_mount_run_registration,
     with_governance_errors,
     wrap_complete,
 )
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.models import RunRecord
 from tokenops.providers import complete
 
 AGENT = "planner"
@@ -59,17 +54,6 @@ def build_app():
 
             goal = str(payload.get("task", ""))
             corpus_profile = bench_corpus_profile(payload)
-
-            client.create_run(
-                RunRecord(
-                    trace_id=trace_id,
-                    agent=AGENT,
-                    status="running",
-                    task=goal,
-                    started_at=time.time(),
-                    dims=dict(attr.tags),
-                )
-            )
 
             steps: list[StepEvent] = []
             token_usage = TokenUsage()
@@ -111,7 +95,7 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{trace_id}",
+                    f"trace:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
@@ -142,7 +126,7 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{trace_id}",
+                    f"trace:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
@@ -168,18 +152,7 @@ def build_app():
             except Throttled as thr:
                 status, halt_reason = "throttled", thr.action.reason
             finally:
-                gov_events = governance_events_payload(controls)
-                detector = halt_detector_from_events(gov_events) if status == "halted" else None
-                client.update_run(
-                    trace_id,
-                    status=status,
-                    halt_reason=halt_reason,
-                    detector=detector,
-                    cost_micros=governor.ledger.cost_micros(trace_id),
-                    steps=governor.ledger.step_count(trace_id),
-                    ended_at=time.time(),
-                    governance_events=gov_events,
-                )
+                pass
 
             response = plan_response(
                 questions=questions,
@@ -206,8 +179,6 @@ def build_app():
         skills=["plan"],
         handler=with_governance_errors(handler),
     )
-    if should_mount_run_registration():
-        mount_run_registration(app, client.require_store())
     instrument_app(
         app,
         service=AGENT,

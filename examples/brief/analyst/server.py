@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Mapping
 
 from examples.a2a.messages import bench_corpus_profile
@@ -20,7 +19,6 @@ from tokenops.control import (
     wrap_complete,
 )
 from tokenops.control.engine import Throttled
-from tokenops.control.models import RunRecord
 
 AGENT = "analyst"
 
@@ -42,18 +40,6 @@ def build_app():
             angles = parse_angles(payload.get("angles", []))
             parse_sections(payload.get("sections", []))
             corpus_profile = bench_corpus_profile(payload)
-            parent_span = payload.get("parent_run")
-
-            client.create_run(
-                RunRecord(
-                    trace_id=trace_id,
-                    agent=AGENT,
-                    status="running",
-                    parent_span=parent_span,
-                    task=topic,
-                    started_at=time.time(),
-                )
-            )
 
             steps: list[StepEvent] = []
             token_usage = TokenUsage()
@@ -89,14 +75,7 @@ def build_app():
             except Throttled as thr:
                 status, halt_reason = "throttled", thr.action.reason
             finally:
-                client.update_run(
-                    trace_id,
-                    status=status,
-                    halt_reason=halt_reason,
-                    cost_micros=governor.ledger.cost_micros(trace_id),
-                    steps=governor.ledger.step_count(trace_id),
-                    ended_at=time.time(),
-                )
+                pass
 
             response = analyze_response(
                 findings,

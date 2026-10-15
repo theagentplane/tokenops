@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from chronicle import Input, boundary
+from chronicle import boundary
 
 from examples.agents.research.tools import core
 from examples.agents.types import CorpusProfile, StepCallback, StepEvent
@@ -18,9 +18,7 @@ def make_search_tool(
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda query: Input(
-            arguments={"name": "search", "args": {"query": query}}, messages=[]
-        ),
+        extract_input=lambda query: {"name": "search", "args": {"query": query}},
     )
     def invoke(query: str) -> core.SearchResult:
         result = core.search(query, profile)
@@ -49,9 +47,7 @@ def make_fetch_tool(
     @boundary(
         "fetch",
         kind="tool",
-        extract_input=lambda query: Input(
-            arguments={"name": "fetch", "args": {"query": query}}, messages=[]
-        ),
+        extract_input=lambda query: {"name": "fetch", "args": {"query": query}},
     )
     def invoke(query: str) -> core.SearchResult:
         result = core.search(query, profile)

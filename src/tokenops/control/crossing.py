@@ -94,7 +94,7 @@ def on_enter(info: CallInfo) -> dict[str, Any] | None:
     )
     governor.pre_call(request)
 
-    seg = f"run:{gov_ctx.attr.trace_id}"
+    seg = f"trace:{gov_ctx.attr.trace_id}"
     governor.ledger.admit(seg)
     _inflight_seg.set(seg)
 

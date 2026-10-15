@@ -46,7 +46,7 @@ governance:
   budgets:
     - id: run_llm_cap
       limit_micros: 2000000          # $2.00 per run; null/omitted -> unlimited accumulator
-      dimension: run
+      dimension: trace
   policies:
     cost_budget:
       budget: run_llm_cap

@@ -6,7 +6,7 @@ from conftest import FakeView, make_attr, make_step
 from tokenops.control import ActionKind, Budget
 from tokenops.control.policies import cost_guard
 
-CAP = Budget(budget_id="run_llm_cap", limit_micros=100_000, dimension="run")
+CAP = Budget(budget_id="run_llm_cap", limit_micros=100_000, dimension="trace")
 
 
 def test_edge_trigger_fires_once():

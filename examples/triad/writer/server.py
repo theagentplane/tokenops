@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Mapping
 
 from examples.a2a.messages import parse_findings
@@ -19,7 +18,6 @@ from tokenops.control import (
     wrap_complete,
 )
 from tokenops.control.engine import Throttled
-from tokenops.control.models import RunRecord
 from tokenops.providers import complete
 
 AGENT = "writer"
@@ -42,18 +40,6 @@ def build_app():
             findings = parse_findings(payload.get("findings", []))
             outline = parse_outline(payload.get("outline", []))
             questions = parse_questions(payload.get("questions", []))
-            parent_span = payload.get("parent_run")
-
-            client.create_run(
-                RunRecord(
-                    trace_id=trace_id,
-                    agent=AGENT,
-                    status="running",
-                    parent_span=parent_span,
-                    task=task,
-                    started_at=time.time(),
-                )
-            )
 
             steps: list[StepEvent] = []
             token_usage = TokenUsage()
@@ -89,14 +75,7 @@ def build_app():
             except Throttled as thr:
                 status, halt_reason = "throttled", thr.action.reason
             finally:
-                client.update_run(
-                    trace_id,
-                    status=status,
-                    halt_reason=halt_reason,
-                    cost_micros=governor.ledger.cost_micros(trace_id),
-                    steps=governor.ledger.step_count(trace_id),
-                    ended_at=time.time(),
-                )
+                pass
 
             response = write_response(
                 answer,

@@ -7,10 +7,9 @@ import pytest
 from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.ledger import LIFETIME, RUN_TOTAL_BUDGET, segment_key_for
-from tokenops.control.models import PolicyInstance, RunRegistration
+from tokenops.control.ledger import LIFETIME, TRACE_TOTAL_BUDGET, segment_key_for
+from tokenops.control.models import RunRegistration
 from tokenops.control.pricing import build_price_book
-from tokenops.control.store import Store
 
 
 def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
@@ -23,29 +22,15 @@ def _fake_complete(provider, model, messages, max_output_tokens=None, **kwargs):
     )
 
 
-@pytest.fixture
-def store(tmp_path):
-    s = Store(str(tmp_path / "e2e.db"))
-    s.upsert_policy_instance(
-        PolicyInstance(
-            id="pi_step",
-            template="step_cap",
-            params={"max_steps": 3},
-            agent="research",
-        )
-    )
-    yield s
-    s.close()
+CONFIG = {"governance": {"budgets": [], "policies": {"step_cap": {"max_steps": 3}}}}
 
 
-def test_attribution_ledger_and_policy_e2e_in_process(store):
-    """Register → govern complete loop → assert attribution on ledger, spend, and HALT."""
-    reg = store.register_run(
-        RunRegistration(
-            trace_id="e2e-run-1",
-            intent="f500_frontier",
-            user_dims={"Country": "US", "IsFortune500": "true", "user_id": "alice"},
-        )
+def test_attribution_ledger_and_policy_e2e_in_process():
+    """Attribute → govern complete loop → assert attribution on ledger, spend, and HALT."""
+    reg = RunRegistration(
+        trace_id="e2e-run-1",
+        intent="f500_frontier",
+        user_dims={"Country": "US", "IsFortune500": "true", "user_id": "alice"},
     )
     attr = _build_attribution(reg, service="research")
 
@@ -56,11 +41,10 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     assert attr.tags["Country"] == "US"
     assert segment_key_for(attr, "tag", "intent") == "tag:intent=f500_frontier"
     assert segment_key_for(attr, "tag", "Country") == "tag:Country=US"
-    assert segment_key_for(attr, "run") == "run:e2e-run-1"
+    assert segment_key_for(attr, "trace") == "trace:e2e-run-1"
     assert segment_key_for(attr, "agent") == "agent:research"
 
-    cfg = store.governance_config_for("research")
-    gov = build_governor(cfg, build_price_book(), ApplyControls())
+    gov = build_governor(CONFIG, build_price_book(), ApplyControls())
     gov.ledger.open_run("e2e-run-1")
 
     governed = wrap_complete(
@@ -88,8 +72,8 @@ def test_attribution_ledger_and_policy_e2e_in_process(store):
     cost = gov.ledger.cost_micros("e2e-run-1")
     assert cost > 0
 
-    run_key = "run:e2e-run-1"
-    assert gov.ledger._spent[(RUN_TOTAL_BUDGET.budget_id, run_key, LIFETIME)] == cost
+    run_key = "trace:e2e-run-1"
+    assert gov.ledger._spent[(TRACE_TOTAL_BUDGET.budget_id, run_key, LIFETIME)] == cost
 
     window = gov.ledger.window("e2e-run-1")
     assert len(window) >= 3

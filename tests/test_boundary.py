@@ -10,14 +10,6 @@ from tokenops.control import ApplyControls, build_governor, install_crossing_hoo
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.models import RunRegistration
-from tokenops.control.store import Store
-
-
-@pytest.fixture
-def store(tmp_path):
-    s = Store(str(tmp_path / "attr.db"))
-    yield s
-    s.close()
 
 
 @pytest.fixture(autouse=True)
@@ -25,12 +17,12 @@ def _crossing_hook():
     install_crossing_hook()
 
 
-def test_boundary_emits_observation_when_governed(store):
+def test_boundary_emits_observation_when_governed():
     clear()
-    reg = store.register_run(RunRegistration(trace_id="r1", intent="demo"))
+    reg = RunRegistration(trace_id="r1", intent="demo")
     config = {
         "governance": {
-            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "run"}],
+            "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
             "policies": {"step_cap": {"max_steps": 100}},
         }
     }

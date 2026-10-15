@@ -8,7 +8,7 @@ from conftest import FakeView, make_attr, make_step, toy_price
 from tokenops.control import ActionKind, Budget, Governor, Halt, Ledger, Observation, Usage
 from tokenops.control.policies import cost_budget
 
-CAP = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="run")
+CAP = Budget(budget_id="run_llm_cap", limit_micros=20_000, dimension="trace")
 
 
 # ---- unit: detector + policy in isolation (FakeView) --------------------- #

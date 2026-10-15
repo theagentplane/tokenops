@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import time
 from collections.abc import Mapping
 
 from examples.a2a.client import delegate_summarize
@@ -17,17 +16,12 @@ from tokenops.control import (
     ActionKind,
     Halt,
     governance_events_payload,
-    halt_detector_from_events,
-    mount_run_registration,
-    should_mount_run_registration,
     with_governance_errors,
     wrap_complete,
     wrap_stream,
 )
 from tokenops.control.engine import Throttled
 from tokenops.control.ledger import LIFETIME
-from tokenops.control.models import RunRecord
-from tokenops.control.trajectory import enqueue_completed_run, schedule_trajectory_drain
 from tokenops.providers import complete, stream_complete
 
 AGENT = "research"
@@ -46,21 +40,9 @@ def build_app():
             attr = bound.attr
             governor = bound.governor
             controls = bound.controls
-            store = bound.store
 
             task = str(payload.get("task", ""))
             corpus_profile = bench_corpus_profile(payload)
-
-            client.create_run(
-                RunRecord(
-                    trace_id=trace_id,
-                    agent=AGENT,
-                    status="running",
-                    task=task,
-                    started_at=time.time(),
-                    dims=dict(attr.tags),
-                )
-            )
 
             steps: list[StepEvent] = []
             token_usage = TokenUsage()
@@ -109,7 +91,7 @@ def build_app():
                 )
                 remaining = governor.ledger.budget_left(
                     "run_llm_cap",
-                    f"run:{trace_id}",
+                    f"trace:{trace_id}",
                     LIFETIME,
                 )
                 if "run_llm_cap" in governor.ledger._budget_by_id and remaining <= 0:
@@ -134,39 +116,7 @@ def build_app():
             except Throttled as thr:
                 status, halt_reason = "throttled", thr.action.reason
             finally:
-                gov_events = governance_events_payload(controls)
-                detector = halt_detector_from_events(gov_events) if status == "halted" else None
-                client.update_run(
-                    trace_id,
-                    status=status,
-                    halt_reason=halt_reason,
-                    detector=detector,
-                    cost_micros=governor.ledger.cost_micros(trace_id),
-                    steps=governor.ledger.step_count(trace_id),
-                    ended_at=time.time(),
-                    governance_events=gov_events,
-                )
-                rec = store.get_run(trace_id)
-                if rec is not None:
-                    gov_cfg = store.governance_config_for(AGENT).get("governance", {})
-                    # trajectory_hint is temporarily disabled (see config.build_governor);
-                    # hint_params stays None and the index enqueue below is a no-op until
-                    # it is re-enabled.
-                    hint_params = (gov_cfg.get("policies") or {}).get("trajectory_hint")
-                    if enqueue_completed_run(
-                        store,
-                        rec=rec,
-                        registration=reg,
-                        agent=AGENT,
-                        window=governor.ledger.window(trace_id),
-                        policy_params=hint_params,
-                    ):
-                        p = dict(hint_params or {})
-                        schedule_trajectory_drain(
-                            store,
-                            max_age_days=int(p.get("max_age_days", 30)),
-                            max_entries_per_scope=int(p.get("max_entries_per_scope", 500)),
-                        )
+                pass
 
             result = RunResult(
                 findings=findings, summary=summary, steps=steps, token_usage=token_usage
@@ -187,8 +137,6 @@ def build_app():
         skills=["research"],
         handler=with_governance_errors(handler),
     )
-    if should_mount_run_registration():
-        mount_run_registration(app, client.require_store())
     instrument_app(
         app,
         service=AGENT,

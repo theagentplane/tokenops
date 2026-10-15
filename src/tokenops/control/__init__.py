@@ -8,13 +8,7 @@ glossary at ``docs/product/policies-index.md`` and behavior docs at ``docs/polic
 ``core.py`` is the canonical runtime vocabulary.
 """
 
-from tokenops.control.attribution import (
-    begin_downstream_run,
-    begin_entry_run,
-    begin_entry_task_run,
-    merge_registration_dims,
-    require_registration,
-)
+from tokenops.control.attribution import merge_registration_dims, require_registration
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
@@ -56,26 +50,18 @@ from tokenops.control.integration import (
     wrap_stream,
 )
 from tokenops.control.ledger import Budget, Ledger, LocalRunState, segment_key
-from tokenops.control.ledger_backend import (
-    AggregateState,
+from tokenops.repositories import (
     ApplyResult,
-    HttpLedgerBackend,
-    LedgerBackend,
+    ControlPlaneClient,
     LedgerEvent,
     PrecheckRequest,
+    PrecheckResult,
 )
 
 # Process-wide: register the governor hook on chronicle.default_hooks (inherited by every session).
 install_crossing_hook()
 
-from tokenops.control.client import ControlPlaneClient, should_mount_run_registration
-from tokenops.control.governance_cache import clear_governance_config_cache
-from tokenops.control.http import (
-    mount_run_registration,
-    post_run,
-    post_run_sync,
-    with_governance_errors,
-)
+from tokenops.control.http import with_governance_errors
 from tokenops.control.instrument import instrument_app
 from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
 from tokenops.control.request_context import (
@@ -106,12 +92,11 @@ __all__ = [
     "Ledger",
     "LocalRunState",
     "segment_key",
-    # ledger backend (remote-only)
-    "LedgerBackend",
-    "HttpLedgerBackend",
+    # control plane client types
+    "ControlPlaneClient",
     "LedgerEvent",
     "PrecheckRequest",
-    "AggregateState",
+    "PrecheckResult",
     "ApplyResult",
     # harness
     "Governor",
@@ -137,9 +122,6 @@ __all__ = [
     "GovernanceMode",
     "parse_governance_mode",
     "merge_registration_dims",
-    "begin_entry_run",
-    "begin_downstream_run",
-    "begin_entry_task_run",
     "require_registration",
     "tokenops_run",
     "agentplane_run_scope",
@@ -156,13 +138,6 @@ __all__ = [
     # Chronicle crossing hook
     "install_crossing_hook",
     "on_crossing",
-    # HTTP (A2A mount + clients)
-    "mount_run_registration",
+    # HTTP
     "with_governance_errors",
-    "post_run",
-    "post_run_sync",
-    "ControlPlaneClient",
-    "should_mount_run_registration",
-    "clear_governance_config_cache",
-    # HTTP propagation (auto trace_id / parent span)
 ]

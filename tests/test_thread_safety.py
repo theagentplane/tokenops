@@ -1,4 +1,4 @@
-"""Thread-safety (§15) — concurrent Ledger / Store / governance cache."""
+"""Thread-safety: concurrent Ledger and control-plane client use."""
 
 from __future__ import annotations
 
@@ -6,24 +6,9 @@ import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 from conftest import make_attr, toy_price
 from tokenops.control.core import Observation, Usage
-from tokenops.control.governance_cache import (
-    clear_governance_config_cache,
-    governance_config_cache_size,
-)
 from tokenops.control.ledger import Ledger
-from tokenops.control.models import PolicyInstance
-from tokenops.control.store import Store
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    clear_governance_config_cache()
-    yield
-    clear_governance_config_cache()
 
 
 def _llm_obs(trace_id: str, ts: float, *, input_tokens: int = 100) -> Observation:
@@ -65,33 +50,29 @@ def test_concurrent_record_two_trace_ids_no_lost_updates():
     assert len(ledger.window("run-b")) == n
 
 
-def test_concurrent_store_backed_spend_two_trace_ids(tmp_path):
-    store = Store(str(tmp_path / "ledger.db"), auto_seed=False)
-    try:
-        # Two Ledgers / "Governors" sharing one Store (same process).
-        la = Ledger(price=toy_price, store=store)
-        lb = Ledger(price=toy_price, store=store)
-        la.open_run("run-a")
-        lb.open_run("run-b")
-        n = 40
-        per_call = 1000
+def test_concurrent_plane_backed_spend_two_trace_ids(fake_plane):
+    # Two Ledgers / "Governors" sharing one control plane (same process).
+    la = Ledger(price=toy_price, backend=fake_plane.client())
+    lb = Ledger(price=toy_price, backend=fake_plane.client())
+    la.open_run("run-a")
+    lb.open_run("run-b")
+    n = 40
+    per_call = 1000
 
-        def worker(ledger: Ledger, trace_id: str) -> None:
-            for i in range(n):
-                ledger.record(_llm_obs(trace_id, float(i)))
+    def worker(ledger: Ledger, trace_id: str) -> None:
+        for i in range(n):
+            ledger.record(_llm_obs(trace_id, float(i)))
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            fa = pool.submit(worker, la, "run-a")
-            fb = pool.submit(worker, lb, "run-b")
-            fa.result()
-            fb.result()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        fa = pool.submit(worker, la, "run-a")
+        fb = pool.submit(worker, lb, "run-b")
+        fa.result()
+        fb.result()
 
-        assert store.ledger_get_spent("__run_total__", "run:run-a", "lifetime") == n * per_call
-        assert store.ledger_get_spent("__run_total__", "run:run-b", "lifetime") == n * per_call
-        assert la.cost_micros("run-a") == n * per_call
-        assert lb.cost_micros("run-b") == n * per_call
-    finally:
-        store.close()
+    assert fake_plane.spent["__trace_total__|trace:run-a|lifetime"] == n * per_call
+    assert fake_plane.spent["__trace_total__|trace:run-b|lifetime"] == n * per_call
+    assert la.cost_micros("run-a") == n * per_call
+    assert lb.cost_micros("run-b") == n * per_call
 
 
 def test_halt_flag_not_torn_under_concurrent_mark_and_read():
@@ -131,51 +112,46 @@ def test_halt_flag_not_torn_under_concurrent_mark_and_read():
     assert ledger.runs["run-1"].halt_reason is not None
 
 
-def test_store_halt_not_torn_under_concurrent_access(tmp_path):
-    store = Store(str(tmp_path / "halt.db"), auto_seed=False)
-    try:
-        ledger = Ledger(price=toy_price, store=store)
-        ledger.open_run("run-1")
-        stop = threading.Event()
-        errors: list[BaseException] = []
+def test_plane_halt_not_torn_under_concurrent_access(fake_plane):
+    ledger = Ledger(price=toy_price, backend=fake_plane.client())
+    ledger.open_run("run-1")
+    stop = threading.Event()
+    errors: list[BaseException] = []
 
-        def marker() -> None:
-            try:
-                for i in range(100):
-                    ledger.mark_halted("run-1", f"r-{i}")
-            except BaseException as exc:  # noqa: BLE001
-                errors.append(exc)
+    def marker() -> None:
+        try:
+            for i in range(100):
+                ledger.mark_halted("run-1", f"r-{i}")
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
 
-        def reader() -> None:
-            try:
-                while not stop.is_set():
-                    assert isinstance(ledger.is_halted("run-1"), bool)
-                    assert isinstance(store.ledger_is_halted("run-1"), bool)
-            except BaseException as exc:  # noqa: BLE001
-                errors.append(exc)
+    def reader() -> None:
+        try:
+            while not stop.is_set():
+                assert isinstance(ledger.is_halted("run-1"), bool)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
 
-        threads = [threading.Thread(target=reader) for _ in range(3)]
-        for t in threads:
-            t.start()
-        m = threading.Thread(target=marker)
-        m.start()
-        m.join()
-        stop.set()
-        for t in threads:
-            t.join()
+    threads = [threading.Thread(target=reader) for _ in range(3)]
+    for t in threads:
+        t.start()
+    m = threading.Thread(target=marker)
+    m.start()
+    m.join()
+    stop.set()
+    for t in threads:
+        t.join()
 
-        assert not errors
-        assert ledger.is_halted("run-1") is True
-        assert store.ledger_is_halted("run-1") is True
-    finally:
-        store.close()
+    assert not errors
+    assert ledger.is_halted("run-1") is True
+    assert "run-1" in fake_plane.halts
 
 
-def test_governance_config_cache_concurrent_get_set_invalidate(tmp_path):
-    store = Store(str(tmp_path / "gov.db"), auto_seed=False)
-    store.upsert_policy_instance(
-        PolicyInstance(id="p1", template="step_cap", params={"max_steps": 3}, agent="planner"),
+def test_governance_pull_is_safe_under_concurrent_reads_and_cache_clears(fake_plane):
+    fake_plane.set_governance(
+        "planner", {"governance": {"budgets": [], "policies": {"step_cap": {"max_steps": 3}}}}
     )
+    client = fake_plane.client()
     errors: list[BaseException] = []
     barrier = threading.Barrier(8)
 
@@ -183,39 +159,27 @@ def test_governance_config_cache_concurrent_get_set_invalidate(tmp_path):
         try:
             barrier.wait()
             for _ in range(30):
-                cfg = store.governance_config_for("planner")
-                assert "step_cap" in cfg["governance"]["policies"]
-                assert cfg["governance"]["policies"]["step_cap"]["max_steps"] in (3, 7)
+                cfg = client.governance("planner").config
+                assert cfg["governance"]["policies"]["step_cap"]["max_steps"] == 3
         except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
 
-    def writer() -> None:
+    def clearer() -> None:
         try:
             barrier.wait()
-            for i in range(15):
-                store.upsert_policy_instance(
-                    PolicyInstance(
-                        id="p1",
-                        template="step_cap",
-                        params={"max_steps": 7 if i % 2 else 3},
-                        agent="planner",
-                    ),
-                )
-                clear_governance_config_cache(store_path=store.path)
+            for _ in range(15):
+                client.clear_governance_cache("planner")
         except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
 
     threads = [threading.Thread(target=reader) for _ in range(6)]
-    threads += [threading.Thread(target=writer) for _ in range(2)]
+    threads += [threading.Thread(target=clearer) for _ in range(2)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
 
     assert not errors
-    # Cache remains consistent (size is small; may be 0 after last invalidate).
-    assert governance_config_cache_size() >= 0
-    store.close()
 
 
 def test_asyncio_tasks_two_trace_ids_via_to_thread():

@@ -1,6 +1,8 @@
-"""Tests for tokenops_run, RequestContext, init / crossing hook (Wave 1–2 API)."""
+"""Tests for tokenops_run, RequestContext, init / crossing hook."""
 
 from __future__ import annotations
+
+import logging
 
 import pytest
 from chronicle import default_hooks
@@ -22,52 +24,42 @@ from tokenops.control.context import (
     current_registration,
 )
 from tokenops.control.crossing import TokenOpsHook, install_crossing_hook
-from tokenops.control.governance_cache import clear_governance_config_cache
 from tokenops.control.models import GovernanceMode
-from tokenops.control.store import Store
+from tokenops.repositories import ControlPlaneError, ControlPlaneUnavailable
+
+CONFIG = {
+    "governance": {
+        "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
+        "policies": {"step_cap": {"max_steps": 5}},
+    }
+}
 
 
-@pytest.fixture
-def store(tmp_path):
-    """Explicit test-injection Store — tokenops_run(store=store) / ControlPlaneClient
-    (store=store) — never reachable from ControlPlaneClient.from_env() (tokenops#118)."""
-    db = str(tmp_path / "wave1.db")
-    clear_governance_config_cache()
-    s = Store(db)
-    yield s
+@pytest.fixture(autouse=True)
+def _clean():
     clear()
     clear_request_context()
-    clear_governance_config_cache()
-    s.close()
+    yield
+    clear()
+    clear_request_context()
 
 
 def test_init_installs_crossing_hook():
     init()
-    assert any(isinstance(h, TokenOpsHook) for h in default_hooks)
-
-
-def test_from_env_installs_crossing_hook(live_plane_url):
-    # Force a fresh look: hook is already installed in-process; still must not raise.
-    client = ControlPlaneClient.from_env()
-    assert not client.embedded
-    assert client.url == live_plane_url
     install_crossing_hook()  # idempotent
+    assert sum(isinstance(h, TokenOpsHook) for h in default_hooks) == 1
 
 
-def test_from_env_raises_without_a_url(monkeypatch):
-    """tokenops#118: no embedded fallback — from_env() must fail closed."""
+def test_from_env_requires_a_url(monkeypatch):
     monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
-    monkeypatch.delenv("TOKENOPS_URL", raising=False)
-    monkeypatch.delenv("TOKENOPS_CONTROL_PLANE_URL", raising=False)
-    with pytest.raises(RuntimeError, match="CONTROL_PLANE_URL"):
+    with pytest.raises(ControlPlaneError, match="CONTROL_PLANE_URL"):
         ControlPlaneClient.from_env()
 
 
-def test_tokenops_run_registers_when_no_trace_id(store):
-    clear()
+def test_run_with_an_explicit_config_needs_no_control_plane(monkeypatch):
+    monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
     with tokenops_run(
-        store=store,
-        headers={},
+        config=CONFIG,
         payload={"task": "do stuff"},
         service="planner",
         intent="triad_plan",
@@ -78,7 +70,7 @@ def test_tokenops_run_registers_when_no_trace_id(store):
         assert bound.registration.mode is GovernanceMode.PREVIEW
         assert bound.registration.user_dims["tenant"] == "acme"
         assert bound.attr.agent == "planner"
-        assert bound.client is not None
+        assert bound.client is None
         assert current_registration() is bound.registration
         assert current_governance() is not None
         assert current_governance().attr.trace_id == bound.registration.trace_id
@@ -87,51 +79,66 @@ def test_tokenops_run_registers_when_no_trace_id(store):
     assert current_governance() is None
 
 
-def test_tokenops_run_without_user_passed_store(live_plane_url):
-    """§6 happy path: from_env's real remote client — no store= from the caller."""
-    clear()
-    with tokenops_run(
-        headers={},
-        payload={"task": "no store kwarg"},
-        service="planner",
-        intent="triad_plan",
-        mode="preview",
-    ) as bound:
-        assert bound.registration.intent == "triad_plan"
-        assert not bound.client.embedded
-        assert bound.client.url == live_plane_url
-        assert bound.store is bound.client.require_store()
-        assert bound.governor.ledger._backend is bound.client.backend
-        assert current_governance() is not None
-    clear()
-
-
-def test_tokenops_run_joins_the_inbound_trace(store):
-    clear()
-    client = ControlPlaneClient(store=store)
+def test_the_run_is_the_chronicle_trace(monkeypatch):
+    monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
     trace = "a" * 32
-    out = client.register_run(intent="shared", mode="enforce", trace_id=trace)
-    assert out["trace_id"] == trace
-
     with tokenops_run(
-        client=client,
+        config=CONFIG,
         headers={"traceparent": f"00-{trace}-{'b' * 16}-01"},
         payload={"task": "hop"},
         service="researcher",
     ) as bound:
         assert bound.registration.trace_id == trace
-        assert bound.registration.intent == "shared"
+        assert bound.attr.trace_id == trace
         assert bound.span.service == "researcher"
-        assert current_governance() is not None
-        assert client.resolve_run(trace).intent == "shared"
-    clear()
 
 
-def test_agent_intent_beats_empty_and_payload_intent(store):
-    """§1: agent kwargs win; payload intent is ignored on tokenops_run path."""
-    clear()
+def test_a_new_trace_is_started_without_an_inbound_traceparent():
+    with tokenops_run(config=CONFIG, service="planner") as bound:
+        assert len(bound.registration.trace_id) == 32
+
+
+def test_governance_is_pulled_from_the_plane_and_the_ledger_uses_it(fake_plane):
+    fake_plane.set_governance("planner", CONFIG)
+    client = fake_plane.client()
+    with tokenops_run(client=client, service="planner", payload={}) as bound:
+        assert bound.client is client
+        assert bound.governor.ledger._backend is client
+        assert "step_cap" in bound.governor._policy_by_name
+    assert any(r.url.path == "/v1/governance/planner" for r in fake_plane.requests)
+
+
+def test_a_stale_configuration_is_used_when_the_plane_goes_down(fake_plane, caplog):
+    fake_plane.set_governance("planner", CONFIG)
+    client = fake_plane.client()
+    with tokenops_run(client=client, service="planner"):
+        pass
+    fake_plane.down = True
+    with caplog.at_level(logging.WARNING, logger="tokenops.run"):
+        with tokenops_run(client=client, service="planner", open_ledger_run=False) as bound:
+            assert "step_cap" in bound.governor._policy_by_name
+    assert any("governance_stale" in r.message for r in caplog.records)
+
+
+def test_the_hop_does_not_run_when_the_plane_is_down_and_nothing_is_cached(fake_plane):
+    """Fail closed: no configuration means no governed run, never an ungoverned one."""
+    fake_plane.down = True
+    with pytest.raises(ControlPlaneUnavailable):
+        with tokenops_run(client=fake_plane.client(), service="planner"):
+            pytest.fail("the body must not run")
+
+
+def test_no_plane_and_no_config_fails_closed(monkeypatch):
+    monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
+    with pytest.raises(ControlPlaneError, match="CONTROL_PLANE_URL"):
+        with tokenops_run(service="planner"):
+            pytest.fail("the body must not run")
+
+
+def test_agent_intent_beats_empty_and_payload_intent():
+    """Agent kwargs win; payload intent is ignored on the tokenops_run path."""
     with tokenops_run(
-        store=store,
+        config=CONFIG,
         headers={},
         payload={
             "task": "only work",
@@ -149,12 +156,9 @@ def test_agent_intent_beats_empty_and_payload_intent(store):
         assert bound.registration.user_dims["tenant"] == "t1"
         assert bound.registration.user_dims["user_id"] == "alice"
         assert "spoof_intent_tag" not in bound.registration.user_dims
-    clear()
 
 
-def test_request_context_ambient(live_plane_url):
-    clear()
-    clear_request_context()
+def test_request_context_ambient():
     bind_request_context(
         RequestContext(
             headers={},
@@ -166,25 +170,21 @@ def test_request_context_ambient(live_plane_url):
             model="gpt-4o-mini",
         )
     )
-    try:
-        with tokenops_run() as bound:
-            assert bound.registration.intent == "from_instrument"
-            assert bound.registration.mode is GovernanceMode.PREVIEW
-            assert bound.registration.user_dims["user_id"] == "bob"
-            assert current_governance().provider == "openai"
-            assert current_governance().model == "gpt-4o-mini"
-    finally:
-        clear_request_context()
-        clear()
+    with tokenops_run(config=CONFIG) as bound:
+        assert bound.registration.intent == "from_instrument"
+        assert bound.registration.mode is GovernanceMode.PREVIEW
+        assert bound.registration.user_dims["user_id"] == "bob"
+        assert current_governance().provider == "openai"
+        assert current_governance().model == "gpt-4o-mini"
 
 
-def test_instrument_app_binds_context_and_hook(live_plane_url):
+def test_instrument_app_binds_context_and_hook():
     app = FastAPI()
     instrument_app(app, service="planner", intent="mw_intent", mode="enforce")
 
     @app.post("/v1/tasks")
     async def tasks():
-        with tokenops_run() as bound:
+        with tokenops_run(config=CONFIG) as bound:
             return {
                 "trace_id": bound.registration.trace_id,
                 "intent": bound.registration.intent,
