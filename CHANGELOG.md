@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The end-to-end test plane no longer serializes requests: control plane 1.0.1 takes the SQLite
+  write lock up front ([control-plane#28](https://github.com/theagentplane/control-plane/issues/28)),
+  so concurrent Chronicle delivery and ledger writes no longer fail with `database is locked`.
+
 ## [2.0.0] - 2026-10-15
 
 Removes what 1.1 deprecated. **No behaviour changed**; only import paths and alias names are

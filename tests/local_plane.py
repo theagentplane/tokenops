@@ -7,7 +7,6 @@ own ``PUT /v1/budgets`` and ``PUT /v1/policies`` routes.
 
 from __future__ import annotations
 
-import asyncio
 import gc
 import shutil
 import socket
@@ -23,27 +22,6 @@ import httpx
 
 API_KEY = "e2e-key"
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
-
-
-class _SerializeRequests:
-    """Handle one HTTP request at a time.
-
-    The plane's SQLite file cannot upgrade a read transaction to a write one under concurrent
-    writers (``database is locked``, answered as a ``500``). A TokenOps agent writes ledger
-    events while Chronicle delivers envelopes, so the test plane serializes requests. A
-    deployment uses a database that supports concurrent writers.
-    """
-
-    def __init__(self, app: Any) -> None:
-        self._app = app
-        self._lock = asyncio.Lock()
-
-    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
-        if scope["type"] != "http":
-            await self._app(scope, receive, send)
-            return
-        async with self._lock:
-            await self._app(scope, receive, send)
 
 
 class LocalPlane:
@@ -62,12 +40,7 @@ class LocalPlane:
         self._sock.bind(("127.0.0.1", 0))
         self.port: int = self._sock.getsockname()[1]
         self._server = uvicorn.Server(
-            uvicorn.Config(
-                _SerializeRequests(self._app),
-                log_level="warning",
-                lifespan="off",
-                access_log=False,
-            )
+            uvicorn.Config(self._app, log_level="warning", lifespan="off", access_log=False)
         )
         self._thread = threading.Thread(
             target=lambda: self._server.run(sockets=[self._sock]), daemon=True
