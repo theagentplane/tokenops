@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-15
+
 ### Fixed
 
 - **Governance silently off under `chronicle.instrument_httpx()`.** TokenOps' own control-plane
