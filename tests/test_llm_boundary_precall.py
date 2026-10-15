@@ -28,7 +28,7 @@ def _hooks():
 
 def test_llm_boundary_pre_call_halt(store):
     clear()
-    reg = store.register_run(RunRegistration(run_id="r-halt"))
+    reg = store.register_run(RunRegistration(trace_id="r-halt"))
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1, "dimension": "run"}],
@@ -60,7 +60,7 @@ def test_llm_boundary_pre_call_halt(store):
 
 def test_llm_boundary_mutate_max_output(store):
     clear()
-    reg = store.register_run(RunRegistration(run_id="r-mut"))
+    reg = store.register_run(RunRegistration(trace_id="r-mut"))
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 10_000_000, "dimension": "run"}],

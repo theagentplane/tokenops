@@ -6,7 +6,6 @@ from examples.a2a.messages import parse_findings, parse_steps, parse_token_usage
 from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.brief.messages import analyze_request, edit_request
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, RUN_ID_HEADER
 from tokenops.control.models import GovernanceMode
 
 
@@ -46,7 +45,7 @@ def submit_brief_sync_with_meta(
     user_dims: dict[str, str] | None = None,
     governance_mode: GovernanceMode = GovernanceMode.ENFORCE,
 ) -> tuple[RunResult, dict[str, object]]:
-    """POST the topic to Scout (entry). Scout registers the run when run_id is omitted."""
+    """POST the topic to Scout (entry). Scout registers the run when trace_id is omitted."""
     payload = task_request(task=topic, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
         payload["user_dims"] = user_dims
@@ -60,7 +59,7 @@ def submit_brief_sync_with_meta(
         "halt_reason": data.get("halt_reason"),
         "cost_micros": int(data.get("cost_micros", 0)),
         "governance_events": data.get("governance_events") or [],
-        "run_id": data.get("run_id"),
+        "trace_id": data.get("trace_id"),
         "angles": data.get("angles") or [],
         "sections": data.get("sections") or [],
     }
@@ -72,7 +71,7 @@ async def delegate_analyst(
     topic: str,
     angles: list[str],
     *,
-    run_id: str | None = None,
+    trace_id: str | None = None,
     sections: list[str] | None = None,
     corpus_profile: str = "healthy",
     parent_span_id: str | None = None,
@@ -84,10 +83,6 @@ async def delegate_analyst(
         bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
-    if run_id:
-        headers[RUN_ID_HEADER] = run_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(analyst_url, payload, headers=headers or None)
     return (
         parse_findings(data.get("findings", [])),
@@ -102,17 +97,13 @@ async def delegate_editor(
     topic: str,
     findings: list[Finding],
     *,
-    run_id: str | None = None,
+    trace_id: str | None = None,
     sections: list[str] | None = None,
     angles: list[str] | None = None,
     parent_span_id: str | None = None,
 ) -> tuple[str, TokenUsage, list[StepEvent], int]:
     payload = edit_request(topic, findings, sections=sections, angles=angles)
     headers: dict[str, str] = {}
-    if run_id:
-        headers[RUN_ID_HEADER] = run_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(editor_url, payload, headers=headers or None)
     brief = str(data.get("brief") or data.get("answer") or data.get("summary", ""))
     return (

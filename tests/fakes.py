@@ -77,7 +77,7 @@ class FakeLedgerBackend:
         self._guard()
         out = AggregateState(server_ts=time.time())
         if "halt" in req.want:
-            halted, reason = self._halt.get(req.run_id, (False, None))
+            halted, reason = self._halt.get(req.trace_id, (False, None))
             out.halted, out.halt_reason = halted, reason
         if "spent" in req.want:
             out.spent = {
@@ -89,7 +89,7 @@ class FakeLedgerBackend:
         if "inflight" in req.want:
             out.inflight = {s: self._inflight.get(s, 0) for s in req.segment_keys}
         if "window" in req.want:
-            st = self._run_state.get(req.run_id)
+            st = self._run_state.get(req.trace_id)
             out.window = (
                 {
                     "step_count": st["step_count"],
@@ -107,7 +107,7 @@ class FakeLedgerBackend:
             return ApplyResult()
         accepted = deduped = 0
         touched: set[tuple[str, str, str]] = set()
-        run_ids: set[str] = set()
+        trace_ids: set[str] = set()
         for ev in events:
             key = str(ev.get("idempotency_key") or "").strip()
             if not key:
@@ -115,8 +115,8 @@ class FakeLedgerBackend:
             if ev.get("kind") == "spent_add":
                 for t in ev.get("targets") or []:
                     touched.add((t["budget_id"], t["segment_key"], t.get("period", "lifetime")))
-            if ev.get("run_id"):
-                run_ids.add(str(ev["run_id"]))
+            if ev.get("trace_id"):
+                trace_ids.add(str(ev["trace_id"]))
             if key in self._seen:
                 deduped += 1
                 continue
@@ -124,12 +124,12 @@ class FakeLedgerBackend:
             self._seen.add(key)
             accepted += 1
         totals = {f"{b}|{s}|{p}": self._spent.get((b, s, p), 0) for (b, s, p) in touched}
-        halted = any(self._halt.get(r, (False, None))[0] for r in run_ids)
+        halted = any(self._halt.get(r, (False, None))[0] for r in trace_ids)
         return ApplyResult(accepted=accepted, deduped=deduped, totals=totals, halted=halted)
 
     def _apply_one(self, ev: LedgerEvent) -> None:
         kind = ev.get("kind")
-        run_id = str(ev.get("run_id") or "")
+        trace_id = str(ev.get("trace_id") or "")
         if kind == "spent_add":
             delta = int(ev.get("delta_micros", 0))
             for t in ev.get("targets") or []:
@@ -143,7 +143,7 @@ class FakeLedgerBackend:
             self._inflight[s] = max(0, self._inflight.get(s, 0) - 1)
         elif kind == "step":
             st = self._run_state.setdefault(
-                run_id, {"step_count": 0, "recent": [], "velocity_micros_per_step": 0.0}
+                trace_id, {"step_count": 0, "recent": [], "velocity_micros_per_step": 0.0}
             )
             st["recent"] = (
                 st["recent"]
@@ -177,11 +177,11 @@ class FakeLedgerBackend:
                 else 0.0
             )
         elif kind == "halt_mark":
-            self._halt[run_id] = (True, ev.get("reason") or None)
-            if run_id in self._records:
-                self._records[run_id]["status"] = "halted"
+            self._halt[trace_id] = (True, ev.get("reason") or None)
+            if trace_id in self._records:
+                self._records[trace_id]["status"] = "halted"
         elif kind == "halt_clear":
-            self._halt[run_id] = (False, None)
+            self._halt[trace_id] = (False, None)
         else:
             raise ValueError(f"unknown event kind {kind!r}")
 
@@ -191,37 +191,37 @@ class FakeLedgerBackend:
         intent: str = "",
         user_dims: dict[str, str] | None = None,
         mode: GovernanceMode | str | None = None,
-        run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> RunRegistration:
         self._guard()
-        rid = (run_id or "").strip() or f"run_{uuid.uuid4().hex[:8]}"
+        rid = (trace_id or "").strip() or f"run_{uuid.uuid4().hex[:8]}"
         if rid in self._regs:
             raise RunAlreadyRegisteredError(f"run {rid!r} is already registered")
         reg = RunRegistration(
-            run_id=rid,
+            trace_id=rid,
             intent=intent,
             user_dims={str(k): str(v) for k, v in (user_dims or {}).items()},
             mode=parse_governance_mode(mode) if mode not in (None, "") else GovernanceMode.ENFORCE,
         )
         self._regs[rid] = reg
         self._reg_at[rid] = time.time()
-        self._records[rid] = {"run_id": rid, "agent": intent or "agent", "status": "running"}
+        self._records[rid] = {"trace_id": rid, "agent": intent or "agent", "status": "running"}
         return reg
 
-    def resolve_run(self, run_id: str) -> RunRegistration:
+    def resolve_run(self, trace_id: str) -> RunRegistration:
         self._guard()
         try:
-            return self._regs[run_id]
+            return self._regs[trace_id]
         except KeyError:
-            raise RunNotRegisteredError(f"run {run_id!r} is not registered") from None
+            raise RunNotRegisteredError(f"run {trace_id!r} is not registered") from None
 
     def governance_config_for(self, agent: str) -> dict[str, Any]:
         self._guard()
         return self._governance
 
-    def patch_run_record(self, run_id: str, **fields: Any) -> None:
+    def patch_run_record(self, trace_id: str, **fields: Any) -> None:
         self._guard()
-        rec = self._records.setdefault(run_id, {"run_id": run_id})
+        rec = self._records.setdefault(trace_id, {"trace_id": trace_id})
         for k, v in fields.items():
             if k in ("steps", "cost_micros"):
                 continue

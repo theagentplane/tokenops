@@ -91,10 +91,12 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
     """Run A completes and is indexed; Run B's first governed LLM call receives the hint."""
     # ---- Run A: complete, index (sync drain — no daemon thread in tests) ----
     reg_a = store.register_run(
-        RunRegistration(run_id="run-a", intent="pricing_research", user_dims={"user_id": "alice"}),
+        RunRegistration(
+            trace_id="run-a", intent="pricing_research", user_dims={"user_id": "alice"}
+        ),
     )
     rec_a = RunRecord(
-        run_id="run-a",
+        trace_id="run-a",
         agent="research",
         status="completed",
         task=TASK,
@@ -117,12 +119,12 @@ def test_trajectory_hint_end_to_end_via_wrap_complete(store):
 
     # ---- Run B: cold start, same intent/agent, paraphrased task ----
     reg_b = store.register_run(
-        RunRegistration(run_id="run-b", intent="pricing_research", user_dims={"user_id": "bob"}),
+        RunRegistration(trace_id="run-b", intent="pricing_research", user_dims={"user_id": "bob"}),
     )
     attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
         RunRecord(
-            run_id="run-b",
+            trace_id="run-b",
             agent="research",
             status="running",
             task=PARAPHRASE,
@@ -163,13 +165,13 @@ def test_trajectory_hint_no_hint_on_cold_start(store):
     """First-ever run for a task gets no hint injected."""
     reg = store.register_run(
         RunRegistration(
-            run_id="run-cold", intent="pricing_research", user_dims={"user_id": "carol"}
+            trace_id="run-cold", intent="pricing_research", user_dims={"user_id": "carol"}
         ),
     )
     attr = _build_attribution(reg, service="research")
     store.create_run(
         RunRecord(
-            run_id="run-cold",
+            trace_id="run-cold",
             agent="research",
             status="running",
             task="brand new unique task about widget inventory",
@@ -203,10 +205,12 @@ def test_trajectory_hint_no_hint_on_cold_start(store):
 def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
     """Hint fires once at step 0; the second LLM call in the same run has no hint."""
     reg_a = store.register_run(
-        RunRegistration(run_id="run-a2", intent="pricing_research", user_dims={"user_id": "alice"}),
+        RunRegistration(
+            trace_id="run-a2", intent="pricing_research", user_dims={"user_id": "alice"}
+        ),
     )
     rec_a = RunRecord(
-        run_id="run-a2",
+        trace_id="run-a2",
         agent="research",
         status="completed",
         task=TASK,
@@ -227,12 +231,12 @@ def test_trajectory_hint_not_reinjected_on_second_llm_call(store):
     store.drain_trajectory_build_queue(max_age_days=30)
 
     reg_b = store.register_run(
-        RunRegistration(run_id="run-b2", intent="pricing_research", user_dims={"user_id": "bob"}),
+        RunRegistration(trace_id="run-b2", intent="pricing_research", user_dims={"user_id": "bob"}),
     )
     attr_b = _build_attribution(reg_b, service="research")
     store.create_run(
         RunRecord(
-            run_id="run-b2", agent="research", status="running", task=TASK, started_at=time.time()
+            trace_id="run-b2", agent="research", status="running", task=TASK, started_at=time.time()
         ),
     )
 

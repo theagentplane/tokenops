@@ -33,13 +33,13 @@ class TimeBudgetDetector(Detector):
         self._started: dict[str, float] = {}
 
     def observe(self, attr: Attribution, step: BoundaryStep, view: LedgerView) -> Signal | None:
-        start = self._started.setdefault(attr.run_id, step.ts)
+        start = self._started.setdefault(attr.trace_id, step.ts)
         elapsed = step.ts - start
         if elapsed >= self.max_seconds:
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"time budget exceeded: {elapsed:.1f}s >= {self.max_seconds}s",
                 evidence={"elapsed_s": elapsed, "max_seconds": self.max_seconds},
             )
@@ -50,7 +50,7 @@ class TimeBudgetPolicy(Policy):
     name = "time_budget"
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
-        return Action(kind=ActionKind.HALT, run_id=signal.run_id, reason=signal.reason)
+        return Action(kind=ActionKind.HALT, trace_id=signal.trace_id, reason=signal.reason)
 
 
 def build(max_seconds: float) -> tuple[Detector, Policy]:

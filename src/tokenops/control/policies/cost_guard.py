@@ -51,11 +51,11 @@ class CostGuardDetector(Detector):
         self.velocity_m = velocity_m
         self._fired: set[str] = set()
 
-    def reset(self, run_id: str) -> None:
-        self._fired.discard(run_id)
+    def reset(self, trace_id: str) -> None:
+        self._fired.discard(trace_id)
 
     def observe(self, attr: Attribution, step: BoundaryStep, view: LedgerView) -> Signal | None:
-        if attr.run_id in self._fired or self.budget.limit_micros is None:
+        if attr.trace_id in self._fired or self.budget.limit_micros is None:
             return None
         sk = segment_key(attr, self.budget)
         if sk is None:
@@ -64,17 +64,17 @@ class CostGuardDetector(Detector):
             self.budget.budget_id, sk, self.budget.period
         )
         ratio = spent / self.budget.limit_micros
-        vel = view.velocity(attr.run_id, self.velocity_m)
+        vel = view.velocity(attr.trace_id, self.velocity_m)
         tripped_ratio = ratio >= self.threshold
         tripped_vel = (
             self.velocity_micros_per_step is not None and vel >= self.velocity_micros_per_step
         )
         if tripped_ratio or tripped_vel:
-            self._fired.add(attr.run_id)  # edge-trigger: only once
+            self._fired.add(attr.trace_id)  # edge-trigger: only once
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"spend at {ratio:.0%} of budget (vel {vel:.0f}/step), minimizing",
                 evidence={"ratio": ratio, "velocity": vel},
             )
@@ -93,13 +93,13 @@ class CostGuardPolicy(Policy):
             # "downgrade" is a model swap — a MUTATE carrying downgrade_to, not its own kind.
             return Action(
                 kind=ActionKind.MUTATE,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=signal.reason,
                 downgrade_to=self.downgrade_to,
             )
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             inject_message="BUDGET PRESSURE: keep responses minimal and to the point; omit "
             "preamble and restatement until the task is complete.",

@@ -10,7 +10,7 @@ HintTier = Literal["sequence_only", "sequence_plus_pitfalls", "full"]
 
 @dataclass(frozen=True, kw_only=True)
 class TrajectoryHit:
-    source_run_id: str
+    source_trace_id: str
     step_count: int
     cost_micros: int
     tool_sequence: str
@@ -48,7 +48,7 @@ def format_hint(
     cost_usd = entry.cost_micros / 1_000_000
     header = (
         "[TokenOps trajectory hint — guidance only; verify current state.]\n\n"
-        f"Similar completed run ({entry.source_run_id}, {entry.step_count} steps, "
+        f"Similar completed run ({entry.source_trace_id}, {entry.step_count} steps, "
         f"${cost_usd:.2f}, {entry.match} match):\n"
     )
     footer = "\nUse as a starting playbook, not a final answer."

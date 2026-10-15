@@ -84,7 +84,7 @@ class RaiseControls:
         raise Halt(
             Action(
                 kind=ActionKind.HALT,
-                run_id=action.run_id,
+                trace_id=action.trace_id,
                 reason=f"{action.kind.value} unsupported by RaiseControls; failing closed",
                 policy_id=action.policy_id,
             )
@@ -302,14 +302,14 @@ class Governor:
     # ---- the three moments ------------------------------------------------ #
 
     def pre_call(self, request: CallRequest) -> None:
-        self._refuse_if_halted(request.attr.run_id)
+        self._refuse_if_halted(request.attr.trace_id)
         signals = [
             s for d in self._detectors if (s := d.pre_call(request, self.ledger)) is not None
         ]
         self._enforce(signals)
 
     def observe(self, obs: Observation):
-        self._refuse_if_halted(obs.attr.run_id)
+        self._refuse_if_halted(obs.attr.trace_id)
         step = self.ledger.record(obs)  # Attribute: price → spent → append → steps++
         signals = [
             s for d in self._detectors if (s := d.observe(obs.attr, step, self.ledger)) is not None
@@ -323,14 +323,14 @@ class Governor:
 
     # ---- internals -------------------------------------------------------- #
 
-    def _refuse_if_halted(self, run_id: str) -> None:
+    def _refuse_if_halted(self, trace_id: str) -> None:
         """The IN-edge kill switch: once halted, every later call is refused — even if the
         agent caught the first Halt and kept going."""
-        if self.ledger.is_halted(run_id):
+        if self.ledger.is_halted(trace_id):
             self.controls.apply(
                 Action(
                     kind=ActionKind.HALT,
-                    run_id=run_id,
+                    trace_id=trace_id,
                     reason="run already halted; refusing further calls",
                 )
             )
@@ -348,7 +348,7 @@ class Governor:
                 if action.kind is ActionKind.HALT and self.enforce:
                     # set the durable flag BEFORE applying, so the kill switch survives a
                     # swallowed raise. Idempotent — marking twice is harmless.
-                    self.ledger.mark_halted(action.run_id, action.reason)
+                    self.ledger.mark_halted(action.trace_id, action.reason)
                 self.controls.apply(action)  # may raise Halt and unwind the agent loop
         finally:
             reset_current_controls(tok)

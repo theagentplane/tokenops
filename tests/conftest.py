@@ -28,8 +28,8 @@ def toy_price(provider: str, model: str, usage: Usage) -> int:
     return usage.input * 10 + usage.output * 30
 
 
-def make_attr(run_id: str = "run-1", **kw) -> Attribution:
-    base = dict(user="alice", agent="research", run_id=run_id)
+def make_attr(trace_id: str = "run-1", **kw) -> Attribution:
+    base = dict(user="alice", agent="research", trace_id=trace_id)
     base.update(kw)
     return Attribution(**base)
 
@@ -60,13 +60,13 @@ class FakeView:
     _recent: list = field(default_factory=list)
     _window: list = field(default_factory=list)
 
-    def cost_micros(self, run_id):
+    def cost_micros(self, trace_id):
         return self._cost
 
-    def step_count(self, run_id):
+    def step_count(self, trace_id):
         return self._steps
 
-    def is_halted(self, run_id):
+    def is_halted(self, trace_id):
         return self._halted
 
     def budget_left(self, budget_id, segment_key, period="lifetime"):
@@ -75,13 +75,13 @@ class FakeView:
     def inflight(self, segment_key):
         return self._inflight
 
-    def velocity(self, run_id, m):
+    def velocity(self, trace_id, m):
         return self._velocity
 
-    def recent(self, run_id, n):
+    def recent(self, trace_id, n):
         return self._recent[-n:]
 
-    def window(self, run_id):
+    def window(self, trace_id):
         return self._window
 
 

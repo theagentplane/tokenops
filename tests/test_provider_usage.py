@@ -18,7 +18,9 @@ PRICE = build_price_book({"fixture": Rate(500000, 3000000, cached=50000)})
 
 
 def crossing(result, provider="openai"):
-    with run_scope(RunRegistration(run_id="offline-137"), SpanContext(span_id="s", service="test")):
+    with run_scope(
+        RunRegistration(trace_id="offline-137"), SpanContext(span_id="s", service="test")
+    ):
         return observation_from_crossing(
             boundary_id="test.chat",
             kind="llm",
@@ -91,7 +93,7 @@ def test_agent_step_normalizes_inclusive_fields():
         tokens=NS(input_tokens=1000, output_tokens=200, cached_tokens=800, reasoning_tokens=150),
     )
     u = step_to_observation(
-        step, Attribution(user="test", agent="test", run_id="offline"), ts=0
+        step, Attribution(user="test", agent="test", trace_id="offline"), ts=0
     ).usage
     assert u == Usage(input=200, output=50, cached=800, reasoning=150)
 
@@ -150,7 +152,7 @@ def test_context_trend_includes_cached_prompt_tokens():
     from tokenops.control.policies.context_compaction import ContextCompactionDetector
 
     request = CallRequest(
-        attr=Attribution(user="t", agent="t", run_id="t"),
+        attr=Attribution(user="t", agent="t", trace_id="t"),
         provider="fixture",
         model="fixture",
         estimated_input_tokens=6000,

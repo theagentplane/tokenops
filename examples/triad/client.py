@@ -7,7 +7,6 @@ from examples.a2a.server import post_task, post_task_sync
 from examples.agents.types import Finding, RunResult, StepEvent, TokenUsage
 from examples.triad.messages import research_request, write_request
 from tokenops.control.client import ControlPlaneClient
-from tokenops.control.context import PARENT_SPAN_ID_HEADER, RUN_ID_HEADER
 from tokenops.control.models import GovernanceMode
 
 
@@ -62,8 +61,8 @@ def submit_goal_sync_with_meta(
 ) -> tuple[RunResult, dict[str, object]]:
     """POST the goal to the Planner entry agent (UI path).
 
-    The Planner registers the run on the control plane when ``X-TokenOps-Run-Id``
-    is absent — clients should not call ``/v1/runs`` themselves for the triad UI.
+    The Planner registers the run on the control plane when no inbound ``traceparent`` joins one;
+    clients should not call ``/v1/runs`` themselves for the triad UI.
     """
     payload = task_request(task=goal, bench={"corpus_profile": corpus_profile}, intent=intent)
     if user_dims:
@@ -71,7 +70,7 @@ def submit_goal_sync_with_meta(
     payload["mode"] = (
         governance_mode.value if isinstance(governance_mode, GovernanceMode) else governance_mode
     )
-    # No run_id header — entry agent opens the run.
+    # No trace_id header — entry agent opens the run.
     data = post_task_sync(planner_url, payload, headers=None)
     result = _parse_result(data)
     meta: dict[str, object] = {
@@ -79,7 +78,7 @@ def submit_goal_sync_with_meta(
         "halt_reason": data.get("halt_reason"),
         "cost_micros": int(data.get("cost_micros", 0)),
         "governance_events": data.get("governance_events") or [],
-        "run_id": data.get("run_id"),
+        "trace_id": data.get("trace_id"),
         "questions": data.get("questions") or [],
         "outline": data.get("outline") or [],
     }
@@ -91,7 +90,7 @@ async def delegate_researcher(
     task: str,
     questions: list[str],
     *,
-    run_id: str | None = None,
+    trace_id: str | None = None,
     outline: list[str] | None = None,
     corpus_profile: str = "healthy",
     parent_span_id: str | None = None,
@@ -104,11 +103,7 @@ async def delegate_researcher(
         bench={"corpus_profile": corpus_profile},
     )
     headers: dict[str, str] = {}
-    if run_id:
-        headers[RUN_ID_HEADER] = run_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
-    # post_task merges ambient propagation (run_id + current span as parent).
+    # post_task merges ambient propagation (trace_id + current span as parent).
     data = await post_task(researcher_url, payload, headers=headers or None)
     return (
         parse_findings(data.get("findings", [])),
@@ -123,7 +118,7 @@ async def delegate_writer(
     task: str,
     findings: list[Finding],
     *,
-    run_id: str | None = None,
+    trace_id: str | None = None,
     outline: list[str] | None = None,
     questions: list[str] | None = None,
     parent_span_id: str | None = None,
@@ -131,10 +126,6 @@ async def delegate_writer(
     """Delegate to writer. Headers come from ambient context when omitted."""
     payload = write_request(task, findings, outline=outline, questions=questions)
     headers: dict[str, str] = {}
-    if run_id:
-        headers[RUN_ID_HEADER] = run_id
-    if parent_span_id:
-        headers[PARENT_SPAN_ID_HEADER] = parent_span_id
     data = await post_task(writer_url, payload, headers=headers or None)
     answer = str(data.get("answer") or data.get("summary", ""))
     return (

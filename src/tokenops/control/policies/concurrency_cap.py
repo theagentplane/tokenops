@@ -51,7 +51,7 @@ class ConcurrencyCapDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=request.attr.run_id,
+                trace_id=request.attr.trace_id,
                 reason=f"inflight {n} >= max_concurrent {self.max_concurrent} on {sk}",
                 evidence={"inflight": n, "max": self.max_concurrent, "segment": sk},
             )
@@ -72,13 +72,13 @@ class ConcurrencyCapPolicy(Policy):
         if self.mode == "queue":
             return Action(
                 kind=ActionKind.QUEUE,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=signal.reason,
                 retry_after_s=self.retry_after_s,
             )
         return Action(
             kind=ActionKind.REJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             retry_after_s=self.retry_after_s,
         )

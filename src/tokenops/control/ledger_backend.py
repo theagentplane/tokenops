@@ -46,7 +46,7 @@ class LedgerEvent(TypedDict, total=False):
     kind: str
     idempotency_key: str
     ts: float
-    run_id: str
+    trace_id: str
     # spent_add
     delta_micros: int
     targets: list[dict[str, Any]]  # [{budget_id, segment_key, period}]
@@ -72,7 +72,7 @@ class LedgerEvent(TypedDict, total=False):
 
 @dataclass(kw_only=True)
 class PrecheckRequest:
-    run_id: str
+    trace_id: str
     segment_keys: list[str] = field(default_factory=list)
     budgets: list[dict[str, str]] = field(
         default_factory=list
@@ -121,14 +121,14 @@ class LedgerBackend(Protocol):
         intent: str = "",
         user_dims: dict[str, str] | None = None,
         mode: GovernanceMode | str | None = None,
-        run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> RunRegistration: ...
 
-    def resolve_run(self, run_id: str) -> RunRegistration: ...
+    def resolve_run(self, trace_id: str) -> RunRegistration: ...
 
     def governance_config_for(self, agent: str) -> dict[str, Any]: ...
 
-    def patch_run_record(self, run_id: str, **fields: Any) -> None: ...
+    def patch_run_record(self, trace_id: str, **fields: Any) -> None: ...
 
     def close(self) -> None: ...
 
@@ -143,7 +143,7 @@ def _mode_value(mode: GovernanceMode | str | None) -> GovernanceMode:
 
 def _reg_from_body(body: dict[str, Any], *, fallback_intent: str = "") -> RunRegistration:
     return RunRegistration(
-        run_id=str(body["run_id"]),
+        trace_id=str(body["run_id"]),
         intent=str(body.get("intent") or fallback_intent),
         user_dims={str(k): str(v) for k, v in (body.get("user_dims") or {}).items()},
         mode=parse_governance_mode(body.get("mode")),
@@ -153,6 +153,13 @@ def _reg_from_body(body: dict[str, Any], *, fallback_intent: str = "") -> RunReg
 # --------------------------------------------------------------------------- #
 # HTTP implementation                                                         #
 # --------------------------------------------------------------------------- #
+
+
+def _to_wire_event(event: LedgerEvent) -> dict[str, Any]:
+    """Control-plane 0.2 names the trace key ``trace_id`` on the wire (removed with the 1.0 client)."""
+    wire: dict[str, Any] = dict(event)
+    wire["run_id"] = wire.pop("trace_id", "")
+    return wire
 
 
 class HttpLedgerBackend:
@@ -196,7 +203,7 @@ class HttpLedgerBackend:
             "POST",
             "/v1/ledger/precheck",
             json={
-                "run_id": req.run_id,
+                "run_id": req.trace_id,
                 "segment_keys": req.segment_keys,
                 "budgets": req.budgets,
                 "want": req.want,
@@ -212,10 +219,10 @@ class HttpLedgerBackend:
             window=b.get("window"),
         )
 
-    def resolve_run(self, run_id: str) -> RunRegistration:
-        r = self._client.get(f"/v1/runs/{run_id}/registration")
+    def resolve_run(self, trace_id: str) -> RunRegistration:
+        r = self._client.get(f"/v1/runs/{trace_id}/registration")
         if r.status_code == 404:
-            raise RunNotRegisteredError(f"run {run_id!r} is not registered")
+            raise RunNotRegisteredError(f"run {trace_id!r} is not registered")
         r.raise_for_status()
         return _reg_from_body(r.json())
 
@@ -233,7 +240,7 @@ class HttpLedgerBackend:
         r = self._req(
             "POST",
             "/v1/ledger/events:batch",
-            json={"events": events},
+            json={"events": [_to_wire_event(e) for e in events]},
             headers={"Durability": durability},
         )
         b = r.json()
@@ -250,25 +257,25 @@ class HttpLedgerBackend:
         intent: str = "",
         user_dims: dict[str, str] | None = None,
         mode: GovernanceMode | str | None = None,
-        run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> RunRegistration:
         payload: dict[str, Any] = {
             "intent": intent,
             "user_dims": {str(k): str(v) for k, v in (user_dims or {}).items()},
             "mode": _mode_value(mode).value,
         }
-        if run_id:
-            payload["run_id"] = run_id
+        if trace_id:
+            payload["run_id"] = trace_id
         r = self._req("POST", "/v1/runs", json=payload)
         return _reg_from_body(r.json(), fallback_intent=intent)
 
-    def patch_run_record(self, run_id: str, **fields: Any) -> None:
+    def patch_run_record(self, trace_id: str, **fields: Any) -> None:
         # steps / cost_micros are derived server-side; the plane ignores them (0.2.x)
         # and rejects them (0.3.0). Don't send them.
         clean = {k: v for k, v in fields.items() if k not in ("steps", "cost_micros")}
         if not clean:
             return
-        self._req("PATCH", f"/v1/run-records/{run_id}", json=clean)
+        self._req("PATCH", f"/v1/run-records/{trace_id}", json=clean)
 
 
 def _err(r: httpx.Response, default: str) -> str:

@@ -15,7 +15,7 @@
   <rect width="820" height="388" fill="#ffffff"/>
 
   <text x="40" y="36" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#0f172a">Research + Summarize (A2A)</text>
-  <text x="40" y="56" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">TokenOps governs LLM and tool boundaries per agent. Shared run_id across both.</text>
+  <text x="40" y="56" font-family="system-ui, sans-serif" font-size="12" fill="#64748b">TokenOps governs LLM and tool boundaries per agent. Shared trace_id across both.</text>
 
   <!-- RESEARCH -->
   <rect x="40" y="72" width="280" height="232" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
@@ -53,7 +53,7 @@
 
   <!-- A2A: y=280, inner right 292 to inner left 528 -->
   <rect x="346" y="266" width="128" height="16" rx="3" fill="#ffffff"/>
-  <text x="410" y="278" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">shared run_id</text>
+  <text x="410" y="278" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">shared trace_id</text>
   <line x1="292" y1="280" x2="528" y2="280" stroke="#64748b" stroke-width="1.5" marker-end="url(#g)"/>
 
   <!-- Control plane: centered, spans both columns -->

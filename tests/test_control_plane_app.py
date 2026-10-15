@@ -47,5 +47,5 @@ def test_mount_run_registration_still_works_when_called_directly(tmp_path):
     with TestClient(app) as client:
         resp = client.post("/v1/runs", json={"intent": "x", "user_dims": {}})
         assert resp.status_code == 201
-        assert "run_id" in resp.json()
+        assert "run_id" in resp.json()  # control-plane 0.2 wire name
     store.close()

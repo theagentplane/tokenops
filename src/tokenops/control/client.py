@@ -159,17 +159,17 @@ class ControlPlaneClient:
         intent: str = "",
         user_dims: Mapping[str, Any] | None = None,
         mode: GovernanceMode | str | None = None,
-        run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> dict[str, Any]:
-        """Register a run; returns ``{run_id, status, mode}`` (same shape as ``POST /v1/runs``)."""
+        """Register a run; returns ``{trace_id, status, mode}`` (same shape as ``POST /v1/runs``)."""
         dims = _coerce_user_dims(user_dims)
         gov_mode = _mode_value(mode)
         if self._store is not None:
-            rid = (run_id or "").strip() or new_id("run")
+            rid = (trace_id or "").strip() or new_id("run")
             try:
                 reg = self._store.register_run(
                     RunRegistration(
-                        run_id=rid,
+                        trace_id=rid,
                         intent=intent,
                         user_dims=dims,
                         mode=gov_mode,
@@ -178,7 +178,7 @@ class ControlPlaneClient:
             except RunAlreadyRegisteredError:
                 raise
             return {
-                "run_id": reg.run_id,
+                "trace_id": reg.trace_id,
                 "status": "registered",
                 "mode": reg.mode.value,
             }
@@ -188,8 +188,8 @@ class ControlPlaneClient:
             "user_dims": dims,
             "mode": gov_mode.value,
         }
-        if run_id:
-            payload["run_id"] = run_id
+        if trace_id:
+            payload["run_id"] = trace_id
         return post_run_sync(self._url, payload, timeout=self._timeout)
 
     async def register_run_async(
@@ -198,7 +198,7 @@ class ControlPlaneClient:
         intent: str = "",
         user_dims: Mapping[str, Any] | None = None,
         mode: GovernanceMode | str | None = None,
-        run_id: str | None = None,
+        trace_id: str | None = None,
     ) -> dict[str, Any]:
         """Async variant of :meth:`register_run` (HTTP path only uses async httpx)."""
         dims = _coerce_user_dims(user_dims)
@@ -208,7 +208,7 @@ class ControlPlaneClient:
                 intent=intent,
                 user_dims=dims,
                 mode=gov_mode,
-                run_id=run_id,
+                trace_id=trace_id,
             )
         assert self._url is not None
         payload: dict[str, Any] = {
@@ -216,13 +216,13 @@ class ControlPlaneClient:
             "user_dims": dims,
             "mode": gov_mode.value,
         }
-        if run_id:
-            payload["run_id"] = run_id
+        if trace_id:
+            payload["run_id"] = trace_id
         return await post_run(self._url, payload, timeout=self._timeout)
 
-    def resolve_run(self, run_id: str) -> RunRegistration:
+    def resolve_run(self, trace_id: str) -> RunRegistration:
         """Resolve a registered run (embedded Store or shared ``TOKENOPS_DB``)."""
-        return self.require_store().resolve_run(run_id)
+        return self.require_store().resolve_run(trace_id)
 
     def governance_config_for(self, agent: str) -> dict:
         """Governance config dict for ``build_governor`` (process-cached; §10)."""
@@ -232,9 +232,9 @@ class ControlPlaneClient:
         """Dashboard run row — escape hatch until plane HTTP covers this."""
         return self.require_store().create_run(rec)
 
-    def update_run(self, run_id: str, **fields: Any) -> None:
+    def update_run(self, trace_id: str, **fields: Any) -> None:
         """Update a dashboard run row — escape hatch until plane HTTP covers this."""
-        self.require_store().update_run(run_id, **fields)
+        self.require_store().update_run(trace_id, **fields)
 
 
 def should_mount_run_registration() -> bool:

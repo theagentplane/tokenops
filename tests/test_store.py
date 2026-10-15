@@ -65,10 +65,12 @@ def test_agent_scoping(store):
 
 
 def test_run_records_and_problematic_filter(store):
-    store.create_run(RunRecord(run_id="r1", agent="research", status="completed", cost_micros=500))
+    store.create_run(
+        RunRecord(trace_id="r1", agent="research", status="completed", cost_micros=500)
+    )
     store.create_run(
         RunRecord(
-            run_id="r2",
+            trace_id="r2",
             agent="research",
             status="halted",
             halt_reason="budget exhausted",
@@ -80,7 +82,7 @@ def test_run_records_and_problematic_filter(store):
     assert store.get_run("r1").ended_at == 123.0
     assert len(store.list_runs()) == 2
     problematic = store.list_runs(problematic_only=True)
-    assert [r.run_id for r in problematic] == ["r2"]
+    assert [r.trace_id for r in problematic] == ["r2"]
     assert problematic[0].halt_reason == "budget exhausted"
 
 
@@ -88,7 +90,7 @@ def test_register_run_creates_dashboard_row(store):
     """Registration alone must surface on the Admin Dashboard (list_runs / get_run)."""
     store.register_run(
         RunRegistration(
-            run_id="reg-only",
+            trace_id="reg-only",
             intent="summarize",
             user_dims={"team": "growth"},
         )
@@ -101,7 +103,7 @@ def test_register_run_creates_dashboard_row(store):
     assert got.dims == {"team": "growth"}
     assert got.cost_micros == 0
     listed = store.list_runs()
-    assert [r.run_id for r in listed] == ["reg-only"]
+    assert [r.trace_id for r in listed] == ["reg-only"]
 
     store.ledger_add_spent(RUN_TOTAL_BUDGET.budget_id, "run:reg-only", LIFETIME, 12_345)
     assert store.get_run("reg-only").cost_micros == 12_345
@@ -110,7 +112,7 @@ def test_register_run_creates_dashboard_row(store):
     # Explicit create_run after register remains REPLACE-safe.
     store.create_run(
         RunRecord(
-            run_id="reg-only",
+            trace_id="reg-only",
             agent="summarize",
             status="completed",
             cost_micros=99,
@@ -132,7 +134,7 @@ def test_register_run_creates_dashboard_row(store):
     assert cleared.halt_reason is None
     assert cleared.status == "halted"  # clear does not invent a new status
 
-    store.register_run(RunRegistration(run_id="no-intent"))
+    store.register_run(RunRegistration(trace_id="no-intent"))
     assert store.get_run("no-intent").agent == "agent"
     assert store.get_run("no-intent").task is None
 
@@ -161,7 +163,7 @@ def test_clear_and_reseed_governance(tmp_path):
     s = Store(str(tmp_path / "reset.db"), auto_seed=False)
     s.upsert_budget(BudgetSpec(id="custom", limit_micros=100, dimension="run"))
     s.upsert_policy_instance(PolicyInstance(id="pi", template="step_cap", params={"max_steps": 1}))
-    s.create_run(RunRecord(run_id="r1", agent="research", status="completed"))
+    s.create_run(RunRecord(trace_id="r1", agent="research", status="completed"))
     governance = {
         "budgets": [{"id": "run_llm_cap", "limit_micros": 2_000_000, "dimension": "run"}],
         "policies": {"cost_budget": {"budget": "run_llm_cap"}},
@@ -179,7 +181,7 @@ def test_clear_and_reseed_governance(tmp_path):
 def test_run_dims_roundtrip_grouping_and_tag_keys(store):
     store.create_run(
         RunRecord(
-            run_id="a",
+            trace_id="a",
             agent="research",
             status="completed",
             cost_micros=300,
@@ -188,7 +190,11 @@ def test_run_dims_roundtrip_grouping_and_tag_keys(store):
     )
     store.create_run(
         RunRecord(
-            run_id="b", agent="research", status="completed", cost_micros=100, dims={"team": "core"}
+            trace_id="b",
+            agent="research",
+            status="completed",
+            cost_micros=100,
+            dims={"team": "core"},
         )
     )
     assert store.get_run("a").dims == {"team": "growth", "Country": "US"}
@@ -207,16 +213,16 @@ def test_dims_migration_on_legacy_db(tmp_path):
     db = str(tmp_path / "legacy.db")
     con = sqlite3.connect(db)
     con.executescript(
-        "CREATE TABLE runs (run_id TEXT PRIMARY KEY, agent TEXT NOT NULL, "
+        "CREATE TABLE runs (trace_id TEXT PRIMARY KEY, agent TEXT NOT NULL, "
         "status TEXT NOT NULL, parent_run TEXT, halt_reason TEXT, detector TEXT, "
         "cost_micros INTEGER DEFAULT 0, steps INTEGER DEFAULT 0, "
         "started_at REAL DEFAULT 0, ended_at REAL, task TEXT);"
     )
-    con.execute("INSERT INTO runs(run_id, agent, status) VALUES ('old','research','completed')")
+    con.execute("INSERT INTO runs(trace_id, agent, status) VALUES ('old','research','completed')")
     con.commit()
     con.close()
     s = Store(db, auto_seed=False)
     assert s.get_run("old").dims == {}  # migrated column, default empty
-    s.create_run(RunRecord(run_id="new", agent="research", dims={"team": "x"}))
+    s.create_run(RunRecord(trace_id="new", agent="research", dims={"team": "x"}))
     assert s.get_run("new").dims == {"team": "x"}
     s.close()

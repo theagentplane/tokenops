@@ -39,16 +39,16 @@ def test_backend_raises_for_a_store_constructed_client(tmp_path):
 def test_register_run_duplicate_raises(tmp_path):
     store = Store(str(tmp_path / "d.db"), auto_seed=False)
     client = ControlPlaneClient(store=store)
-    client.register_run(intent="a", run_id="same")
+    client.register_run(intent="a", trace_id="same")
     with pytest.raises(RunAlreadyRegisteredError):
-        client.register_run(intent="b", run_id="same")
+        client.register_run(intent="b", trace_id="same")
     store.close()
 
 
 def test_resolve_run_and_governance_config_for(tmp_path):
     store = Store(str(tmp_path / "facade.db"), auto_seed=False)
     client = ControlPlaneClient(store=store)
-    client.register_run(intent="x", run_id="r1", mode="preview")
+    client.register_run(intent="x", trace_id="r1", mode="preview")
     reg = client.resolve_run("r1")
     assert reg.intent == "x"
     assert reg.mode is GovernanceMode.PREVIEW

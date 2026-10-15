@@ -49,11 +49,11 @@ class ProgressGuardDetector(Detector):
         self.simhash_threshold = simhash_threshold
         self._corrections: dict[str, int] = defaultdict(int)
 
-    def reset(self, run_id: str) -> None:
-        self._corrections.pop(run_id, None)
+    def reset(self, trace_id: str) -> None:
+        self._corrections.pop(trace_id, None)
 
-    def _stalled(self, step: BoundaryStep, view: LedgerView, run_id: str) -> bool:
-        recent = view.recent(run_id, self.window)
+    def _stalled(self, step: BoundaryStep, view: LedgerView, trace_id: str) -> bool:
+        recent = view.recent(trace_id, self.window)
         if step.node_type == "tool" and step.signature and step.result_hash:
             # unchanged RESULT, not merely a repeated call
             same = sum(
@@ -81,15 +81,15 @@ class ProgressGuardDetector(Detector):
         return False
 
     def observe(self, attr: Attribution, step: BoundaryStep, view: LedgerView) -> Signal | None:
-        if not self._stalled(step, view, attr.run_id):
+        if not self._stalled(step, view, attr.trace_id):
             return None
-        self._corrections[attr.run_id] += 1
-        corr = self._corrections[attr.run_id]
+        self._corrections[attr.trace_id] += 1
+        corr = self._corrections[attr.trace_id]
         sev = Severity.TRIP if corr > self.max_corrections else Severity.WARN
         return Signal(
             detector=self.name,
             severity=sev,
-            run_id=attr.run_id,
+            trace_id=attr.trace_id,
             reason=f"no progress: repeated result on '{step.boundary_id}'; correction {corr}",
             evidence={
                 "correction": corr,
@@ -107,12 +107,12 @@ class ProgressGuardPolicy(Policy):
         if signal.severity is Severity.TRIP:
             return Action(
                 kind=ActionKind.HALT,
-                run_id=signal.run_id,
+                trace_id=signal.trace_id,
                 reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress, halting",
             )
         return Action(
             kind=ActionKind.INJECT,
-            run_id=signal.run_id,
+            trace_id=signal.trace_id,
             reason=signal.reason,
             inject_message=(
                 f"NO PROGRESS DETECTED on '{signal.evidence['boundary_id']}': you are repeating "

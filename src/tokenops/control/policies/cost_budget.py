@@ -46,7 +46,7 @@ class CostBudgetDetector(Detector):
             return Signal(
                 detector=self.name,
                 severity=Severity.TRIP,
-                run_id=attr.run_id,
+                trace_id=attr.trace_id,
                 reason=f"budget '{self.budget.budget_id}' exhausted on {sk} ({left} micros left)",
                 evidence={"budget_id": self.budget.budget_id, "segment": sk, "left_micros": left},
             )
@@ -60,7 +60,7 @@ class CostBudgetPolicy(Policy):
     name = "cost_budget"
 
     def decide(self, signal: Signal, view: LedgerView) -> Action:
-        return Action(kind=ActionKind.HALT, run_id=signal.run_id, reason=signal.reason)
+        return Action(kind=ActionKind.HALT, trace_id=signal.trace_id, reason=signal.reason)
 
 
 def build(budget: Budget) -> tuple[Detector, Policy]:
