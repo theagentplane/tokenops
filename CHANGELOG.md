@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- End-to-end tests (`tests/e2e`) against a real control plane 1.x in process: a governed agent
+  trips its budget and the halt is on the trace attributes and in the halted-trace list; two
+  agents share one budget and the second is stopped by the first; a halted trace is replayed
+  with Chronicle, reproducing the halt with the original cap and passing with the fix.
+
 ### Changed
 
 - Requires `agent-chronicle>=1.1,<2` and reads the active span with the public
