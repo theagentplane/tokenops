@@ -218,3 +218,15 @@ def any_backend(request):
         yield backend
     finally:
         client.close()
+
+
+@pytest.fixture
+def chronicle_envelopes():
+    """Envelopes Chronicle recorded during the test (read through a ``record`` hook)."""
+    from chronicle import FunctionHook, default_hooks
+
+    envelopes: list = []
+    hook = FunctionHook(record=envelopes.append)
+    default_hooks.register(hook)
+    yield envelopes
+    default_hooks.unregister(hook)

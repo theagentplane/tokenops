@@ -1,13 +1,15 @@
-"""Chronicle boundary hooks → TokenOps govern (pre_call + observe).
+"""Chronicle boundary hook -> TokenOps govern (pre_call + observe).
 
-Chronicle ``@boundary`` / ``wrap_llm`` invoke:
+One Chronicle ``Hook`` (registered on ``chronicle.default_hooks``) handles the three events
+TokenOps cares about for ``@boundary`` / ``wrap_llm`` crossings:
 
-* ``session.on_enter`` after input capture, before the wrapped call (LLM pre_call)
-* ``session.on_crossing`` after LIVE record / cut-point (observe)
-* ``session.on_leave`` after the attempt when ``on_enter`` completed (ledger complete)
+* ``enter``: before the wrapped call (LLM pre_call; may patch kwargs or stop the call)
+* ``crossing``: the call returned and was captured (observe)
+* ``leave``: after the attempt, when ``enter`` completed (ledger complete)
 
-``reset_session()`` clears hooks, so ``install_crossing_hook`` wraps ``reset_session``
-to re-attach all three.
+Stopping a call is done by raising an exception that Chronicle propagates: ``Halt`` is a
+``BaseException`` and ``Throttled`` is an ``AbortCall``, so neither is swallowed by the hook
+failure policy.
 """
 
 from __future__ import annotations
@@ -15,8 +17,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Any
 
-from chronicle import Input
-from chronicle.session import ChronicleSession, get_session
+from chronicle import CallInfo, Hook, default_hooks
 
 # When wrap_complete / wrap_stream already run pre_call + admit, skip boundary pre_call
 # so LLM calls are not governed twice.
@@ -40,11 +41,8 @@ def _service_name() -> str:
     return span.service if span else "unknown"
 
 
-def _input_state_to_dict(input: Input) -> dict[str, object]:
-    d: dict[str, object] = dict(input.arguments)
-    if input.messages:
-        d["messages"] = [m.model_dump() for m in input.messages]
-    return d
+def _kind(call: CallInfo) -> str:
+    return str(getattr(call.kind, "value", call.kind))
 
 
 def _estimate_input_tokens(state: dict[str, object]) -> int:
@@ -54,14 +52,9 @@ def _estimate_input_tokens(state: dict[str, object]) -> int:
     return max(1, len(str(messages)) // 4)
 
 
-def on_enter(
-    boundary_id: str,
-    kind: str,
-    input: Input,
-) -> dict[str, Any] | None:
+def on_enter(info: CallInfo) -> dict[str, Any] | None:
     """LLM-kind pre_call: may Halt, or return kwargs patches (max_output / model)."""
-    del boundary_id  # used for tracing only; attribution comes from run scope
-    if kind != "llm" or _wrap_owns_precall.get():
+    if _kind(info) != "llm" or _wrap_owns_precall.get():
         return None
 
     from tokenops.control.context import current_governance, current_registration
@@ -77,7 +70,7 @@ def on_enter(
     if callable(begin):
         begin()
 
-    state = _input_state_to_dict(input)
+    state: dict[str, object] = dict(info.arguments)
     provider = str(state.get("provider") or gov_ctx.provider or "")
     model = str(state.get("model") or gov_ctx.model or "")
     raw_cap = state.get("max_output_tokens")
@@ -115,9 +108,9 @@ def on_enter(
     return patch or None
 
 
-def on_leave(boundary_id: str, kind: str, input: Input) -> None:
+def on_leave(info: CallInfo) -> None:
     """Release inflight admit from :func:`on_enter` (success or failure)."""
-    del boundary_id, kind, input
+    del info
     from tokenops.control.context import current_governance
 
     seg = _inflight_seg.get()
@@ -131,12 +124,7 @@ def on_leave(boundary_id: str, kind: str, input: Input) -> None:
         _inflight_seg.set(None)
 
 
-def on_crossing(
-    boundary_id: str,
-    kind: str,
-    input: Input,
-    result: Any,
-) -> None:
+def on_crossing(info: CallInfo, result: Any) -> None:
     """Project crossing → Observation when registration + governance are bound."""
     from tokenops.control.boundary import emit_observation, observation_from_crossing
     from tokenops.control.context import current_governance, current_registration
@@ -144,7 +132,7 @@ def on_crossing(
     if current_governance() is None or current_registration() is None:
         return
     gov = current_governance()
-    state = _input_state_to_dict(input)
+    state: dict[str, object] = dict(info.arguments)
     # Prefer provider/model from the crossing (e.g. wrap_llm dispatch args) so
     # MUTATE model overrides price correctly; fall back to bound governance.
     provider = str(state.get("provider") or (gov.provider if gov else "") or "")
@@ -159,8 +147,8 @@ def on_crossing(
         if comp is not None:
             compaction = dict(comp)
     obs = observation_from_crossing(
-        boundary_id=boundary_id,
-        kind=kind,
+        boundary_id=info.name,
+        kind=_kind(info),
         service=_service_name(),
         input_state=state,
         result=result,
@@ -171,35 +159,27 @@ def on_crossing(
     emit_observation(obs)
 
 
-def _attach(session: ChronicleSession) -> ChronicleSession:
-    session.on_crossing = on_crossing
-    session.on_enter = on_enter
-    session.on_leave = on_leave
-    return session
+class TokenOpsHook(Hook):
+    """The Chronicle hook that drives the governor from boundary crossings."""
+
+    def enter(self, call: CallInfo) -> dict[str, Any] | None:
+        return on_enter(call)
+
+    def leave(self, call: CallInfo) -> None:
+        on_leave(call)
+
+    def crossing(self, call: CallInfo, result: Any) -> None:
+        on_crossing(call, result)
+
+
+_hook = TokenOpsHook()
 
 
 def install_crossing_hook() -> None:
-    """Attach enter/crossing/leave hooks to the current session and every ``reset_session()``.
+    """Register the TokenOps hook on ``chronicle.default_hooks`` (idempotent).
 
-    Idempotent. Patches ``chronicle.session.reset_session`` (and rebinds the
-    ``chronicle`` package export when present) so callers keep the wrapped entrypoint.
-    Prefer ``chronicle.session.reset_session`` (attribute access) over
-    ``from chronicle import reset_session`` so you always see the live hook.
+    Default hooks are inherited by every Chronicle session, so nothing needs re-attaching
+    after a session is created.
     """
-    import chronicle as chronicle_pkg
-    import chronicle.session as session_mod
-
-    _attach(get_session())
-
-    current = session_mod.reset_session
-    if getattr(current, "_tokenops_crossing_hook", False):
-        return
-
-    original = current
-
-    def reset_session_with_hook() -> ChronicleSession:
-        return _attach(original())
-
-    reset_session_with_hook._tokenops_crossing_hook = True  # type: ignore[attr-defined]
-    session_mod.reset_session = reset_session_with_hook
-    chronicle_pkg.reset_session = reset_session_with_hook
+    if _hook not in list(default_hooks):
+        default_hooks.register(_hook)

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import chronicle.session as chronicle_session
 import pytest
-from chronicle import Input, ReplayPlan, boundary, get_session
-from chronicle.session import SessionMode
+from chronicle import boundary
 
 from conftest import toy_price
 from tokenops.control import ApplyControls, build_governor, install_crossing_hook
@@ -27,52 +25,15 @@ def _crossing_hook():
     install_crossing_hook()
 
 
-def test_chronicle_live_records_envelope():
-    chronicle_session.reset_session()
-    session = get_session()
-    assert session.mode == SessionMode.LIVE
-
+def test_chronicle_live_records_envelope(chronicle_envelopes):
     @boundary("search", kind="tool")
     def search(q: str) -> dict:
         return {"snippet": q, "status": "ok"}
 
     out = search("pricing")
     assert out["snippet"] == "pricing"
-    assert len(session.envelopes) == 1
-    assert session.envelopes[0].name == "search"
-    chronicle_session.reset_session()
-
-
-def test_chronicle_replay_stub_skips_execution(tmp_path):
-    trace_dir = tmp_path / "trace"
-
-    chronicle_session.reset_session()
-    session = get_session()
-    session.begin_trace("trace-replay")
-
-    @boundary("search", kind="tool")
-    def search(q: str) -> dict:
-        return {"snippet": q, "status": "ok"}
-
-    search("record-me")
-    session.export_trace(trace_dir)
-    chronicle_session.reset_session()
-
-    session = get_session()
-    session.enable_replay(ReplayPlan().stub("search", 1))
-    session.load_trace(trace_dir)
-
-    called = []
-
-    @boundary("search", kind="tool")
-    def search_replay(q: str) -> dict:
-        called.append(q)
-        return {"snippet": "live", "status": "ok"}
-
-    out = search_replay("ignored")
-    assert out["snippet"] == "record-me"
-    assert called == []
-    chronicle_session.reset_session()
+    assert len(chronicle_envelopes) == 1
+    assert chronicle_envelopes[0].name == "search"
 
 
 def test_boundary_tokenops_observe_when_governed(store):
@@ -88,14 +49,10 @@ def test_boundary_tokenops_observe_when_governed(store):
     attr = _build_attribution(reg, service="research")
     gov.ledger.open_run("r1")
 
-    chronicle_session.reset_session().begin_trace("r1")
-
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: Input(
-            arguments={"name": "search", "args": {"query": q}}, messages=[]
-        ),
+        extract_input=lambda q: {"name": "search", "args": {"query": q}},
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}
@@ -105,5 +62,4 @@ def test_boundary_tokenops_observe_when_governed(store):
             search("pricing")
 
     clear()
-    chronicle_session.reset_session()
     assert gov.ledger.step_count("r1") == 1

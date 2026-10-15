@@ -248,7 +248,7 @@ def wrap_complete(
     estimate = est_input_fn or _estimate_input_tokens
     seg = f"run:{attr.run_id}"
     boundary_id = f"{service or attr.agent}.chat"
-    traced = wrap_llm(boundary_id, dispatch)
+    traced = wrap_llm(boundary_id, dispatch, provider=provider)
     controls.compaction_supported = True  # wrap_complete IS the prompt-assembly hook
 
     def governed(p: str, m: str, messages) -> object:
@@ -389,7 +389,7 @@ def wrap_stream(
             output_tokens=max(1, len(text) // 4),
         )
 
-    traced = wrap_llm(boundary_id, _stream_once)
+    traced = wrap_llm(boundary_id, _stream_once, provider=provider)
 
     def governed(p: str, m: str, messages) -> object:
         from tokenops.control.crossing import reset_wrap_owns_precall, wrap_owns_precall

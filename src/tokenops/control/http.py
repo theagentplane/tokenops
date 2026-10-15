@@ -11,7 +11,6 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 import httpx
-from chronicle.session import reset_session
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
@@ -34,7 +33,7 @@ def _coerce_user_dims(raw: object) -> dict[str, str]:
 
 
 def mount_run_registration(app: FastAPI, store: Store) -> None:
-    """Mount ``POST /v1/runs`` and begin a Chronicle trace for the registered run."""
+    """Mount ``POST /v1/runs`` (run registration)."""
 
     @app.post("/v1/runs")
     async def register_run(request: Request) -> JSONResponse:
@@ -58,7 +57,6 @@ def mount_run_registration(app: FastAPI, store: Store) -> None:
             )
         except RunAlreadyRegisteredError as exc:
             return JSONResponse({"error": str(exc)}, status_code=409)
-        reset_session().begin_trace(reg.run_id)
         return JSONResponse(
             {"run_id": reg.run_id, "status": "registered", "mode": reg.mode.value},
             status_code=201,

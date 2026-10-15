@@ -67,7 +67,7 @@ from tokenops.control.ledger_backend import (
     PrecheckRequest,
 )
 
-# Process-wide: re-attach after every reset_session (Chronicle clears on_crossing).
+# Process-wide: register the governor hook on chronicle.default_hooks (inherited by every session).
 install_crossing_hook()
 
 from tokenops.control.client import ControlPlaneClient, should_mount_run_registration

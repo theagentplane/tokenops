@@ -6,7 +6,6 @@ policies (output_runaway / progress_guard / context_compaction) fire determinist
 
 from __future__ import annotations
 
-import chronicle.session as chronicle_session
 import pytest
 
 from conftest import toy_price
@@ -76,7 +75,6 @@ def test_retry_recovers_from_degenerate_output():
     scripted = ScriptedModel(fail_n=2)
     governed = _bound_run(gov, attr, scripted)
 
-    chronicle_session.reset_session().begin_trace("r1")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])
@@ -151,7 +149,6 @@ def test_cancel_tears_down_degenerate_stream_then_retries():
         on_cancel=lambda: cancels.append(1),
     )
 
-    chronicle_session.reset_session().begin_trace("r2")
     with run_scope(reg, SpanContext(span_id="s", service="research")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             resp = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "hi"}])

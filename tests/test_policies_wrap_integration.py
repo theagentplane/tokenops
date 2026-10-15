@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import time
 
-import chronicle.session as chronicle_session
 import pytest
 
 from conftest import toy_price
@@ -86,7 +85,6 @@ def _governed(gov, attr, dispatch, *, run_id: str):
 
 def _with_scope(gov, attr, run_id: str, fn):
     reg = _reg(run_id)
-    chronicle_session.reset_session().begin_trace(run_id)
     with run_scope(reg, SpanContext(span_id="s1", service="research")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             return fn()
@@ -512,7 +510,6 @@ def test_it_trajectory_hint_injects_playbook_on_pre_call(tmp_path):
         governed("openai", "gpt-4o-mini", [{"role": "user", "content": task}])
 
     try:
-        chronicle_session.reset_session().begin_trace("r-th")
         with run_scope(reg, SpanContext(span_id="s1", service="research")):
             with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
                 run()

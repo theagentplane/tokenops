@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import chronicle.session as chronicle_session
 import pytest
-from chronicle import Input, boundary
+from chronicle import boundary
 
 from conftest import toy_price
 from tokenops.control import ApplyControls, build_governor, install_crossing_hook
@@ -38,14 +37,11 @@ def test_boundary_emits_observation_when_governed(store):
     gov = build_governor(config, toy_price, ApplyControls())
     attr = _build_attribution(reg, service="research")
     gov.ledger.open_run("r1")
-    chronicle_session.reset_session().begin_trace("r1")
 
     @boundary(
         "search",
         kind="tool",
-        extract_input=lambda q: Input(
-            arguments={"name": "search", "args": {"query": q}}, messages=[]
-        ),
+        extract_input=lambda q: {"name": "search", "args": {"query": q}},
     )
     def search(query: str) -> dict:
         return {"snippet": query, "completeness": 0.9}
@@ -54,6 +50,5 @@ def test_boundary_emits_observation_when_governed(store):
         with _governance_scope(gov, attr):
             search("pricing")
     clear()
-    chronicle_session.reset_session()
 
     assert gov.ledger.step_count("r1") == 1

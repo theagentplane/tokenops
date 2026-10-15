@@ -15,8 +15,6 @@ import asyncio
 import time
 from collections.abc import Mapping
 
-from chronicle.session import reset_session
-
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
 from examples.agents.types import StepEvent, TokenUsage
@@ -55,7 +53,6 @@ def build_app():
         with tokenops_run(client=client) as bound:
             reg = bound.registration
             run_id = reg.run_id
-            reset_session().begin_trace(run_id)
             attr = bound.attr
             governor = bound.governor
             controls = bound.controls

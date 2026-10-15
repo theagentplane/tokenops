@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import chronicle.session as chronicle_session
 import pytest
-from chronicle import get_session
 
 from conftest import toy_price
 from tokenops.control import (
@@ -32,7 +30,7 @@ def _bound(gov, attr, dispatch, *, service: str = "research"):
     )
 
 
-def test_openai_shaped_dispatch_with_wrap_complete_and_chronicle():
+def test_openai_shaped_dispatch_with_wrap_complete_and_chronicle(chronicle_envelopes):
     install_crossing_hook()
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
@@ -48,20 +46,18 @@ def test_openai_shaped_dispatch_with_wrap_complete_and_chronicle():
         return ModelResponse(content="plan: ok", input_tokens=20, output_tokens=8)
 
     governed = _bound(gov, attr, dispatch, service="planner")
-    chronicle_session.reset_session().begin_trace("r-oai")
-    session = get_session()
 
     with run_scope(reg, SpanContext(span_id="s", service="planner")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             out = governed("openai", "gpt-4o-mini", [{"role": "user", "content": "goal"}])
 
     assert out.content == "plan: ok"
-    assert len(session.envelopes) == 1
-    assert session.envelopes[0].kind == "llm"
+    assert len(chronicle_envelopes) == 1
+    assert chronicle_envelopes[0].kind == "llm"
     assert len([s for s in ledger.window("r-oai") if s.node_type == "llm"]) == 1
 
 
-def test_langchain_governed_chat_model_with_wrap_complete():
+def test_langchain_governed_chat_model_with_wrap_complete(chronicle_envelopes):
     pytest.importorskip("langchain_core")
     # Optional stack can SIGFPE on import (transformers/numpy) — probe in a subprocess.
     import subprocess
@@ -95,15 +91,12 @@ def test_langchain_governed_chat_model_with_wrap_complete():
     governed = _bound(gov, attr, dispatch, service="writer")
     llm = GovernedChatModel(governed, provider="openai", model="gpt-4o-mini")
 
-    chronicle_session.reset_session().begin_trace("r-lc")
-    session = get_session()
-
     with run_scope(reg, SpanContext(span_id="s", service="writer")):
         with _governance_scope(gov, attr, provider="openai", model="gpt-4o-mini"):
             result = llm.invoke([HumanMessage(content="write it")])
 
     assert result.content == "lc answer"
-    assert len(session.envelopes) == 1
-    assert session.envelopes[0].name == "writer.chat"
+    assert len(chronicle_envelopes) == 1
+    assert chronicle_envelopes[0].name == "writer.chat"
     llm_steps = [s for s in ledger.window("r-lc") if s.node_type == "llm"]
     assert len(llm_steps) == 1  # GovernedChatModel → wrap_complete → wrap_llm, once

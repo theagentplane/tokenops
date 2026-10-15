@@ -24,6 +24,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
+from chronicle import AbortCall
+
 from tokenops.control.core import (
     Action,
     ActionKind,
@@ -40,7 +42,7 @@ from tokenops.control.ledger import Ledger
 _SEVERITY_RANK = {Severity.OK: 0, Severity.WARN: 1, Severity.TRIP: 2}
 
 
-class Throttled(Exception):
+class Throttled(AbortCall):
     """Raised by an OUT connector for REJECT/QUEUE — a *retryable* backpressure signal.
 
     Unlike :class:`Halt` (a ``BaseException`` that aborts the run), this is an ordinary

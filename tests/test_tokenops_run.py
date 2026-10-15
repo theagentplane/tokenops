@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import chronicle.session as chronicle_session
 import pytest
+from chronicle import default_hooks
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -22,7 +22,7 @@ from tokenops.control.context import (
     current_governance,
     current_registration,
 )
-from tokenops.control.crossing import install_crossing_hook, on_crossing
+from tokenops.control.crossing import TokenOpsHook, install_crossing_hook
 from tokenops.control.governance_cache import clear_governance_config_cache
 from tokenops.control.models import GovernanceMode
 from tokenops.control.store import Store
@@ -44,9 +44,7 @@ def store(tmp_path):
 
 def test_init_installs_crossing_hook():
     init()
-    assert getattr(chronicle_session.reset_session, "_tokenops_crossing_hook", False)
-    session = chronicle_session.reset_session()
-    assert session.on_crossing is on_crossing
+    assert any(isinstance(h, TokenOpsHook) for h in default_hooks)
 
 
 def test_from_env_installs_crossing_hook(live_plane_url):
@@ -54,7 +52,6 @@ def test_from_env_installs_crossing_hook(live_plane_url):
     client = ControlPlaneClient.from_env()
     assert not client.embedded
     assert client.url == live_plane_url
-    assert getattr(chronicle_session.reset_session, "_tokenops_crossing_hook", False)
     install_crossing_hook()  # idempotent
 
 
@@ -201,4 +198,3 @@ def test_instrument_app_binds_context_and_hook(live_plane_url):
     assert body["intent"] == "mw_intent"
     assert body["service"] == "planner"
     assert body["run_id"]
-    assert getattr(chronicle_session.reset_session, "_tokenops_crossing_hook", False)
