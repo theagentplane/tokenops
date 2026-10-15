@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
+from examples.a2a.tracing import configure_tracing
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
 from examples.brief.analyst.agent import AnalystAgent
@@ -25,6 +26,7 @@ AGENT = "analyst"
 
 def build_app():
     cfg = load_config().analyst
+    configure_tracing(AGENT, [])
     agent = AnalystAgent(cfg)
     client = ControlPlaneClient.from_env()
 

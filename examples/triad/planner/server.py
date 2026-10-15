@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
+from examples.a2a.tracing import configure_tracing
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
 from examples.triad.client import delegate_researcher, delegate_writer
@@ -40,6 +41,7 @@ INTENT = "triad_plan"
 
 def build_app():
     cfg = load_config().planner
+    configure_tracing(AGENT, [cfg.researcher_url, cfg.writer_url])
     agent = PlannerAgent(cfg)
     client = ControlPlaneClient.from_env()
 

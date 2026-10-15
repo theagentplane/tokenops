@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Governance silently off under `chronicle.instrument_httpx()`.** TokenOps' own control-plane
+  requests were recorded as crossings, which re-entered the governor hook and called the plane
+  again; Chronicle swallowed the resulting recursion as a hook failure and the run went
+  ungoverned (no spend, no budget trips). Plane requests now carry `chronicle.internal`, so
+  Chronicle skips them.
+
+### Changed
+
+- The example servers configure tracing (`examples/a2a/tracing.py`) and are verified end to end
+  against a real control plane (`tests/e2e`): triad, research to summarize, and brief.
+
 ## [1.0.0] - 2026-10-15
 
 TokenOps 1.0 is the **governors only**: policies, budgets and halts, attached to

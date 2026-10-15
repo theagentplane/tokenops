@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from examples.a2a.messages import bench_corpus_profile
 from examples.a2a.server import create_a2a_app, run_server
+from examples.a2a.tracing import configure_tracing
 from examples.agents.types import StepEvent, TokenUsage
 from examples.app_config import load_config
 from examples.triad.messages import parse_outline, parse_questions, research_response
@@ -25,6 +26,7 @@ AGENT = "researcher"
 
 def build_app():
     cfg = load_config().researcher
+    configure_tracing(AGENT, [])
     agent = ResearcherAgent(cfg)
     client = ControlPlaneClient.from_env()
 

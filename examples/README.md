@@ -4,12 +4,20 @@ Agent stacks that show TokenOps in a multi-agent run: the research to summarize 
 `agents/`, the planner, researcher and writer triad under `triad/`, and a LangChain stack under
 `brief/`, all speaking A2A (`a2a/`).
 
-> **Status.** These were written for TokenOps 0.4, which shipped its own plane and UI. They
-> import and use the 1.0 API (`tokenops_run`, `wrap_complete`, `ControlPlaneClient`), but they
-> have not been re-verified end to end against a control plane 1.x, and the launcher scripts and
-> `make` targets were removed. They are being rewritten; see
-> [#162](https://github.com/theagentplane/tokenops/issues/162). For a runnable, tested reference
-> use `python -m tokenops.demo` (in process) and `tests/e2e` (a real control plane).
+> **Status.** Each server calls `examples.a2a.tracing.configure_tracing`, which allow-lists its
+> peers for `traceparent` injection and turns on `chronicle.instrument_httpx()`, so a hop joins
+> the caller's trace. Verified end to end against a real control plane 1.x in `tests/e2e`
+> (scripted model, offline search corpus, real servers over HTTP):
+>
+> | Stack | Test |
+> |---|---|
+> | `triad/` planner, researcher, writer | `tests/e2e/test_triad_example.py` |
+> | `agents/` research to summarize (native) | `tests/e2e/test_research_summarize_example.py` |
+> | `brief/` scout, analyst, editor (LangChain) | `tests/e2e/test_brief_example.py` |
+>
+> Not verified: the LangChain variants under `agents/` (`research` and `summarize`), and any
+> run against a live provider. The launcher scripts and `make` targets from 0.4 were removed.
+> For an in-process reference use `python -m tokenops.demo`.
 
 ## Layout
 

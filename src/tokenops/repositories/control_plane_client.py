@@ -39,6 +39,12 @@ from tokenops.repositories.control_plane_types import (
     PrecheckResult,
 )
 
+# Chronicle's httpx instrumenter records every httpx call unless the request carries this
+# extension. Without it, TokenOps' own calls to the plane would be recorded as crossings and
+# re-enter the governor hook (unbounded recursion, swallowed as a hook failure, so nothing is
+# governed). Chronicle uses the same key for its own delivery.
+_CHRONICLE_INTERNAL = {"chronicle.internal": True}
+
 URL_ENV = "CONTROL_PLANE_URL"
 API_KEY_ENV = "CONTROL_PLANE_API_KEY"
 DEFAULT_TIMEOUT_S = 5.0
@@ -93,7 +99,9 @@ class ControlPlaneClient:
             cached = self._governance.get(agent)
         headers = {"If-None-Match": cached[0]} if cached and cached[0] else {}
         try:
-            response = self._http.get(f"/v1/governance/{agent}", headers=headers)
+            response = self._http.get(
+                f"/v1/governance/{agent}", headers=headers, extensions=_CHRONICLE_INTERNAL
+            )
         except httpx.TransportError as exc:
             return self._stale_or_raise(cached, f"governance for {agent!r}", exc)
         if response.status_code == 304 and cached is not None:
@@ -190,7 +198,9 @@ class ControlPlaneClient:
         params: Mapping[str, Any] | None = None,
     ) -> httpx.Response:
         try:
-            response = self._http.request(method, path, json=json, params=params)
+            response = self._http.request(
+                method, path, json=json, params=params, extensions=_CHRONICLE_INTERNAL
+            )
         except httpx.TransportError as exc:
             raise ControlPlaneUnavailable(
                 f"control plane unreachable: {method} {path}: {exc}"
