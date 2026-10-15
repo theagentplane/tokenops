@@ -32,7 +32,7 @@ def parse_governance_mode(value: object) -> GovernanceMode:
 
 
 @dataclass(frozen=True, kw_only=True)
-class RunRegistration:
+class HopAttribution:
     """The attribution of one hop under a trace: who, why and in which mode.
 
     Built in memory by ``tokenops_run`` from the Chronicle trace id and the hop's own
@@ -46,5 +46,10 @@ class RunRegistration:
     mode: GovernanceMode = GovernanceMode.ENFORCE
 
 
-class RunNotRegisteredError(LookupError):
+class NoGovernanceScopeError(LookupError):
     """Telemetry was produced outside a bound ``tokenops_run`` scope."""
+
+
+# Deprecated names kept for 1.x; use HopAttribution and NoGovernanceScopeError.
+RunRegistration = HopAttribution
+RunNotRegisteredError = NoGovernanceScopeError

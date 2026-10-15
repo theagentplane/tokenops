@@ -98,7 +98,6 @@ TokenOps 1.0 is the governors only. Honest limits:
 
 - A policy's step window is per process and per trace; `step_cap` is not a run-wide cap across
   processes ([ADR 0004](../adr/0004-policy-state-lives-in-process-except-shared-spend.md)).
-- `trajectory_hint` is a known template that is disabled.
 - Spend is understated, not overstated, by lost writes: events are never retried when the outcome
   is unknown.
 - The governors attach through Chronicle hooks, but `wrap_complete` and `wrap_stream` are still

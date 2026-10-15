@@ -13,7 +13,7 @@ from tokenops.control import (
 )
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import GovernanceMode, RunRegistration
+from tokenops.control.models import GovernanceMode, HopAttribution
 from tokenops.control.pricing import build_price_book
 
 
@@ -31,7 +31,7 @@ CONFIG = {"governance": {"budgets": [], "policies": {"step_cap": {"max_steps": 2
 
 
 def test_preview_mode_records_actions_without_halting():
-    reg = RunRegistration(trace_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW)
+    reg = HopAttribution(trace_id="preview-run", intent="demo", mode=GovernanceMode.PREVIEW)
     gov, controls = build_governance_stack(
         CONFIG,
         build_price_book(),
@@ -62,7 +62,7 @@ def test_preview_mode_records_actions_without_halting():
 
 
 def test_enforce_mode_still_halts():
-    reg = RunRegistration(trace_id="enforce-run", intent="demo")
+    reg = HopAttribution(trace_id="enforce-run", intent="demo")
     gov, controls = build_governance_stack(
         CONFIG,
         build_price_book(),

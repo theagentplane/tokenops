@@ -21,7 +21,7 @@ from tokenops import (
 from tokenops.control.context import (
     clear,
     current_governance,
-    current_registration,
+    current_hop,
 )
 from tokenops.control.crossing import TokenOpsHook, install_crossing_hook
 from tokenops.control.models import GovernanceMode
@@ -66,16 +66,16 @@ def test_run_with_an_explicit_config_needs_no_control_plane(monkeypatch):
         mode="preview",
         user_dims={"tenant": "acme"},
     ) as bound:
-        assert bound.registration.intent == "triad_plan"
-        assert bound.registration.mode is GovernanceMode.PREVIEW
-        assert bound.registration.user_dims["tenant"] == "acme"
+        assert bound.hop.intent == "triad_plan"
+        assert bound.hop.mode is GovernanceMode.PREVIEW
+        assert bound.hop.user_dims["tenant"] == "acme"
         assert bound.attr.agent == "planner"
         assert bound.client is None
-        assert current_registration() is bound.registration
+        assert current_hop() is bound.hop
         assert current_governance() is not None
-        assert current_governance().attr.trace_id == bound.registration.trace_id
+        assert current_governance().attr.trace_id == bound.hop.trace_id
         assert bound.governor.controls is bound.controls
-    assert current_registration() is None
+    assert current_hop() is None
     assert current_governance() is None
 
 
@@ -88,14 +88,14 @@ def test_the_run_is_the_chronicle_trace(monkeypatch):
         payload={"task": "hop"},
         service="researcher",
     ) as bound:
-        assert bound.registration.trace_id == trace
+        assert bound.hop.trace_id == trace
         assert bound.attr.trace_id == trace
         assert bound.span.service == "researcher"
 
 
 def test_a_new_trace_is_started_without_an_inbound_traceparent():
     with tokenops_run(config=CONFIG, service="planner") as bound:
-        assert len(bound.registration.trace_id) == 32
+        assert len(bound.hop.trace_id) == 32
 
 
 def test_governance_is_pulled_from_the_plane_and_the_ledger_uses_it(fake_plane):
@@ -151,11 +151,11 @@ def test_agent_intent_beats_empty_and_payload_intent():
         mode="enforce",
         user_dims={"tenant": "t1"},
     ) as bound:
-        assert bound.registration.intent == "agent_owned"
-        assert bound.registration.mode is GovernanceMode.ENFORCE
-        assert bound.registration.user_dims["tenant"] == "t1"
-        assert bound.registration.user_dims["user_id"] == "alice"
-        assert "spoof_intent_tag" not in bound.registration.user_dims
+        assert bound.hop.intent == "agent_owned"
+        assert bound.hop.mode is GovernanceMode.ENFORCE
+        assert bound.hop.user_dims["tenant"] == "t1"
+        assert bound.hop.user_dims["user_id"] == "alice"
+        assert "spoof_intent_tag" not in bound.hop.user_dims
 
 
 def test_request_context_ambient():
@@ -171,9 +171,9 @@ def test_request_context_ambient():
         )
     )
     with tokenops_run(config=CONFIG) as bound:
-        assert bound.registration.intent == "from_instrument"
-        assert bound.registration.mode is GovernanceMode.PREVIEW
-        assert bound.registration.user_dims["user_id"] == "bob"
+        assert bound.hop.intent == "from_instrument"
+        assert bound.hop.mode is GovernanceMode.PREVIEW
+        assert bound.hop.user_dims["user_id"] == "bob"
         assert current_governance().provider == "openai"
         assert current_governance().model == "gpt-4o-mini"
 
@@ -186,8 +186,8 @@ def test_instrument_app_binds_context_and_hook():
     async def tasks():
         with tokenops_run(config=CONFIG) as bound:
             return {
-                "trace_id": bound.registration.trace_id,
-                "intent": bound.registration.intent,
+                "trace_id": bound.hop.trace_id,
+                "intent": bound.hop.intent,
                 "service": bound.span.service,
             }
 

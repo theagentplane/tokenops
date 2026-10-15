@@ -58,8 +58,7 @@ process).
   and the demo asset scripts.
 - The SQLite `Store`, `HttpStore`, the 0.2 `LedgerBackend`, `dev_plane`, `governance_cache`,
   `RunRecord`, `Segment`, `BudgetSpec`, `PolicyInstance`.
-- `tokenops.control.trajectory` and the `trajectory_hint` implementation (the template stays
-  known and disabled).
+- `tokenops.control.trajectory` and the `trajectory_hint` implementation (the template was removed in 1.0.1, ADR 0005).
 - `uvicorn` from the runtime dependencies.
 
 ## 5. Chronicle 1.x hooks

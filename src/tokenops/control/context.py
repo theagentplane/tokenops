@@ -1,6 +1,6 @@
 """Request-scoped run context — stack-agnostic via contextvars.
 
-Boundaries and ingest read registration + span from ambient context instead of
+Boundaries and ingest read the hop attribution + span from ambient context instead of
 threading dims through every handler signature.
 """
 
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from tokenops.control.core import Attribution
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 
 # HTTP headers for cross-service propagation (see docs/run-attribution.md).
 
@@ -27,11 +27,16 @@ class SpanContext:
 
 @dataclass(frozen=True, kw_only=True)
 class BoundRun:
-    registration: RunRegistration
+    hop: HopAttribution
     span: SpanContext
 
+    @property
+    def registration(self) -> HopAttribution:
+        """Deprecated alias of ``hop``."""
+        return self.hop
 
-_registration: ContextVar[RunRegistration | None] = ContextVar("run_registration", default=None)
+
+_hop: ContextVar[HopAttribution | None] = ContextVar("tokenops_hop", default=None)
 _span: ContextVar[SpanContext | None] = ContextVar("run_span", default=None)
 _governance: ContextVar[GovernanceContext | None] = ContextVar("governance", default=None)
 _current_controls: ContextVar[Any | None] = ContextVar("current_controls", default=None)
@@ -49,10 +54,6 @@ class GovernanceContext:
 
 def current_governance() -> GovernanceContext | None:
     return _governance.get()
-
-
-def bind_governance(governance: GovernanceContext) -> None:
-    _governance.set(governance)
 
 
 def clear_governance() -> None:
@@ -74,26 +75,16 @@ def reset_current_controls(token: Any) -> None:
     _current_controls.reset(token)
 
 
-def current_registration() -> RunRegistration | None:
-    return _registration.get()
+def current_hop() -> HopAttribution | None:
+    return _hop.get()
 
 
 def current_span() -> SpanContext | None:
     return _span.get()
 
 
-def current_bound_run() -> BoundRun | None:
-    reg = _registration.get()
-    if reg is None:
-        return None
-    span = _span.get()
-    if span is None:
-        return None
-    return BoundRun(registration=reg, span=span)
-
-
-def bind_registration(registration: RunRegistration) -> None:
-    _registration.set(registration)
+def bind_hop(hop: HopAttribution) -> None:
+    _hop.set(hop)
 
 
 def bind_span(span: SpanContext) -> None:
@@ -101,7 +92,7 @@ def bind_span(span: SpanContext) -> None:
 
 
 def clear() -> None:
-    _registration.set(None)
+    _hop.set(None)
     _span.set(None)
     _governance.set(None)
     _current_controls.set(None)
@@ -125,12 +116,17 @@ def _governance_scope(
 
 
 @contextmanager
-def run_scope(registration: RunRegistration, span: SpanContext) -> Iterator[BoundRun]:
-    """Install registration + span for one request; restored on exit."""
-    tok_reg = _registration.set(registration)
+def run_scope(hop: HopAttribution, span: SpanContext) -> Iterator[BoundRun]:
+    """Install the hop attribution + span for one request; restored on exit."""
+    tok_reg = _hop.set(hop)
     tok_span = _span.set(span)
     try:
-        yield BoundRun(registration=registration, span=span)
+        yield BoundRun(hop=hop, span=span)
     finally:
-        _registration.reset(tok_reg)
+        _hop.reset(tok_reg)
         _span.reset(tok_span)
+
+
+# Deprecated names kept for 1.x.
+current_registration = current_hop
+bind_registration = bind_hop

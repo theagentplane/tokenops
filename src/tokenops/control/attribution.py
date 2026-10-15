@@ -1,16 +1,16 @@
 """Attribution builders (internal).
 
 Integrators use :func:`~tokenops.control.run.tokenops_run` —
-not these helpers directly. Boundaries call :func:`require_registration`.
+not these helpers directly. Boundaries call :func:`require_hop`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
-from tokenops.control.context import current_registration
+from tokenops.control.context import current_hop
 from tokenops.control.core import Attribution
-from tokenops.control.models import RunNotRegisteredError, RunRegistration
+from tokenops.control.models import HopAttribution, NoGovernanceScopeError
 
 # Payload keys allowed to merge into user_dims when the agent owns intent/mode (§1).
 _PAYLOAD_USER_DIM_ALLOWLIST = frozenset({"user_id", "user"})
@@ -22,7 +22,7 @@ def _coerce_user_dims(raw: object) -> dict[str, str]:
     return {str(k): str(v) for k, v in raw.items()}
 
 
-def merge_registration_dims(
+def merge_hop_dims(
     agent_dims: Mapping[str, str] | None,
     payload: Mapping[str, object] | None,
 ) -> dict[str, str]:
@@ -40,8 +40,8 @@ def merge_registration_dims(
     return dims
 
 
-def _build_attribution(reg: RunRegistration, *, service: str) -> Attribution:
-    """Map registration + boundary ``service`` to ledger/policy ``Attribution``."""
+def _build_attribution(reg: HopAttribution, *, service: str) -> Attribution:
+    """Map the hop attribution + boundary ``service`` to ledger/policy ``Attribution``."""
     tags = dict(reg.user_dims)
     if reg.intent:
         tags.setdefault("intent", reg.intent)
@@ -49,9 +49,16 @@ def _build_attribution(reg: RunRegistration, *, service: str) -> Attribution:
     return Attribution(user=user, agent=service, trace_id=reg.trace_id, tags=tags)
 
 
-def require_registration() -> RunRegistration:
+def require_hop() -> HopAttribution:
     """Fail closed when boundaries run outside a bound request context."""
-    reg = current_registration()
+    reg = current_hop()
     if reg is None:
-        raise RunNotRegisteredError("no run registration in request context")
+        raise NoGovernanceScopeError(
+            "no governed scope in this context: wrap the work in tokenops_run"
+        )
     return reg
+
+
+# Deprecated names kept for 1.x.
+require_registration = require_hop
+merge_registration_dims = merge_hop_dims

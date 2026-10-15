@@ -12,7 +12,7 @@ from tokenops.control import (
 )
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.providers.types import ModelResponse
 
 
@@ -32,7 +32,7 @@ def test_wrap_complete_observes_via_crossing_hook_once(chronicle_envelopes):
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
     gov = Governor(ledger, controls)
-    reg = RunRegistration(trace_id="r-w4", intent="t", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="r-w4", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="research")
     ledger.open_run("r-w4")
 
@@ -67,7 +67,7 @@ def test_wrap_complete_no_ledger_without_governance_scope(chronicle_envelopes):
     ledger = Ledger(price=toy_price)
     controls = ApplyControls()
     gov = Governor(ledger, controls)
-    reg = RunRegistration(trace_id="r-bare", intent="t", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="r-bare", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="research")
     ledger.open_run("r-bare")
 

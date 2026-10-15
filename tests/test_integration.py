@@ -7,7 +7,7 @@ import pytest
 from conftest import make_attr, toy_price
 from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 
 
 def test_budget_halts_governed_complete():
@@ -29,7 +29,7 @@ def test_budget_halts_governed_complete():
     gov = build_governor(config, toy_price, ApplyControls())
     attr = make_attr(trace_id="live-1")
     gov.ledger.open_run("live-1")
-    reg = RunRegistration(trace_id="live-1", intent="demo", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="live-1", intent="demo", user_dims={"user_id": "alice"})
 
     governed = wrap_complete(
         gov,

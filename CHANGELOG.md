@@ -17,8 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The "registration" vocabulary is renamed, because nothing is registered (a run is a trace):
+  `RunRegistration` is `HopAttribution`, `RunNotRegisteredError` is `NoGovernanceScopeError`,
+  `bound.registration` is `bound.hop`, and `current_registration`, `bind_registration`,
+  `require_registration` and `merge_registration_dims` are `current_hop`, `bind_hop`,
+  `require_hop` and `merge_hop_dims`. The old names remain as aliases in 1.x.
 - The example servers configure tracing (`examples/a2a/tracing.py`) and are verified end to end
   against a real control plane (`tests/e2e`): triad, research to summarize, and brief.
+
+### Removed
+
+- The `trajectory_hint` template: it could not be enabled and the control plane never accepted
+  it ([ADR 0005](docs/adr/0005-remove-trajectory-hint.md)). A configuration naming it now fails
+  with `unknown policy`. Also removed as unused: `bind_governance`, `current_bound_run` and
+  `CallRequest.primary_agent_turn`.
 
 ## [1.0.0] - 2026-10-15
 

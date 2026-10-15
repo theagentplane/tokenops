@@ -9,7 +9,7 @@ from conftest import toy_price
 from tokenops.control import ApplyControls, build_governor, install_crossing_hook
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def test_chronicle_live_records_envelope(chronicle_envelopes):
 
 def test_boundary_tokenops_observe_when_governed():
     clear()
-    reg = RunRegistration(trace_id="r1")
+    reg = HopAttribution(trace_id="r1")
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],

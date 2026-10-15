@@ -9,7 +9,7 @@ from conftest import toy_price
 from tokenops.control import ApplyControls, Halt, build_governor, install_crossing_hook
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.providers.types import ModelResponse
 
 
@@ -20,7 +20,7 @@ def _hooks():
 
 def test_llm_boundary_pre_call_halt():
     clear()
-    reg = RunRegistration(trace_id="r-halt")
+    reg = HopAttribution(trace_id="r-halt")
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1, "dimension": "trace"}],
@@ -52,7 +52,7 @@ def test_llm_boundary_pre_call_halt():
 
 def test_llm_boundary_mutate_max_output():
     clear()
-    reg = RunRegistration(trace_id="r-mut")
+    reg = HopAttribution(trace_id="r-mut")
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 10_000_000, "dimension": "trace"}],

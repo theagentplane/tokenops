@@ -8,7 +8,7 @@ from tokenops.control import ApplyControls, Halt, build_governor, wrap_complete
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.ledger import LIFETIME, TRACE_TOTAL_BUDGET, segment_key_for
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.control.pricing import build_price_book
 
 
@@ -27,7 +27,7 @@ CONFIG = {"governance": {"budgets": [], "policies": {"step_cap": {"max_steps": 3
 
 def test_attribution_ledger_and_policy_e2e_in_process():
     """Attribute → govern complete loop → assert attribution on ledger, spend, and HALT."""
-    reg = RunRegistration(
+    reg = HopAttribution(
         trace_id="e2e-run-1",
         intent="f500_frontier",
         user_dims={"Country": "US", "IsFortune500": "true", "user_id": "alice"},

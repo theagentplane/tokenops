@@ -12,7 +12,7 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
-from tokenops.control.attribution import _build_attribution, require_registration
+from tokenops.control.attribution import _build_attribution, require_hop
 from tokenops.control.context import current_governance, current_span
 from tokenops.control.core import NodeType, Observation, Usage
 from tokenops.control.usage import usage_from_counts
@@ -58,7 +58,7 @@ def observation_from_crossing(
     extra_tags: Mapping[str, str] | None = None,
     compaction: Mapping[str, int] | None = None,
 ) -> Observation:
-    reg = require_registration()
+    reg = require_hop()
     attr = _build_attribution(reg, service=service)
     node_type = _KIND_MAP.get(kind, "tool")
     tags = {"node_type": node_type, **(extra_tags or {})}

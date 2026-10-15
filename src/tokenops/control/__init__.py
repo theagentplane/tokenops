@@ -8,7 +8,12 @@ glossary at ``docs/product/policies-index.md`` and behavior docs at ``docs/polic
 ``core.py`` is the canonical runtime vocabulary.
 """
 
-from tokenops.control.attribution import merge_registration_dims, require_registration
+from tokenops.control.attribution import (
+    merge_hop_dims,
+    merge_registration_dims,
+    require_hop,
+    require_registration,
+)
 from tokenops.control.boundary import emit_observation, observation_from_crossing
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
@@ -64,7 +69,14 @@ install_crossing_hook()
 from tokenops.control.http import with_governance_errors
 from tokenops.control.instrument import instrument_app
 from tokenops.control.ledger_writers import flush_ledger_writes
-from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
+from tokenops.control.models import (
+    GovernanceMode,
+    HopAttribution,
+    NoGovernanceScopeError,
+    RunNotRegisteredError,
+    RunRegistration,
+    parse_governance_mode,
+)
 from tokenops.control.request_context import (
     RequestContext,
     bind_request_context,
@@ -119,11 +131,16 @@ __all__ = [
     "consume_carry",
     "step_to_observation",
     # attribution / unified run
-    "RunRegistration",
+    "HopAttribution",
+    "NoGovernanceScopeError",
+    "RunNotRegisteredError",  # deprecated alias
+    "RunRegistration",  # deprecated alias
     "GovernanceMode",
     "parse_governance_mode",
-    "merge_registration_dims",
-    "require_registration",
+    "merge_hop_dims",
+    "require_hop",
+    "merge_registration_dims",  # deprecated alias
+    "require_registration",  # deprecated alias
     "tokenops_run",
     "agentplane_run_scope",
     "TokenOpsBound",

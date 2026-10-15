@@ -177,17 +177,6 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
             ),
             default_params={"repeats": 4, "max_retries": 2},
         ),
-        # Re-enable only with persistent plane-side trajectory routes and quality gates.
-        # The standalone policy module remains available for research/tests.
-        "trajectory_hint": PolicyTemplate(
-            display_name="Trajectory hint",
-            factory=None,
-            disabled_reason=(
-                "trajectory_hint is temporarily disabled (remote-only control-plane work); "
-                "remove it from your governance config. See "
-                "docs/policies/trajectory_hint.md and config.build_governor for details."
-            ),
-        ),
     }
 )
 

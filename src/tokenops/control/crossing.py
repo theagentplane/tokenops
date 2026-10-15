@@ -57,11 +57,11 @@ def on_enter(info: CallInfo) -> dict[str, Any] | None:
     if _kind(info) != "llm" or _wrap_owns_precall.get():
         return None
 
-    from tokenops.control.context import current_governance, current_registration
+    from tokenops.control.context import current_governance, current_hop
     from tokenops.control.core import CallRequest
 
     gov_ctx = current_governance()
-    if gov_ctx is None or current_registration() is None:
+    if gov_ctx is None or current_hop() is None:
         return None
 
     governor = gov_ctx.governor
@@ -125,11 +125,11 @@ def on_leave(info: CallInfo) -> None:
 
 
 def on_crossing(info: CallInfo, result: Any) -> None:
-    """Project crossing → Observation when registration + governance are bound."""
+    """Project crossing → Observation when a hop attribution + governance are bound."""
     from tokenops.control.boundary import emit_observation, observation_from_crossing
-    from tokenops.control.context import current_governance, current_registration
+    from tokenops.control.context import current_governance, current_hop
 
-    if current_governance() is None or current_registration() is None:
+    if current_governance() is None or current_hop() is None:
         return
     gov = current_governance()
     state: dict[str, object] = dict(info.arguments)
