@@ -117,14 +117,11 @@ def test_unsupported_spellings_are_not_config_aliases(unsupported):
         build_governor({"policies": {unsupported: {}}}, toy_price)
 
 
-@pytest.mark.parametrize("params", [{}, {"enabled": True}, {"enabled": False}])
-def test_trajectory_hint_remains_known_but_unavailable(params):
-    assert "trajectory_hint" in policy_template_ids(include_disabled=True)
-    assert "trajectory_hint" not in policy_template_ids()
-    assert POLICY_TEMPLATES["trajectory_hint"].factory is None
-    assert "temporarily disabled" in policy_label("trajectory_hint")
-    with pytest.raises(ValueError, match="trajectory_hint is temporarily disabled"):
-        build_governor({"policies": {"trajectory_hint": params}}, toy_price)
+def test_trajectory_hint_is_not_a_template():
+    """It was removed (ADR 0005): naming it is an unknown policy, like any other typo."""
+    assert "trajectory_hint" not in POLICY_TEMPLATES
+    with pytest.raises(ValueError, match="unknown policy"):
+        build_governor({"policies": {"trajectory_hint": {}}}, toy_price)
 
 
 def test_template_adapter_cannot_register_a_different_policy_name(monkeypatch):

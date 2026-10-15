@@ -14,7 +14,7 @@ from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.core import Observation
 from tokenops.control.integration import wrap_stream
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.control.policies import (
     context_compaction,
     output_runaway,
@@ -27,7 +27,7 @@ from tokenops.providers.types import ModelResponse
 
 def _attr(trace_id):
     return _build_attribution(
-        RunRegistration(trace_id=trace_id, intent="t", user_dims={"user_id": "alice"}),
+        HopAttribution(trace_id=trace_id, intent="t", user_dims={"user_id": "alice"}),
         service="research",
     )
 
@@ -69,7 +69,7 @@ def test_retry_recovers_from_degenerate_output():
     gov = Governor(ledger, controls)
     gov.register(*output_runaway.build(repeats=4, max_retries=2))
 
-    reg = RunRegistration(trace_id="r1", intent="t", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="r1", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="research")
     ledger.open_run("r1")
     scripted = ScriptedModel(fail_n=2)
@@ -130,7 +130,7 @@ def test_cancel_tears_down_degenerate_stream_then_retries():
     gov = Governor(ledger, controls)
     gov.register(*output_runaway.build(repeats=4, max_retries=2))
 
-    reg = RunRegistration(trace_id="r2", intent="t", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="r2", intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="research")
     ledger.open_run("r2")
     stream = ScriptedStream(fail_n=2)

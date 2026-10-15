@@ -21,7 +21,7 @@ stored by, TokenOps.
 
 ### Hop attribution
 
-`tokenops_run` builds a frozen `RunRegistration(trace_id, intent, user_dims, mode)` for the hop:
+`tokenops_run` builds a frozen `HopAttribution(trace_id, intent, user_dims, mode)` for the hop:
 
 | Field | Source | Notes |
 |---|---|---|
@@ -36,7 +36,7 @@ Rules:
   intent or mode.
 - **A hop does not inherit** the entry hop's intent or dims. Each hop uses its own, so supply the
   dims your `tag` budgets key on at every hop.
-- **Outside a bound scope, boundaries fail closed** (`RunNotRegisteredError`).
+- **Outside a bound scope, boundaries fail closed** (`NoGovernanceScopeError`).
 - `corpus_profile` and other bench-only fields are not governance dimensions.
 
 ### Boundary observation

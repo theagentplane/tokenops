@@ -24,7 +24,7 @@ from tokenops.control import (
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
 from tokenops.control.core import Observation
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.control.policies import (
     concurrency_cap,
     context_compaction,
@@ -41,8 +41,8 @@ from tokenops.control.policies import (
 from tokenops.providers.types import ModelResponse
 
 
-def _reg(trace_id: str) -> RunRegistration:
-    return RunRegistration(trace_id=trace_id, intent="policy_it", user_dims={"user_id": "alice"})
+def _reg(trace_id: str) -> HopAttribution:
+    return HopAttribution(trace_id=trace_id, intent="policy_it", user_dims={"user_id": "alice"})
 
 
 def _attr(trace_id: str):

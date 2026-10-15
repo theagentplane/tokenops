@@ -35,7 +35,7 @@ def build_app():
 
     async def handler(payload: dict, headers: Mapping[str, str]) -> dict:
         with tokenops_run(client=client) as bound:
-            reg = bound.registration
+            reg = bound.hop
             trace_id = reg.trace_id
             attr = bound.attr
             governor = bound.governor

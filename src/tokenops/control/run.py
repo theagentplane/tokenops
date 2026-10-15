@@ -24,13 +24,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
-from tokenops.control.attribution import _build_attribution, merge_registration_dims
+from tokenops.control.attribution import _build_attribution, merge_hop_dims
 from tokenops.control.chronicle_trace_utils import chronicle_span
 from tokenops.control.config import build_governance_stack, build_governor
 from tokenops.control.context import (
     SpanContext,
     _governance_scope,
-    bind_registration,
+    bind_hop,
     bind_span,
     run_scope,
 )
@@ -42,7 +42,7 @@ from tokenops.control.crossing import install_crossing_hook
 from tokenops.control.engine import ApplyControls, Governor, PreviewControls
 from tokenops.control.ledger import PriceFn
 from tokenops.control.ledger_writers import writer_for
-from tokenops.control.models import GovernanceMode, RunRegistration, parse_governance_mode
+from tokenops.control.models import GovernanceMode, HopAttribution, parse_governance_mode
 from tokenops.control.pricing import build_price_book
 from tokenops.control.request_context import current_request_context
 from tokenops.repositories import ControlPlaneClient
@@ -54,12 +54,17 @@ logger = logging.getLogger("tokenops.run")
 class TokenOpsBound:
     """Objects bound for one hop under :func:`tokenops_run`."""
 
-    registration: RunRegistration
+    hop: HopAttribution
     span: SpanContext
     attr: Attribution
     governor: Governor
     controls: ApplyControls | PreviewControls
     client: ControlPlaneClient | None
+
+    @property
+    def registration(self) -> HopAttribution:
+        """Deprecated alias of ``hop``."""
+        return self.hop
 
 
 def _resolve_ambient(
@@ -122,7 +127,7 @@ def _resolve_ambient(
         agent_dims = rc.user_dims
     else:
         agent_dims = None
-    resolved_dims = merge_registration_dims(agent_dims, body)
+    resolved_dims = merge_hop_dims(agent_dims, body)
 
     if mode is not None:
         resolved_mode: GovernanceMode | str | None = mode
@@ -188,7 +193,7 @@ def tokenops_run(
         client_obj = client
 
     with chronicle_span(hdrs, service=svc) as trace:
-        reg = RunRegistration(
+        reg = HopAttribution(
             trace_id=trace.trace_id,
             intent=resolved_intent,
             user_dims=dict(resolved_dims),
@@ -227,13 +232,13 @@ def tokenops_run(
         if open_ledger_run:
             gov.ledger.open_run(reg.trace_id)
 
-        bind_registration(reg)
+        bind_hop(reg)
         bind_span(span)
         try:
             with run_scope(reg, span):
                 with _governance_scope(gov, attr, provider=prov or "", model=mdl or ""):
                     yield TokenOpsBound(
-                        registration=reg,
+                        hop=reg,
                         span=span,
                         attr=attr,
                         governor=gov,

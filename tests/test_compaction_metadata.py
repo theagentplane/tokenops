@@ -6,7 +6,7 @@ from conftest import toy_price
 from tokenops.control import ApplyControls, Governor, Ledger, wrap_complete
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, run_scope
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.control.policies import context_compaction
 from tokenops.providers.types import ModelResponse
 
@@ -15,7 +15,7 @@ def _run(chronicle_envelopes, *, ctx_max: int):
     controls = ApplyControls()
     gov = Governor(Ledger(price=toy_price), controls)
     gov.register(*context_compaction.build(ctx_max=ctx_max))
-    reg = RunRegistration(trace_id="a" * 32, intent="t", user_dims={"user_id": "alice"})
+    reg = HopAttribution(trace_id="a" * 32, intent="t", user_dims={"user_id": "alice"})
     attr = _build_attribution(reg, service="research")
     gov.ledger.open_run(reg.trace_id)
 

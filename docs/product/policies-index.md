@@ -24,7 +24,6 @@ a policy mandatory in custom configurations or change its documented enforcement
 | `cost_guard` | Cost guard | In default seed | [cost_guard.md](../policies/cost_guard.md) |
 | `context_compaction` | Context compaction | In default seed | [context_compaction.md](../policies/context_compaction.md) |
 | `output_runaway` | Output runaway | In default seed | [output_runaway.md](../policies/output_runaway.md) |
-| `trajectory_hint` | Trajectory hint | Temporarily disabled | [trajectory_hint.md](../policies/trajectory_hint.md) |
 
 ## Naming convention
 
@@ -75,13 +74,6 @@ Existing YAML keys, policy class imports, and stored instance IDs remain valid.
   with their original `registry` and `k` values. Update the key in copied YAML
   without changing its params; for a historical stored row, update only its
   `template`, retaining the instance `id` and params. No runtime alias is added.
-- **`trajectory_hint` remains known but temporarily disabled.** It is absent from
-  the seed and new Admin choices. Existing stored instances retain their IDs and
-  can be disabled in Admin; enabled instances must not enter the effective config.
-  `build_governor` rejects any YAML entry with that key, even if its params contain
-  `enabled: false`. Remove it from YAML rather than trying another spelling.
-  The standalone module remains for research/tests; see its
-  [limitations and re-enablement requirements](../policies/trajectory_hint.md).
 - Descriptions such as "tool-call validity", the demo chip ID `cost_cap`, and
   historical benchmark scenario names are not additional policy IDs. Use the
   glossary to identify their actual templates rather than mechanically renaming

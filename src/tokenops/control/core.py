@@ -173,7 +173,6 @@ class CallRequest:
     model: str
     estimated_input_tokens: int = 0
     max_output_tokens: int | None = None
-    primary_agent_turn: bool = False  # first main-agent LLM turn (browser-use aux LLMs may precede)
 
 
 # =========================================================================== #

@@ -7,7 +7,7 @@ from tokenops.control.boundary import observation_from_crossing
 from tokenops.control.context import SpanContext, run_scope
 from tokenops.control.core import Attribution, Usage
 from tokenops.control.integration import step_to_observation
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 from tokenops.control.pricing import Rate, build_price_book
 from tokenops.providers import anthropic as ant
 from tokenops.providers import openai as oa
@@ -19,7 +19,7 @@ PRICE = build_price_book({"fixture": Rate(500000, 3000000, cached=50000)})
 
 def crossing(result, provider="openai"):
     with run_scope(
-        RunRegistration(trace_id="offline-137"), SpanContext(span_id="s", service="test")
+        HopAttribution(trace_id="offline-137"), SpanContext(span_id="s", service="test")
     ):
         return observation_from_crossing(
             boundary_id="test.chat",

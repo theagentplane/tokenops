@@ -13,7 +13,7 @@ from tokenops.control import (
 from tokenops.control.attribution import _build_attribution
 from tokenops.control.context import SpanContext, _governance_scope, clear, run_scope
 from tokenops.control.crossing import TokenOpsHook
-from tokenops.control.models import RunRegistration
+from tokenops.control.models import HopAttribution
 
 
 def test_install_crossing_hook_is_idempotent():
@@ -49,7 +49,7 @@ def test_on_crossing_noop_when_unbound():
 def test_on_crossing_observes_when_governed():
     clear()
     install_crossing_hook()
-    reg = RunRegistration(trace_id="hook-1", intent="demo")
+    reg = HopAttribution(trace_id="hook-1", intent="demo")
     config = {
         "governance": {
             "budgets": [{"id": "run_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],

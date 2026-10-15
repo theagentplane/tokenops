@@ -25,8 +25,7 @@ tool_output_cap        the current call's tool output only
 time_budget            the wall clock since the hop started
 =====================  ==========================================================
 
-``trajectory_hint`` is a known template that is disabled in ``build_governor``; it has no
-implementation module (its cross-run index lived in the removed SQLite store).
+``trajectory_hint`` (a cross-run playbook hint) was removed in 1.0.1; see ADR 0005.
 """
 
 from tokenops.control.policies import (
