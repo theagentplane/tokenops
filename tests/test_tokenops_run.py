@@ -19,12 +19,14 @@ from tokenops import (
     tokenops_run,
 )
 from tokenops.capabilities.crossing import TokenOpsHook, install_crossing_hook
+from tokenops.framework.config import build_governance_stack
 from tokenops.framework.context import (
     clear,
     current_governance,
     current_hop,
 )
 from tokenops.framework.models import GovernanceMode
+from tokenops.framework.pricing import build_price_book
 from tokenops.repositories import ControlPlaneError, ControlPlaneUnavailable
 
 CONFIG = {
@@ -198,3 +200,13 @@ def test_instrument_app_binds_context_and_hook():
     assert body["intent"] == "mw_intent"
     assert body["service"] == "planner"
     assert body["trace_id"]
+
+
+def test_shared_governor_for_multiple_runs(monkeypatch):
+    monkeypatch.delenv("CONTROL_PLANE_URL", raising=False)
+    gov, _ = build_governance_stack(CONFIG, build_price_book())
+
+    for _ in range(5):
+        with tokenops_run(governor=gov, service="planner"):
+            pass
+        assert len(gov.ledger.runs) == 0, "LocalRunState leaked after tokenops_run exited"

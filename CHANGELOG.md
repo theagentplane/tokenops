@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `Ledger.mark_halted` and `Ledger.is_halted` no longer insert a ghost `LocalRunState` for
+  trace IDs that were never opened via `open_run`, preventing unbounded memory growth in
+  long-lived / shared-governor processes (#115).
+
 ## [2.0.1] - 2026-10-15
 
 ### Changed

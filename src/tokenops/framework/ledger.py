@@ -312,10 +312,9 @@ class Ledger:
     def mark_halted(self, trace_id: str, reason: str = "") -> None:
         with self._lock:
             rs = self.runs.get(trace_id)
-            if rs is None:
-                rs = self.runs[trace_id] = LocalRunState()
-            rs.halted = True
-            rs.halt_reason = reason or rs.halt_reason
+            if rs is not None:
+                rs.halted = True
+                rs.halt_reason = reason or rs.halt_reason
             if self._backend is not None:
                 self._backend.apply_events([halt_event("halt_mark", trace_id, reason=reason)])
 
@@ -349,9 +348,7 @@ class Ledger:
             if self._backend is not None:
                 self._barrier()
                 state = self._backend.precheck(PrecheckRequest(trace_id=trace_id, want=["halt"]))
-                if state.halted:
-                    if rs is None:
-                        rs = self.runs[trace_id] = LocalRunState()
+                if state.halted and rs is not None:
                     rs.halted = True
                     rs.halt_reason = state.halt_reason
                 return state.halted
