@@ -105,6 +105,6 @@ TokenOps 1.0 is the governors only. Honest limits:
   TokenOps wrappers ([#173](https://github.com/theagentplane/tokenops/issues/173)).
 - SQLite serializes writers, so a TokenOps agent and Chronicle writing at once queue behind
   each other (bounded by the plane's `busy_timeout`) rather than failing; this needs
-  `agentplane-control-plane>=1.0.1`
+  `agentplane-control-plane>=1.0.2`
   ([control-plane#28](https://github.com/theagentplane/control-plane/issues/28)). Use a
   database that supports concurrent writers for production throughput.

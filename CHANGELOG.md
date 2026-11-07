@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tool_output_prune` (opt-in): hides comments and docstrings in source-code tool results, keeping code and the
   line count. Python by default; `languages` adds Go, Java, Rust and C/C++ (or `"auto"`), detected from the text alone
   ([#191](https://github.com/theagentplane/tokenops/issues/191)).
+  Plane-managed configuration needs `agentplane-control-plane>=1.0.2`, which adds the template to its allow-list.
 
 ## [2.0.1] - 2026-10-15
 
