@@ -34,8 +34,9 @@ class ToolOutputPruneDetector(Detector):
         docstrings: bool = True,
         min_saved_chars: int = 200,
         languages: str | Sequence[str] = ("python",),
+        keep_jsdoc_types: bool = True,
     ) -> None:
-        self.handlers = resolve_languages(languages)
+        self.handlers = resolve_languages(languages, keep_jsdoc_types=keep_jsdoc_types)
         self.comments = comments
         self.docstrings = docstrings
         self.min_saved_chars = min_saved_chars
@@ -65,6 +66,7 @@ def build(
     docstrings: bool = True,
     min_saved_chars: int = 200,
     languages: str | Sequence[str] = ("python",),
+    keep_jsdoc_types: bool = True,
 ) -> tuple[Detector, Policy]:
     return (
         ToolOutputPruneDetector(
@@ -72,6 +74,7 @@ def build(
             docstrings=docstrings,
             min_saved_chars=min_saved_chars,
             languages=languages,
+            keep_jsdoc_types=keep_jsdoc_types,
         ),
         ToolOutputPrunePolicy(),
     )

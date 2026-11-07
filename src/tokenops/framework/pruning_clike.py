@@ -19,7 +19,7 @@ from bisect import bisect_right
 from typing import Literal
 
 from tokenops.framework.pruning_clex import lex_c_style
-from tokenops.framework.pruning_types import CLexConfig, Span
+from tokenops.framework.pruning_types import CLexConfig, CLexed, Span
 
 HIDDEN_DOC = "/* (doc hidden) */"
 
@@ -50,6 +50,12 @@ class CStyleHandler:
         False  # `/*! */` is a doc comment (Rust); elsewhere it is a kept license block
     )
     cgo = False  # a comment right above `import "C"` is code (Go)
+    keep_line = _KEEP_LINE  # line comments that must stay (matched at the start of the comment)
+    keep_block = _KEEP_BLOCK  # block comments that must stay
+
+    def lex(self, text: str) -> CLexed | None:
+        """Comments and code skeleton of `text`, or None to refuse. Other lexers (JS, shell, SQL) override this."""
+        return lex_c_style(text, self.cfg)
 
     def score(self, text: str) -> float:
         return float(len(self.structure.findall(text)))
@@ -61,7 +67,7 @@ class CStyleHandler:
     # -- LanguageHandler ------------------------------------------------------------------------------------
 
     def spans(self, text: str) -> list[Span] | None:
-        lexed = lex_c_style(text, self.cfg)
+        lexed = self.lex(text)
         if lexed is None:
             return None
         lines = text.split("\n")
@@ -115,11 +121,12 @@ class CStyleHandler:
         body = span.text
         if body.startswith("/*!"):
             return not self.bang_block_is_doc
-        return bool(_KEEP_LINE.match(body) if body.startswith("//") else _KEEP_BLOCK.match(body))
+        return bool(
+            self.keep_block.match(body) if body.startswith("/*") else self.keep_line.match(body)
+        )
 
     def same_code(self, before: str, after: str) -> bool:
-        a = lex_c_style(before, self.cfg)
-        b = lex_c_style(after, self.cfg)
+        a, b = self.lex(before), self.lex(after)
         return a is not None and b is not None and a.skeleton == b.skeleton
 
     # -- helpers --------------------------------------------------------------------------------------------
@@ -157,6 +164,6 @@ class CStyleHandler:
         return out
 
     def _line_kind(self, body: str) -> str:
-        if _KEEP_LINE.match(body):
+        if self.keep_line.match(body):
             return "keep"
         return "doc" if self._line_is_doc(body) else "plain"

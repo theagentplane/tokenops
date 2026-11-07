@@ -177,7 +177,10 @@ language-specific, so each language needs its own rules and its own evidence.
 | Go, Java, Rust, C/C++ handlers | Implemented | `pruning_go.py`, `pruning_java.py`, `pruning_rust.py`, `pruning_c.py` |
 | 5.3 detection from the text alone, refusal when close | Implemented (`select_handler`: best >= 1.5x runner-up and 2 more) | `framework/pruning.py` |
 | `languages: [...]` / `"auto"` config | Implemented, default `["python"]` | `framework/config.py`, `pruning_languages.py` |
-| 5.4 option C, tree-sitter | Not built; JS/TS, PHP, Ruby, shell, SQL not supported | |
+| JS/TS handler | Implemented with a hand-written lexer (regex-or-division from the previous token, refuse when unsure; template literals; JSX refused). JSDoc with type tags stays unless `keep_jsdoc_types` is false | `pruning_jslex.py`, `pruning_js.py` |
+| Shell handler | Implemented; not in `"auto"` (a window can start inside a heredoc) | `pruning_shlex.py`, `pruning_shell.py` |
+| SQL handler | Implemented; refuses on dialect conflicts (backslash escapes, `#` comments) | `pruning_sqllex.py`, `pruning_sql.py` |
+| 5.4 option C, tree-sitter | Not built, and the JS/TS lexer is hand-written, so the optional extra stays an open question; PHP and Ruby not supported | |
 | 5.6 evidence for default-on | Parity and fragment tests only; no replay or live run in these languages | |
 
 Deviations from 5.2, and choices it left open:

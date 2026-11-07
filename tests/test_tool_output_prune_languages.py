@@ -343,7 +343,7 @@ def test_policy_prunes_go_when_enabled():
 
 
 def test_resolve_languages():
-    assert [h.name for h in resolve_languages("auto")] == list(HANDLERS)
+    assert [h.name for h in resolve_languages("auto")] == [k for k in HANDLERS if k != "shell"]
     assert [h.name for h in resolve_languages(["C++", "golang", "c"])] == ["c", "go"]
     with pytest.raises(ValueError, match="unknown language"):
         resolve_languages(["cobol"])
