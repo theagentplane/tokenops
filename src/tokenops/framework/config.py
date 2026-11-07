@@ -51,6 +51,7 @@ from tokenops.framework.policies import (
     time_budget,
     tool_fix,
     tool_output_cap,
+    tool_output_prune,
 )
 
 
@@ -138,6 +139,15 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
             display_name="Tool output cap",
             factory=lambda p, c: tool_output_cap.build(p.get("cap_tokens", 8000)),
             default_params={"cap_tokens": 8000},
+        ),
+        "tool_output_prune": PolicyTemplate(
+            display_name="Tool output prune",
+            factory=lambda p, c: tool_output_prune.build(
+                comments=p.get("comments", True),
+                docstrings=p.get("docstrings", True),
+                min_saved_chars=p.get("min_saved_chars", 200),
+            ),
+            default_params={"comments": True, "docstrings": True, "min_saved_chars": 200},
         ),
         "progress_guard": PolicyTemplate(
             display_name="Progress guard",
