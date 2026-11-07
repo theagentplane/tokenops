@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tool_output_prune` (opt-in): hides comments and docstrings in source-code tool results, keeping code and the
+  line count. Python by default; `languages` adds Go, Java, Rust and C/C++ (or `"auto"`), detected from the text alone
+  ([#191](https://github.com/theagentplane/tokenops/issues/191)).
+
 ## [2.0.1] - 2026-10-15
 
 ### Changed

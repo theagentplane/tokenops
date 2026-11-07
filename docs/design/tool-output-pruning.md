@@ -167,6 +167,32 @@ is consistent with the agent reading more when explanations are hidden, but is n
 The Python implementation is a hand-written lexer on the standard library. The approach generalises, but the hazards are
 language-specific, so each language needs its own rules and its own evidence.
 
+**Implementation status (first multi-language increment, [#191](https://github.com/theagentplane/tokenops/issues/191)).**
+
+| Part | Status | Where |
+|---|---|---|
+| 5.5 `LanguageHandler` interface and shared driver | Implemented | `framework/pruning_types.py`, `framework/pruning.py` |
+| Python handler | Implemented, no behaviour change | `framework/pruning_python.py` |
+| 5.4 option B, shared C-style lexer | Implemented (nested comments, raw strings, text blocks, char/lifetime rules, `\` continuation) | `framework/pruning_clex.py`, `pruning_clike.py` |
+| Go, Java, Rust, C/C++ handlers | Implemented | `pruning_go.py`, `pruning_java.py`, `pruning_rust.py`, `pruning_c.py` |
+| 5.3 detection from the text alone, refusal when close | Implemented (`select_handler`: best >= 1.5x runner-up and 2 more) | `framework/pruning.py` |
+| `languages: [...]` / `"auto"` config | Implemented, default `["python"]` | `framework/config.py`, `pruning_languages.py` |
+| 5.4 option C, tree-sitter | Not built; JS/TS, PHP, Ruby, shell, SQL not supported | |
+| 5.6 evidence for default-on | Parity and fragment tests only; no replay or live run in these languages | |
+
+Deviations from 5.2, and choices it left open:
+
+- `// SAFETY:` (Rust) **stays**, as does `// SPDX-License-Identifier`; both are cheap and carry meaning.
+- A plain license header block (`/* ... */`) is an ordinary comment and is hidden; only `/*! ... */` is kept (except in
+  Rust, where it is an inner doc comment).
+- Java `///` is treated as a doc comment (JEP 467 Markdown doc comments).
+- The Go doc rule is "a `//` block directly above `func`, `type`, `var`, `const` or `package`"; other `//` blocks are
+  ordinary comments.
+- The safety contract is a code skeleton: whitespace and comments collapse to one space, strings are kept verbatim; the
+  hidden text is re-lexed and must give the same skeleton.
+- Changed for all languages, Python included: trailing blank lines left by a hidden last comment are no longer stripped, so
+  the line count is exactly unchanged (the fragment property test found this).
+
 ### 5.1 Why Python-only is a real limit
 
 SWE-bench Verified is Python. Agents in the field read Java, TypeScript, Go, Rust, C and C++, Ruby, PHP and shell too.
