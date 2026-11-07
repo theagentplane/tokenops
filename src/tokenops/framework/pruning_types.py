@@ -32,19 +32,15 @@ class LanguageHandler(Protocol):
 
     def score(self, text: str) -> float:
         """How strongly `text` has this language's structure; 0 when it does not."""
-        ...
 
     def spans(self, text: str) -> list[Span] | None:
         """Comment and docstring spans, or None to refuse (the text does not lex cleanly)."""
-        ...
 
     def keep(self, span: Span) -> bool:
         """True for a span that must stay visible (a comment a tool reads, a pragma)."""
-        ...
 
     def same_code(self, before: str, after: str) -> bool:
         """The safety contract: the code is identical before and after, comments and docstrings aside."""
-        ...
 
 
 @dataclass(frozen=True)
