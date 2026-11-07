@@ -137,6 +137,9 @@ class ApplyControls:
     call: _ResolvedCall = field(default_factory=_ResolvedCall)
     retry: bool = False
     tool_result_override: str | None = None  # deep INJECT: substitute the last tool result
+    shaped_result: str | None = (
+        None  # a pruner's rewrite of the last tool result (applied before the cap measures)
+    )
     max_carry: int = 3  # steer messages carried onto one dispatch; the rest are dropped
     dropped_carry: int = 0  # how many were dropped, for the dashboard
 
@@ -152,6 +155,12 @@ class ApplyControls:
         crossing). One-shot — cleared on read."""
         val = self.tool_result_override
         self.tool_result_override = None
+        return val
+
+    def take_shaped_result(self) -> str | None:
+        """Consume the pruned text of the last tool result, if a pruner rewrote it. One-shot — cleared on read."""
+        val = self.shaped_result
+        self.shaped_result = None
         return val
 
     def apply(self, action: Action) -> None:
@@ -318,6 +327,15 @@ class Governor:
         ]
         self._enforce(signals)
         return step
+
+    def shape_tool_result(self, boundary_id: str, text: str) -> str | None:
+        """Run each detector's ``shape_tool_result`` in registration order; the new text, or None if none changed it."""
+        shaped = text
+        for d in self._detectors:
+            new = d.shape_tool_result(boundary_id, shaped)
+            if new is not None:
+                shaped = new
+        return None if shaped == text else shaped
 
     def tick(self, now: float) -> None:
         signals = [s for d in self._detectors if (s := d.tick(now, self.ledger)) is not None]
