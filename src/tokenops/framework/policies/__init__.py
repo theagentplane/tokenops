@@ -22,6 +22,7 @@ context_compaction     in process: the recent step window
 output_runaway         the current call's output only
 tool_fix               the current call's tool request only
 tool_output_cap        the current call's tool output only
+tool_output_prune      the current call's tool output only (rewrites it before the cap measures it)
 time_budget            the wall clock since the hop started
 =====================  ==========================================================
 
@@ -40,6 +41,7 @@ from tokenops.framework.policies import (
     time_budget,
     tool_fix,
     tool_output_cap,
+    tool_output_prune,
 )
 
 __all__ = [
@@ -54,4 +56,5 @@ __all__ = [
     "time_budget",
     "tool_fix",
     "tool_output_cap",
+    "tool_output_prune",
 ]

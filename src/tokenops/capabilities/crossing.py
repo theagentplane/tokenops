@@ -124,6 +124,40 @@ def on_leave(info: CallInfo) -> None:
         _inflight_seg.set(None)
 
 
+_TEXT_KEYS = ("output", "stdout", "text", "content")
+
+
+def _tool_text(result: Any) -> str | None:
+    """The text of a tool result: the string itself, or the first string under a conventional key of a dict."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        for key in _TEXT_KEYS:
+            value = result.get(key)
+            if isinstance(value, str):
+                return value
+    return None
+
+
+def _shape_tool_result(governor: Any, controls: Any, name: str, result: Any) -> Any:
+    """Let the pruner policies rewrite the tool result text *before* it is observed, so the cap measures what the agent
+    will receive. The rewrite is left on ``controls.shaped_result`` for the host to apply; the wrapped function's own
+    return value is never changed here."""
+    text = _tool_text(result)
+    shape = getattr(governor, "shape_tool_result", None)
+    if text is None or shape is None:
+        return result
+    shaped = shape(name, text)
+    if shaped is None:
+        return result
+    if controls is not None and hasattr(controls, "shaped_result"):
+        controls.shaped_result = shaped
+    if isinstance(result, str):
+        return shaped
+    key = next(k for k in _TEXT_KEYS if isinstance(result.get(k), str))
+    return {**result, key: shaped}
+
+
 def on_crossing(info: CallInfo, result: Any) -> None:
     """Project crossing → Observation when a hop attribution + governance are bound."""
     from tokenops.framework.boundary import emit_observation, observation_from_crossing
@@ -146,6 +180,8 @@ def on_crossing(info: CallInfo, result: Any) -> None:
         comp = getattr(call, "compaction", None) if call is not None else None
         if comp is not None:
             compaction = dict(comp)
+    if _kind(info) == "tool" and governor is not None:
+        result = _shape_tool_result(governor, controls, info.name, result)
     obs = observation_from_crossing(
         boundary_id=info.name,
         kind=_kind(info),

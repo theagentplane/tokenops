@@ -20,6 +20,7 @@ a policy mandatory in custom configurations or change its documented enforcement
 | `concurrency_cap` | Concurrency cap | In default seed | [concurrency_cap.md](../policies/concurrency_cap.md) |
 | `tool_fix` | Tool fix | In default seed | [tool_fix.md](../policies/tool_fix.md) |
 | `tool_output_cap` | Tool output cap | In default seed | [tool_output_cap.md](../policies/tool_output_cap.md) |
+| `tool_output_prune` | Tool output prune | Opt-in | [tool_output_prune.md](../policies/tool_output_prune.md) |
 | `progress_guard` | Progress guard | In default seed | [progress_guard.md](../policies/progress_guard.md) |
 | `cost_guard` | Cost guard | In default seed | [cost_guard.md](../policies/cost_guard.md) |
 | `context_compaction` | Context compaction | In default seed | [context_compaction.md](../policies/context_compaction.md) |

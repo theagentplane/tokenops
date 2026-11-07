@@ -327,6 +327,10 @@ class Detector(ABC):
         """Inspect on a clock, independent of events (timeouts, stalls)."""
         return None
 
+    def shape_tool_result(self, boundary_id: str, text: str) -> str | None:
+        """Rewrite a tool result's text before it is observed (pruning). Return the new text, or None to leave it."""
+        return None
+
     def reset(self, trace_id: str) -> None:
         """Drop any per-run state held for ``trace_id``."""
         return None
