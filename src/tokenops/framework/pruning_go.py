@@ -14,7 +14,7 @@ from tokenops.framework.pruning_types import CLexConfig
 _STRUCTURE = re.compile(
     r"^(?:package \w+\s*$|import (?:\(|\"|\w+ \")|func (?:\([^)]*\) )?\w+[\[(]|type \w+ (?:struct|interface)\b"
     r"|type \w+ [\w\[\]*.]+$)"
-    r"|^\s*(?:[\w, .\[\]*]+ := |defer |go (?:func|\w+\()|if err != nil|for .*\brange\b|(?:var|const) \w+)",
+    r"|^\s*(?:[\w, .\[\]*]+ := |defer |go (?:func|\w+\()|if err != nil|for .*\brange\b|(?:var|const) (?:\(|\w+ [\w\[\]*.]+(?: =.*)?$))",
     re.M,
 )
 _DECLARATION = re.compile(r"(?:func|type|var|const|package)\b")

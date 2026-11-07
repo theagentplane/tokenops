@@ -147,12 +147,14 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
                 docstrings=p.get("docstrings", True),
                 min_saved_chars=p.get("min_saved_chars", 200),
                 languages=p.get("languages", ["python"]),
+                keep_jsdoc_types=p.get("keep_jsdoc_types", True),
             ),
             default_params={
                 "comments": True,
                 "docstrings": True,
                 "min_saved_chars": 200,
                 "languages": ["python"],
+                "keep_jsdoc_types": True,
             },
         ),
         "progress_guard": PolicyTemplate(
