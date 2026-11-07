@@ -180,11 +180,6 @@ def test_events_are_not_deduplicated(ledger_client: ControlPlaneClient):
     assert state.spent == {f"dedupe_probe|{segment}|lifetime": 20}
 
 
-# Templates released here before the plane's allow-list has them. TEMPORARY: remove each name once the plane
-# release that adds it is the minimum in pyproject.toml. tool_output_prune: theagentplane/control-plane#41.
-_NOT_YET_IN_PLANE = frozenset({"tool_output_prune"})
-
-
 @_NEEDS_PLANE
 def test_every_enabled_policy_template_is_known_to_the_plane():
     """A template the plane does not know cannot be written to it (a 400)."""
@@ -192,5 +187,4 @@ def test_every_enabled_policy_template_is_known_to_the_plane():
 
     from tokenops.framework.config import policy_template_ids
 
-    unknown = set(policy_template_ids()) - set(PLANE_TEMPLATES)
-    assert unknown <= _NOT_YET_IN_PLANE, f"the plane does not know {sorted(unknown)}"
+    assert set(policy_template_ids()) <= set(PLANE_TEMPLATES)
