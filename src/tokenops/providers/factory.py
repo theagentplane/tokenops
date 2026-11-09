@@ -10,6 +10,8 @@ def complete(
     max_output_tokens: int | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
+    extra_body: dict | None = None,
+    extra_headers: dict | None = None,
 ) -> ModelResponse:
     # Import the provider module lazily so an unused provider's SDK is never a hard
     # dependency (e.g. running OpenAI-only without the anthropic package installed).
@@ -29,6 +31,8 @@ def complete(
         max_output_tokens=max_output_tokens,
         frequency_penalty=frequency_penalty,
         presence_penalty=presence_penalty,
+        extra_body=extra_body,
+        extra_headers=extra_headers,
     )
 
 
@@ -40,6 +44,8 @@ def stream_complete(
     max_output_tokens=None,
     frequency_penalty=None,
     presence_penalty=None,
+    extra_body=None,
+    extra_headers=None,
 ):
     """Yield visible output text chunks. Used by the CANCEL actuator (``wrap_stream``).
 
@@ -61,4 +67,6 @@ def stream_complete(
         max_output_tokens=max_output_tokens,
         frequency_penalty=frequency_penalty,
         presence_penalty=presence_penalty,
+        extra_body=extra_body,
+        extra_headers=extra_headers,
     )

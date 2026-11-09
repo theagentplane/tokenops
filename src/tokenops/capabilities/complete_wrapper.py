@@ -25,6 +25,7 @@ from tokenops.framework.message_steering import (
     consume_carry,
     estimate_input_tokens,
 )
+from tokenops.providers.cache_affinity import open_affinity_run
 
 __all__ = ["DispatchFn", "policy_metadata", "tighten_cap", "wrap_complete"]
 
@@ -39,21 +40,25 @@ def tighten_cap(cap: int | None) -> int:
     return max(64, (cap or _RETRY_BASE_CAP) // 2)
 
 
-def policy_metadata(controls: ApplyControls) -> Callable[[object], dict[str, int]]:
+def policy_metadata(
+    controls: ApplyControls, extra: Callable[[], dict[str, str]] | None = None
+) -> Callable[[object], dict[str, Any]]:
     """Envelope metadata for what a policy did to this call.
 
     The plane stores no per-policy statistics (control-plane ADR 0009), so what a policy
     achieved is recorded on the envelope instead: ``tokenops.compaction_tokens_before``,
     ``..._tokens_after`` and ``..._tokens_saved`` when ``context_compaction`` rewrote the
-    prompt. Read after the dispatch returns, so ``controls.call`` is this call's.
+    prompt. Read after the dispatch returns, so ``controls.call`` is this call's. ``extra``
+    adds more entries (``tokenops.cache_affinity``, see ``AffinityRun.metadata``).
     """
 
-    def extract(_result: object) -> dict[str, int]:
+    def extract(_result: object) -> dict[str, Any]:
+        meta: dict[str, Any] = extra() if extra is not None else {}
         call = getattr(controls, "call", None)
         compaction = getattr(call, "compaction", None) if call is not None else None
-        if not compaction:
-            return {}
-        return {f"tokenops.compaction_{key}": int(value) for key, value in compaction.items()}
+        if compaction:
+            meta.update({f"tokenops.compaction_{k}": int(v) for k, v in compaction.items()})
+        return meta
 
     return extract
 
@@ -69,6 +74,7 @@ def wrap_complete(
     est_input_fn: Callable[[object], int] | None = None,
     service: str = "",
     max_call_retries: int = 3,
+    cache_affinity: Any = None,
 ) -> Callable[[str, str, Any], object]:
     """Wrap a ``complete(provider, model, messages)`` entry point for **pre_call** governance
     and the **RETRY** actuator.
@@ -79,13 +85,21 @@ def wrap_complete(
     After each traced dispatch, ``output_runaway`` may set ``controls.retry``; the call is
     re-issued with a tighter output cap and raised frequency/presence penalties, bounded
     by ``max_call_retries`` and by the policy's own retry budget (INJECT once exhausted).
+
+    ``cache_affinity`` (off by default) sends one routing hint per run so the provider's prompt
+    cache hits: ``"auto"``, or ``{"mode": "auto" | {"body_field": ...} | {"header": ...},
+    "key": "run" | "fixed:<string>"}``. See :mod:`tokenops.providers.cache_affinity`.
     """
     install_crossing_hook()
     estimate = est_input_fn or estimate_input_tokens
     seg = f"trace:{attr.trace_id}"
     boundary_id = f"{service or attr.agent}.chat"
+    affinity = open_affinity_run(cache_affinity, provider, attr.trace_id)
     traced = wrap_llm(
-        boundary_id, dispatch, provider=provider, extract_metadata=policy_metadata(controls)
+        boundary_id,
+        dispatch,
+        provider=provider,
+        extract_metadata=policy_metadata(controls, affinity.metadata),
     )
     controls.compaction_supported = True  # wrap_complete IS the prompt-assembly hook
 
@@ -116,7 +130,10 @@ def wrap_complete(
                 while True:
                     controls.retry = False
                     # Chronicle records + on_crossing → Governor.observe (when bound)
-                    response = traced(p, use_model, messages, max_output_tokens=cap, **penalties)
+                    response = affinity.call(
+                        lambda **kw: traced(p, use_model, messages, **kw),
+                        {"max_output_tokens": cap, **penalties},
+                    )
                     if controls.retry and attempt < max_call_retries:
                         attempt += 1
                         cap = tighten_cap(cap)

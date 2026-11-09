@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Cache affinity (opt-in): `wrap_complete(..., cache_affinity="auto")` and `wrap_stream` send one routing hint per
+  agent run (`prompt_cache_key` for OpenAI and Azure, or an explicit body field or header) so the provider's prompt
+  cache hits, with one fail-soft re-send if the provider refuses it. Off by default; see
+  [docs/cache-affinity.md](docs/cache-affinity.md)
+  ([#196](https://github.com/theagentplane/tokenops/issues/196)).
+
 ## [2.1.0] - 2026-11-08
 
 ### Added

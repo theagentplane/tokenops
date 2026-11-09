@@ -29,6 +29,7 @@ from tokenops.framework.message_steering import (
     estimate_input_tokens,
 )
 from tokenops.framework.policies._util import max_ngram_repeat
+from tokenops.providers.cache_affinity import open_affinity_run
 
 __all__ = ["wrap_stream"]
 
@@ -90,13 +91,18 @@ def wrap_stream(
     check_every: int = 4,
     max_call_retries: int = 3,
     on_cancel: Callable[[], None] | None = None,
+    cache_affinity: Any = None,
 ) -> Callable[[str, str, Any], object]:
-    """Streaming variant of ``wrap_complete`` that owns the **CANCEL** actuator."""
+    """Streaming variant of ``wrap_complete`` that owns the **CANCEL** actuator.
+
+    ``cache_affinity`` is the same opt-in routing hint as on ``wrap_complete``.
+    """
     install_crossing_hook()
     seg = f"trace:{attr.trace_id}"
     estimate = estimate_input_tokens
     boundary_id = f"{service or attr.agent}.chat"
     cancel_flag = {"cancelled": False}
+    affinity = open_affinity_run(cache_affinity, provider, attr.trace_id)
 
     def _stream_once(
         p: str,
@@ -105,16 +111,19 @@ def wrap_stream(
         max_output_tokens: int | None = None,
         **penalties: float,
     ) -> _StreamResult:
-        cancelled, text = _stream_and_watch(
-            stream_dispatch,
-            p,
-            use_model,
-            messages,
-            cap=max_output_tokens,
-            penalties=penalties,
-            ngram=ngram,
-            repeats=repeats,
-            check_every=check_every,
+        cancelled, text = affinity.call(
+            lambda **kw: _stream_and_watch(
+                stream_dispatch,
+                p,
+                use_model,
+                messages,
+                cap=max_output_tokens,
+                penalties=kw,
+                ngram=ngram,
+                repeats=repeats,
+                check_every=check_every,
+            ),
+            penalties,
         )
         cancel_flag["cancelled"] = cancelled
         return _StreamResult(
@@ -127,7 +136,7 @@ def wrap_stream(
         boundary_id,
         _stream_once,
         provider=provider,
-        extract_metadata=policy_metadata(controls),
+        extract_metadata=policy_metadata(controls, affinity.metadata),
     )
 
     def governed(p: str, m: str, messages: Any) -> object:

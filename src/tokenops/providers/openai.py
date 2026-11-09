@@ -14,6 +14,8 @@ def chat(
     max_output_tokens: int | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
+    extra_body: dict | None = None,
+    extra_headers: dict | None = None,
 ) -> ModelResponse:
     if provider == "openai":
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -24,6 +26,10 @@ def chat(
             kwargs["frequency_penalty"] = frequency_penalty
         if presence_penalty is not None:
             kwargs["presence_penalty"] = presence_penalty
+        if extra_body:  # cache affinity: routing hint in the request body
+            kwargs["extra_body"] = extra_body
+        if extra_headers:  # cache affinity: routing hint as a header
+            kwargs["extra_headers"] = extra_headers
         response = client.chat.completions.create(**kwargs)
         usage = response.usage
         content = response.choices[0].message.content or ""
@@ -54,6 +60,8 @@ def stream_chat(
     max_output_tokens: int | None = None,
     frequency_penalty: float | None = None,
     presence_penalty: float | None = None,
+    extra_body: dict | None = None,
+    extra_headers: dict | None = None,
 ):
     """Yield visible output text chunks as they stream. The control plane's CANCEL tears
     this generator down mid-flight (``generator.close()``) to stop a runaway bleed."""
@@ -65,6 +73,10 @@ def stream_chat(
         kwargs["frequency_penalty"] = frequency_penalty
     if presence_penalty is not None:
         kwargs["presence_penalty"] = presence_penalty
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    if extra_headers:
+        kwargs["extra_headers"] = extra_headers
     for chunk in client.chat.completions.create(**kwargs):
         if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
