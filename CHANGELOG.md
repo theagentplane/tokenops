@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-09
+
 ### Added
 
 - Cache affinity (opt-in): `wrap_complete(..., cache_affinity="auto")` and `wrap_stream` send one routing hint per
