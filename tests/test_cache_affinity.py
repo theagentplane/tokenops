@@ -172,3 +172,30 @@ def test_stream_wrapper_applies_and_falls_back() -> None:
     )  # fmt: skip
     _call(governed, gov, reg, attr, n=2)
     assert ["extra_body" in c for c in seen] == [True, False, False]
+
+
+def test_the_built_in_openai_dispatch_forwards_the_hint(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from tokenops.providers import openai as openai_module
+
+    sent: dict = {}
+
+    class _Client:
+        def __init__(self, **_kw) -> None:
+            create = lambda **kw: (  # noqa: E731
+                sent.update(kw)
+                or SimpleNamespace(
+                    usage=None, choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
+                )
+            )
+            self.chat = SimpleNamespace(completions=SimpleNamespace(create=create))
+
+    monkeypatch.setattr(openai_module, "OpenAI", _Client)
+    from tokenops.providers import complete
+
+    complete(
+        "openai", "m", MESSAGES, extra_body={"prompt_cache_key": "k"}, extra_headers={"h": "v"}
+    )
+    assert sent["extra_body"] == {"prompt_cache_key": "k"}
+    assert sent["extra_headers"] == {"h": "v"}

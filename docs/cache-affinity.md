@@ -39,8 +39,11 @@ separate design.
 
 If the provider refuses the hint (the error names the field or header), the call is re-sent once
 without it and the rest of the run stays unkeyed. An unrelated error, such as a content-filter
-400, is raised and does not switch the hint off. The built-in OpenAI dispatch passes
-`extra_body` and `extra_headers` through; a custom `dispatch` must accept them (as `**kwargs`).
+400, is raised and does not switch the hint off.
+
+The built-in dispatch (`tokenops.providers.complete`) forwards `extra_body` and `extra_headers`
+for `provider="openai"` only. It has no Azure client, so with `provider="azure"` use a custom
+`dispatch` that accepts and forwards `**kwargs` (as the benchmark adapter does).
 
 ## What is recorded
 
