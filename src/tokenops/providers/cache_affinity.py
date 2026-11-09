@@ -30,7 +30,8 @@ __all__ = [
 
 class CacheAffinity(Protocol):
     @property
-    def name(self) -> str: ...
+    def name(self) -> str:
+        """Strategy name, ``none`` when no hint is sent."""
 
     def apply(self, kwargs: dict[str, Any], key: str) -> dict[str, Any]:
         """Return a COPY of the dispatch kwargs carrying the routing hint. Never mutate."""
