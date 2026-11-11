@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-11
+
 ### Added
 
 - `progress_guard` `input_repeats` (opt-in, default `0` = off): fires when the newest message sent to the model is
