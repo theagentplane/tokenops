@@ -164,6 +164,8 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
                 repeats=p.get("repeats", 3),
                 max_corrections=p.get("max_corrections", 2),
                 simhash_threshold=p.get("simhash_threshold", 4),
+                input_repeats=p.get("input_repeats", 0),
+                input_simhash_threshold=p.get("input_simhash_threshold", 0),
             ),
             default_params={"window": 6, "repeats": 3, "max_corrections": 2},
         ),

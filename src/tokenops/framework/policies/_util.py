@@ -88,3 +88,26 @@ def simhash64(text: str) -> int:
 
 def hamming(a: int, b: int) -> int:
     return bin(a ^ b).count("1")
+
+
+def last_message_text(messages: object) -> str:
+    """Whitespace-collapsed text of the last message in a ``messages`` list, or ``""``.
+
+    List-of-parts content (``[{"type": "text", "text": ...}]``) is joined; parts without text
+    are ignored. Anything that is not a non-empty list of messages yields ``""``.
+    """
+    if not isinstance(messages, list) or not messages:
+        return ""
+    last = messages[-1]
+    content = last.get("content") if isinstance(last, dict) else getattr(last, "content", None)
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                parts.append(part["text"])
+        content = " ".join(parts)
+    if not isinstance(content, str):
+        return ""
+    return " ".join(content.split())

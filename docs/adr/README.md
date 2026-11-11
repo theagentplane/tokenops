@@ -11,6 +11,7 @@ Write an ADR when a decision:
 - changes how the system is structured (modules, layers, who owns what),
 - changes a public interface, a data format or a schema,
 - adds, removes or replaces a significant dependency or tool,
+- adds or changes a policy, a policy parameter or a configuration key (a feature addition),
 - is hard or expensive to reverse, or
 - affects another repository (chronicle, primitives, control-plane, tokenops).
 
@@ -46,6 +47,7 @@ Do not write one for routine changes: a bug fix, a rename, a small refactor.
 | [0004](0004-policy-state-lives-in-process-except-shared-spend.md) | Keep policy state in process; only spend, in-flight and halt are shared | Proposed |
 | [0005](0005-remove-trajectory-hint.md) | Remove the `trajectory_hint` template | Proposed |
 | [0006](0006-layered-packages-with-deprecated-shims.md) | Layered packages, with the 1.0 paths kept as deprecated shims | Proposed |
+| [0007](0007-progress-guard-input-repeat-detection.md) | Detect a stall from the unchanged input shown to the model, opt-in | Proposed |
 
 Decisions taken in the suite for the 1.0 rework (trace as run, governance pulled from the
 database, halt as a trace attribute, no deduplication of ledger events, ledger counters) are

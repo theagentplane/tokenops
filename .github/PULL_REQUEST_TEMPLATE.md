@@ -17,6 +17,7 @@
 ## Checklist
 
 - [ ] Change is under about 400 lines, or the description links the split plan or says why it is one change
+- [ ] ADR added in `docs/adr/` for a feature addition (new or changed policy, parameter, config key or public API), or not needed
 - [ ] Tests added or updated
 - [ ] CHANGELOG entry added and classified as compatible or breaking
 - [ ] `ruff check`, `ruff format --check`, `mypy` and `pytest` pass locally
