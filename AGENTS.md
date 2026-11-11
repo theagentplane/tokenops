@@ -28,6 +28,8 @@ Decisions that shape this repository are recorded as ADRs in [`docs/adr/`](docs/
 - **Before changing architecture,** read the ADRs: structure, public interfaces, data formats,
   dependencies or anything shared with another repository. Do not undo an accepted decision
   silently. If a change conflicts with one, say so and propose a new ADR that supersedes it.
+- **Every feature addition needs an ADR** in the same pull request: a new or changed policy, policy
+  parameter, configuration key or public API. Bug fixes and refactors do not.
 - **When asked to record a decision,** or when you make one that meets the criteria in
   `docs/adr/README.md`, write an ADR: copy `docs/adr/template.md`, use the next free number,
   keep it to about a page, and add it to the index.

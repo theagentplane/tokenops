@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `progress_guard` `input_repeats` (opt-in, default `0` = off): fires when the newest message sent to the model is
+  the same text on at least that many calls in the window, even when the agent varies its actions and replies;
+  `input_simhash_threshold` (default `0` = exact) allows near-duplicates
+  ([#199](https://github.com/theagentplane/tokenops/issues/199)).
+
 ## [2.2.0] - 2026-11-09
 
 ### Added
