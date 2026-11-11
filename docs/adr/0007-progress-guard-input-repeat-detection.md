@@ -4,7 +4,7 @@
 |---|---|
 | Status | Proposed |
 | Date | 2026-11-11 |
-| Deciders | To be confirmed by the maintainers |
+| Deciders | Susheem Koul |
 
 ## Context
 
