@@ -13,7 +13,8 @@ only an unchanged (signature, result_hash) â€” or a near-duplicate llm output â€
 
 Opt-in third detection (``input_repeats`` > 0): the newest message sent to the model is the
 same text (exact, or SimHash within ``input_simhash_threshold`` when > 0) on at least
-``input_repeats`` calls in the window, whatever the model replies or does. It catches an agent that varies its actions but is shown the same screen every time.
+``input_repeats`` calls in the window, whatever the model replies or does. It catches an agent that varies its actions but is shown
+the same screen every time.
 """
 
 from __future__ import annotations

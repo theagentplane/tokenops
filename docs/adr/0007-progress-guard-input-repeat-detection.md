@@ -38,8 +38,9 @@ response because waiting is a legitimate cause.
 
 ## Consequences
 
-- **Good:** a class of stalls that varies its actions becomes visible; existing configurations
-  behave exactly as before.
+- **Good:** a class of stalls that varies its actions becomes visible; the existing checks'
+  detection, parameters and defaults are unchanged. The signal reason and the nudge text for the
+  model-output check now describe what stalled (they used to say "same action with the same result").
 - **Bad or risky:** false nudges for long silent waits; SimHash is weak on short messages; only the
   last message is compared, so a system reminder appended to it would defeat the exact match. Replays over recorded runs show where
   it would speak, not whether the nudge changes the outcome; a live run is still needed.

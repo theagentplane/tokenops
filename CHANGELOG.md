@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `input_simhash_threshold` (default `0` = exact) allows near-duplicates
   ([#199](https://github.com/theagentplane/tokenops/issues/199)).
 
+### Changed
+
+- `progress_guard`: the signal reason and the injected nudge now say what stalled (tool result, model output or
+  input). Detection, parameters and defaults of the existing checks are unchanged; the model-output check's text used
+  to say "same action with the same result".
+
 ## [2.2.0] - 2026-11-09
 
 ### Added
