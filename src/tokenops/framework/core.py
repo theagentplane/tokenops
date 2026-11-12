@@ -173,6 +173,9 @@ class CallRequest:
     model: str
     estimated_input_tokens: int = 0
     max_output_tokens: int | None = None
+    #: Adapter-supplied labels for this call, e.g. ``{"call_kind": "extract"}``. Empty by
+    #: default; detectors that read none behave as before.
+    tags: Mapping[str, str] = field(default_factory=dict)
 
 
 # =========================================================================== #

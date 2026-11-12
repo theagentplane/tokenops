@@ -44,11 +44,13 @@ class CostGuardDetector(Detector):
         threshold: float = 0.8,
         velocity_micros_per_step: int | None = None,
         velocity_m: int = 5,
+        horizon_steps: int | None = None,
     ) -> None:
         self.budget = budget
         self.threshold = threshold
         self.velocity_micros_per_step = velocity_micros_per_step
         self.velocity_m = velocity_m
+        self.horizon_steps = horizon_steps
         self._fired: set[str] = set()
 
     def reset(self, trace_id: str) -> None:
@@ -69,14 +71,22 @@ class CostGuardDetector(Detector):
         tripped_vel = (
             self.velocity_micros_per_step is not None and vel >= self.velocity_micros_per_step
         )
-        if tripped_ratio or tripped_vel:
+        projected = spent + vel * (self.horizon_steps or 0)
+        tripped_proj = self.horizon_steps is not None and projected >= self.budget.limit_micros
+        if tripped_ratio or tripped_vel or tripped_proj:
             self._fired.add(attr.trace_id)  # edge-trigger: only once
             return Signal(
                 detector=self.name,
                 severity=Severity.WARN,
                 trace_id=attr.trace_id,
-                reason=f"spend at {ratio:.0%} of budget (vel {vel:.0f}/step), minimizing",
-                evidence={"ratio": ratio, "velocity": vel},
+                reason=f"spend at {ratio:.0%} of budget (vel {vel:.0f}/step"
+                + (
+                    f", on course for {projected / self.budget.limit_micros:.0%}"
+                    if tripped_proj
+                    else ""
+                )
+                + "), minimizing",
+                evidence={"ratio": ratio, "velocity": vel, "projected": projected},
             )
         return None
 
@@ -114,6 +124,7 @@ def build(
     downgrade_to: str | None = None,
     velocity_micros_per_step: int | None = None,
     velocity_m: int = 5,
+    horizon_steps: int | None = None,
 ) -> tuple[Detector, Policy]:
     return (
         CostGuardDetector(
@@ -121,6 +132,7 @@ def build(
             threshold=threshold,
             velocity_micros_per_step=velocity_micros_per_step,
             velocity_m=velocity_m,
+            horizon_steps=horizon_steps,
         ),
         CostGuardPolicy(mode, downgrade_to),
     )

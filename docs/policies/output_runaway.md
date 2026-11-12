@@ -26,6 +26,12 @@ n-gram repetition over the streamed visible output: repeats ≥ R
 OR single-token domination
 OR tail-loop
 ```
+Outputs shorter than `min_words` (default 12) are skipped. With a handful of words the most
+common word is always a large share (two words: at least half), so domination says nothing,
+and a RETRY re-sends the full prompt, which costs more than a short output. Structured agents
+produce such outputs every step: browser-use's compact action JSON is a single
+whitespace-separated word, and before this floor every action-only step was retried.
+
 Most runaways are *prevented* up front by setting frequency/presence penalties and a
 `max_output` cap on the original request; this policy is the *recovery* when one slips
 through. Detection is deterministic and model-free (`max_ngram_repeat`,
@@ -56,6 +62,7 @@ the hard stop if the degeneration also burns budget or steps.
 |---|---|
 | `output.text` with a 3-gram repeated 6× | `WARN` |
 | clean unique text | `None` |
+| fewer than `min_words` words (action JSON, `"ok"`) | `None` |
 | degenerate ×4, `max_retries=2` | `RETRY, RETRY, INJECT`; **no HALT** |
 | `node_type="tool"` | `None` (llm-only) |
 

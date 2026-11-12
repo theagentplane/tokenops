@@ -423,7 +423,7 @@ def test_it_output_runaway_retries_then_succeeds():
         def __call__(self, provider, model, messages, max_output_tokens=None, **kw):
             self.calls.append(kw)
             self.n += 1
-            text = "loop loop loop loop loop loop loop" if self.n < 3 else "unique clean answer"
+            text = " ".join(["loop"] * 30) if self.n < 3 else "unique clean answer"
             return ModelResponse(content=text, input_tokens=50, output_tokens=20)
 
     scripted = Scripted()

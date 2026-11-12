@@ -85,6 +85,15 @@ under it MUTATE fails closed to HALT — by design.
 | unknown model | `TRIP` (`fail_closed=True`) |
 | e2e: MUTATE recorded via CollectingControls; HALT raised after budget burned | both verified |
 
+## Parameters added (optional)
+
+- `caps_by_kind` (default unset): a default cap per kind of call, keyed on
+  `CallRequest.tags["call_kind"]` (set through `wrap_complete(..., call_tags=...)`). Unlabelled
+  calls and kinds not in the map use `default_max_output`.
+- `wrap_up` (default `false`): when the remaining budget fits this call's worst case but not
+  two, this call carries one "budget almost spent, finish now" message. The next call that
+  does not fit halts as before, so the budget is never exceeded.
+
 ## Status
 
 ✅ implemented, ✅ tested (unit + e2e). MUTATE asserted through the Governor with a
