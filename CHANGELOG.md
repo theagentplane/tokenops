@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `progress_guard` reads optional adapter signals: `progress` ("yes"/"no", for example an agent's own step
+  evaluation; `progress_streak` "no" in a row is a stall) and `blocked` ("yes" on a bot-check page). No tags, no change.
+- `progress_guard` and `pre_call_worst_case` take `wrap_up` (default off): one "finish now with your best answer"
+  message before a halt. For the budget it is sent on the last call the budget can afford, so it is never exceeded.
+- `cost_guard` takes `horizon_steps` (default off): fire when the run's recent rate will reach the budget within that
+  many steps, instead of only at 80% spent.
+- `pre_call_worst_case` takes `wrap_up_reserve` (default 1): how many worst-case calls the budget wrap-up keeps in
+  reserve. Agents that take one more action after the wrap-up message need 2.
+- `progress_guard` takes `grace_steps` (default 0): no correction before that boundary step, except on a blocked page.
+  An early "no progress" message can keep an agent trying on a task it was about to give up on.
+- `pre_call_worst_case` takes `caps_by_kind`: a default output cap per kind of call, from the new optional
+  `CallRequest.tags` (set with `wrap_complete(..., call_tags=...)`).
+
+### Changed
+
+- `progress_guard`'s "no progress" correction now leads with finishing ("Unless another approach is clearly
+  available, finish now with the best answer you have"), and a bot-check page gets its own "blocked" message.
+
+### Fixed
+
+- `progress_guard` resets its correction count after progress (`reset_on_progress`, default true), as its docs say
+  ("HALT only after K corrections with no progress"). Before, two unrelated stalls anywhere in a run added up to one
+  halt. Set `reset_on_progress: false` for the old behaviour.
+
+- `output_runaway` no longer flags short outputs. Below `min_words` (new param, default 12) the most common word is
+  always a large share of the text, so a compact JSON action such as browser-use's `{"action":[{"click":...}]}`
+  (one whitespace-separated word, domination 100%) was retried twice with a halved output cap. A retry re-sends the
+  whole prompt, so this cost more than it saved.
+
 ## [2.3.0] - 2026-11-11
 
 ### Added

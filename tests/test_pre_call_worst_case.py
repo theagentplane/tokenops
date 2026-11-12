@@ -95,3 +95,118 @@ def test_e2e_halts_when_spent_leaves_no_room():
     )
     with pytest.raises(Halt):
         gov.pre_call(_req(est_in=1000, max_out=None))
+
+
+def _kind_req(kind=None):
+    return CallRequest(
+        attr=make_attr(),
+        provider="openai",
+        model="gpt-4o-mini",
+        estimated_input_tokens=100,
+        tags={"call_kind": kind} if kind else {},
+    )
+
+
+def test_caps_by_kind_bounds_each_kind_of_call():
+    det, pol = pcwc.build(CAP, toy_price, default_max_output=2048, caps_by_kind={"extract": 512})
+    cap = lambda kind: (
+        pol.decide(det.pre_call(_kind_req(kind), FakeView()), FakeView()).max_output_tokens
+    )  # noqa: E731
+    assert cap("extract") == 512
+    assert cap("plan") == 2048  # a kind not in the map uses the default
+    assert cap(None) == 2048  # an unlabelled call uses the default
+
+
+def test_caps_by_kind_prices_the_smaller_cap():
+    """The worst case must price the cap that will be enforced, so a tight budget that
+    cannot fit 2048 output tokens can still fit an extraction call."""
+    budget_left = toy_price("openai", "gpt-4o-mini", Usage(input=100)) + toy_price(
+        "openai", "gpt-4o-mini", Usage(output=1000)
+    )
+    det, _ = pcwc.build(CAP, toy_price, default_max_output=2048, caps_by_kind={"extract": 512})
+    view = FakeView(_budget_left=budget_left)
+    assert det.pre_call(_kind_req("plan"), view).severity.value == "trip"
+    assert det.pre_call(_kind_req("extract"), view).severity.value == "warn"
+
+
+def test_wrap_complete_passes_call_tags_to_pre_call():
+    from tokenops.capabilities.complete_wrapper import wrap_complete
+    from tokenops.framework.engine import ApplyControls
+
+    seen = []
+
+    class Spy:
+        name = "spy"
+
+        def pre_call(self, request, view):
+            seen.append(dict(request.tags))
+
+        def observe(self, *a):
+            return None
+
+        def tick(self, *a):
+            return None
+
+    ledger = Ledger(price=toy_price)
+    controls = ApplyControls()
+    gov = Governor(ledger, controls)
+
+    class SpyPolicy:
+        name = "spy"
+
+    gov.register(Spy(), SpyPolicy())
+    attr = make_attr()
+    ledger.open_run(attr.trace_id)
+    governed = wrap_complete(
+        gov,
+        controls,
+        attr,
+        provider="openai",
+        model="gpt-4o-mini",
+        dispatch=lambda p, m, msgs, **kw: type(
+            "R", (), {"content": "ok", "input_tokens": 1, "output_tokens": 1}
+        )(),
+        call_tags=lambda msgs: {"call_kind": "extract"},
+    )
+    governed("openai", "gpt-4o-mini", [{"role": "user", "content": "x"}])
+    assert seen == [{"call_kind": "extract"}]
+
+
+def test_wrap_up_on_the_last_affordable_call_then_halt():
+    worst = toy_price("openai", "gpt-4o-mini", Usage(input=100)) + toy_price(
+        "openai", "gpt-4o-mini", Usage(output=512)
+    )
+    det, pol = pcwc.build(CAP, toy_price, default_max_output=512, wrap_up=True)
+    req = _kind_req()
+    # plenty left: the usual cap, no message
+    a = pol.decide(det.pre_call(req, FakeView(_budget_left=10 * worst)), FakeView())
+    assert a.inject_message is None
+    # one worst case fits, two do not: cap + "finish now", once
+    last = FakeView(_budget_left=int(1.5 * worst))
+    a = pol.decide(det.pre_call(req, last), FakeView())
+    assert a.kind is ActionKind.MUTATE and a.max_output_tokens == 512
+    assert a.inject_message and "Finish now" in a.inject_message
+    assert pol.decide(det.pre_call(req, last), FakeView()).inject_message is None  # only once
+    # nothing fits: halt, exactly as without wrap_up
+    assert det.pre_call(req, FakeView(_budget_left=worst - 1)).severity.value == "trip"
+
+
+def test_wrap_up_off_never_adds_a_message():
+    det, pol = pcwc.build(CAP, toy_price, default_max_output=512)
+    worst = toy_price("openai", "gpt-4o-mini", Usage(input=100)) + toy_price(
+        "openai", "gpt-4o-mini", Usage(output=512)
+    )
+    a = pol.decide(det.pre_call(_kind_req(), FakeView(_budget_left=int(1.5 * worst))), FakeView())
+    assert a.inject_message is None
+
+
+def test_wrap_up_reserve_sends_the_message_while_two_calls_still_fit():
+    worst = toy_price("openai", "gpt-4o-mini", Usage(input=100)) + toy_price(
+        "openai", "gpt-4o-mini", Usage(output=512)
+    )
+    left = FakeView(_budget_left=int(2.5 * worst))
+    det, pol = pcwc.build(CAP, toy_price, default_max_output=512, wrap_up=True, wrap_up_reserve=2)
+    a = pol.decide(det.pre_call(_kind_req(), left), FakeView())
+    assert a.inject_message and "Finish now" in a.inject_message
+    det1, pol1 = pcwc.build(CAP, toy_price, default_max_output=512, wrap_up=True)
+    assert pol1.decide(det1.pre_call(_kind_req(), left), FakeView()).inject_message is None

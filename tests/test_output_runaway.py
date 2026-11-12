@@ -39,6 +39,24 @@ def test_bounded_retry_then_inject_never_halt():
     assert ActionKind.HALT not in kinds
 
 
+def test_short_outputs_are_never_degenerate():
+    """Below min_words the top word is always a big share: no signal, and a retry costs more."""
+    det, _ = output_runaway.build()
+    for text in (
+        '{"action":[{"click":{"index":24}}]}',  # browser-use action JSON: one "word"
+        '{"memory":"Found it.","action":[{"done":{"text":"OpenCV"}}]}',  # short final answer
+        "ok",
+    ):
+        assert det.observe(make_attr(), _llm(text), FakeView()) is None, text
+
+
+def test_min_words_is_configurable():
+    loop = " ".join(["the"] * 8)
+    assert output_runaway.build()[0].observe(make_attr(), _llm(loop), FakeView()) is None
+    det, _ = output_runaway.build(min_words=4)
+    assert det.observe(make_attr(), _llm(loop), FakeView()).severity.value == "warn"
+
+
 def test_only_llm_with_text():
     det, _ = output_runaway.build()
     assert (

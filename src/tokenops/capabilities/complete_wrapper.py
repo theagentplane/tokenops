@@ -8,7 +8,7 @@ call is billed twice.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from chronicle import wrap_llm
@@ -75,6 +75,7 @@ def wrap_complete(
     service: str = "",
     max_call_retries: int = 3,
     cache_affinity: Any = None,
+    call_tags: Callable[[Any], Mapping[str, str]] | None = None,
 ) -> Callable[[str, str, Any], object]:
     """Wrap a ``complete(provider, model, messages)`` entry point for **pre_call** governance
     and the **RETRY** actuator.
@@ -89,6 +90,10 @@ def wrap_complete(
     ``cache_affinity`` (off by default) sends one routing hint per run so the provider's prompt
     cache hits: ``"auto"``, or ``{"mode": "auto" | {"body_field": ...} | {"header": ...},
     "key": "run" | "fixed:<string>"}``. See :mod:`tokenops.providers.cache_affinity`.
+
+    ``call_tags`` (optional) labels each call for pre-call detectors: it gets the messages and
+    returns tags for :attr:`CallRequest.tags`, such as ``{"call_kind": "extract"}`` for
+    ``pre_call_worst_case``'s ``caps_by_kind``.
     """
     install_crossing_hook()
     estimate = est_input_fn or estimate_input_tokens
@@ -113,6 +118,7 @@ def wrap_complete(
                 model=m,
                 estimated_input_tokens=estimate(messages),
                 max_output_tokens=controls.call.max_output_tokens,
+                tags=dict(call_tags(messages)) if call_tags is not None else {},
             )
             governor.pre_call(request)
 

@@ -61,6 +61,29 @@ Not implemented; the in-path stop is Tier 1 only (deterministic, no model).
 | same last message sent ×`input_repeats` (opt-in), actions vary | `WARN` |
 | 3 near-identical llm `output.text` (SimHash) | `WARN` |
 
+## Signals from the adapter (optional)
+
+An adapter can tag observations (`Observation.tags`, or `extra_tags` on a crossing). With no
+tags the policy behaves as before.
+
+| Tag | Meaning | Effect |
+|---|---|---|
+| `progress: "no"` | the agent reports the step did not work (browser-use: its own step evaluation) | `progress_streak` (default 3) in a row is a stall |
+| `progress: "yes"` | the step worked | ends the streak; resets corrections (with `reset_on_progress`) |
+| `blocked: "yes"` | a bot-check or captcha page | every such step is a stall, with a "use another source or finish" message |
+
+A self-report is not fed through the repeated-result rule: three "worked" reports in a row
+would read as a stall.
+
+## Parameters added
+
+- `reset_on_progress` (default `true`): the correction count restarts when the boundary that
+  stalled next shows a changed result, or on `progress: "yes"`, so two unrelated stalls do not
+  add up to one halt. `false` keeps the count for the whole run (the behaviour before).
+- `progress_streak` (default 3): consecutive `progress: "no"` that make a stall.
+- `wrap_up` (default `false`): where the policy would HALT, it first sends one "finish now with
+  your best answer" message and halts on the next stall.
+
 ## Status
 
 ✅ implemented, ✅ tested (unit). Tier-1 exact-repeat + SimHash done; hang-via-tick and

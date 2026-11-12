@@ -10,6 +10,13 @@ LLD row:
             "generation degenerated" error to the agent and continue. No HALT — persistent
             failure is caught by cost_budget / step_cap / progress_guard.
 
+Outputs shorter than ``min_words`` are never flagged. With only a few words the most common
+word is always a large share of the text (with two words it is at least half), so the
+domination signal carries no information there, and a retry re-sends the whole prompt, so
+it costs more than any short output it could replace. Structured agents hit this every
+step: browser-use's compact action JSON (``{"action":[{"click":{"index":3}}]}``) is a
+single whitespace-separated word.
+
 This observe-path detector runs on the completed visible text. In a true streaming wrap the
 first action is CANCEL (stop mid-stream); here the stream has finished, so the policy goes
 straight to bounded RETRY, then INJECT. Never HALT.
@@ -38,16 +45,19 @@ class OutputRunawayDetector(Detector):
 
     name = "output_runaway"
 
-    def __init__(self, *, n: int = 3, repeats: int = 4, domination: float = 0.5) -> None:
+    def __init__(
+        self, *, n: int = 3, repeats: int = 4, domination: float = 0.5, min_words: int = 12
+    ) -> None:
         self.n = n
         self.repeats = repeats
         self.domination = domination
+        self.min_words = min_words
 
     def observe(self, attr: Attribution, step: BoundaryStep, view: LedgerView) -> Signal | None:
         if step.node_type != "llm" or not isinstance(step.output, dict):
             return None
         text = step.output.get("text", "")
-        if not text:
+        if not text or len(text.split()) < self.min_words:
             return None
         rep = max_ngram_repeat(text, self.n)
         dom = single_token_domination(text)
@@ -95,8 +105,14 @@ class OutputRunawayPolicy(Policy):
 
 
 def build(
-    *, n: int = 3, repeats: int = 4, domination: float = 0.5, max_retries: int = 2
+    *,
+    n: int = 3,
+    repeats: int = 4,
+    domination: float = 0.5,
+    max_retries: int = 2,
+    min_words: int = 12,
 ) -> tuple[Detector, Policy]:
-    return OutputRunawayDetector(n=n, repeats=repeats, domination=domination), OutputRunawayPolicy(
-        max_retries=max_retries
+    detector = OutputRunawayDetector(
+        n=n, repeats=repeats, domination=domination, min_words=min_words
     )
+    return detector, OutputRunawayPolicy(max_retries=max_retries)

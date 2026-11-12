@@ -53,6 +53,12 @@ failure mode.
 | mode minimize | `INJECT` "…minimal…" |
 | mode downgrade, `downgrade_to=…` | `MUTATE(downgrade_to)` |
 
+## Projected trigger (optional)
+
+`horizon_steps` (default off): fire when `spent + velocity * horizon_steps >= limit`, so a run
+whose recent rate will not fit is told to economize early, not at 80% of the budget a few
+calls before the halt. Velocity is spend per boundary step (tool crossings included).
+
 ## Status
 
 ✅ implemented, ✅ tested (unit). Velocity trigger and elasticity check are wired as config

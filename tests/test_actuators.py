@@ -33,7 +33,7 @@ def _attr(trace_id):
     )
 
 
-DEGENERATE = "loop loop loop loop loop loop loop loop"
+DEGENERATE = " ".join(["loop"] * 30)  # a runaway is long; short outputs are below min_words
 CLEAN = "the quarterly pricing analysis is complete and unique"
 
 

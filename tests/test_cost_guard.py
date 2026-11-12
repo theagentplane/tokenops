@@ -34,3 +34,26 @@ def test_downgrade_mutates():
     sig = det.observe(make_attr(), make_step(), FakeView(_budget_left=10_000))
     a = pol.decide(sig, FakeView())
     assert a.kind is ActionKind.MUTATE and a.downgrade_to == "gpt-4o-mini"
+
+
+def test_projected_trigger_fires_early_when_the_rate_will_not_fit():
+    """Spent 30% only, but at 8,000/step the next 10 steps take it past the budget."""
+    det, _ = cost_guard.build(CAP, horizon_steps=10)
+    sig = det.observe(make_attr(), make_step(), FakeView(_budget_left=70_000, _velocity=8_000.0))
+    assert sig is not None and sig.evidence["projected"] == 30_000 + 80_000
+    assert "on course for 110%" in sig.reason
+
+
+def test_projected_trigger_is_quiet_when_the_rate_fits():
+    det, _ = cost_guard.build(CAP, horizon_steps=10)
+    assert (
+        det.observe(make_attr(), make_step(), FakeView(_budget_left=70_000, _velocity=5_000.0))
+        is None
+    )
+
+
+def test_projected_trigger_is_off_by_default():
+    det, _ = cost_guard.build(CAP)
+    assert (
+        det.observe(make_attr(), make_step(), FakeView(_budget_left=70_000, _velocity=1e9)) is None
+    )
