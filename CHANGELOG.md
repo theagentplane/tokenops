@@ -38,6 +38,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (one whitespace-separated word, domination 100%) was retried twice with a halved output cap. A retry re-sends the
   whole prompt, so this cost more than it saved.
 
+## [2.3.0] - 2026-11-11
+
+### Added
+
+- `progress_guard` `input_repeats` (opt-in, default `0` = off): fires when the newest message sent to the model is
+  the same text on at least that many calls in the window, even when the agent varies its actions and replies;
+  `input_simhash_threshold` (default `0` = exact) allows near-duplicates
+  ([#199](https://github.com/theagentplane/tokenops/issues/199)).
+
+### Changed
+
+- `progress_guard`: the signal reason and the injected nudge now say what stalled (tool result, model output or
+  input). Detection, parameters and defaults of the existing checks are unchanged; the model-output check's text used
+  to say "same action with the same result".
+
 ## [2.2.0] - 2026-11-09
 
 ### Added

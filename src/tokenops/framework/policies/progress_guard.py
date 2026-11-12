@@ -37,12 +37,18 @@ partial answer. The halt is still decided by a stall; the HALT action itself is 
 often just the agent finding its way, and an early "no progress" message can keep an agent
 trying on a task it was about to give up on (a longer, more expensive failure).
 
+**Unchanged input** (``input_repeats`` > 0, off by default): the newest message sent to the
+model is the same text (exact, or SimHash within ``input_simhash_threshold`` when > 0) on at
+least ``input_repeats`` calls in the window, whatever the model replies or does. It catches an
+agent that varies its actions but is shown the same screen every time.
+
 An adapter that sends no tags gets exactly the repeated-result behaviour.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 
 from tokenops.framework.core import (
     Action,
@@ -55,7 +61,24 @@ from tokenops.framework.core import (
     Severity,
     Signal,
 )
-from tokenops.framework.policies._util import hamming, simhash64
+from tokenops.framework.observation_utils import short_hash
+from tokenops.framework.policies._util import hamming, last_message_text, simhash64
+
+# What stalled, per kind of check: "tool" = unchanged result, "output" = near-duplicate reply,
+# "input" = the same input shown again.
+_WHAT = {
+    "tool": "repeated result",
+    "output": "repeated model output",
+    "input": "unchanged input",
+    "blocked": "the page is a bot check",
+    "wrap_up": "still no progress after corrections, asking for the final answer",
+}
+_NUDGE = {
+    "tool": "you are repeating the same action with the same result.",
+    "output": "your recent replies are nearly identical.",
+    "input": "you are being shown the same input again and again, however you vary your actions.",
+}
+
 
 #: Tag names an adapter sets on an observation (``Observation.tags`` / ``extra_tags``).
 PROGRESS_TAG = "progress"
@@ -78,7 +101,11 @@ class ProgressGuardDetector(Detector):
         reset_on_progress: bool = True,
         wrap_up: bool = False,
         grace_steps: int = 0,
+        input_repeats: int = 0,
+        input_simhash_threshold: int = 0,
     ) -> None:
+        self.input_simhash_threshold = input_simhash_threshold
+        self.input_repeats = input_repeats
         self.wrap_up = wrap_up
         self.grace_steps = grace_steps
         self.window = window
@@ -96,8 +123,34 @@ class ProgressGuardDetector(Detector):
         self._no_progress.pop(trace_id, None)
         self._stalled_at.pop(trace_id, None)
 
-    def _repeated(self, step: BoundaryStep, view: LedgerView, trace_id: str) -> bool:
+    def _input_stalled(self, step: BoundaryStep, recent: Sequence[BoundaryStep]) -> bool:
+        # the same newest message shown to the model again and again
+        text = last_message_text(step.input.get("messages"))
+        if not text:
+            return False
+        if self.input_simhash_threshold > 0:  # fuzzy: SimHash within the Hamming threshold
+            fp = simhash64(text)
+
+            def match(other: str) -> bool:
+                return bool(other) and hamming(simhash64(other), fp) <= self.input_simhash_threshold
+
+        else:  # exact after whitespace collapse
+            key = short_hash(text)
+
+            def match(other: str) -> bool:
+                return bool(other) and short_hash(other) == key
+
+        same = sum(
+            1
+            for s in recent
+            if s.node_type == "llm" and match(last_message_text(s.input.get("messages")))
+        )
+        return same >= self.input_repeats
+
+    def _stalled(self, step: BoundaryStep, view: LedgerView, trace_id: str) -> str | None:
         recent = view.recent(trace_id, self.window)
+        if step.node_type == "llm" and self.input_repeats > 0 and self._input_stalled(step, recent):
+            return "input"
         if step.node_type == "tool" and step.signature and step.result_hash:
             # unchanged RESULT, not merely a repeated call
             same = sum(
@@ -107,11 +160,11 @@ class ProgressGuardDetector(Detector):
                 and s.signature == step.signature
                 and s.result_hash == step.result_hash
             )
-            return same >= self.repeats
+            return "tool" if same >= self.repeats else None
         if step.node_type == "llm":
             text = step.output.get("text", "") if isinstance(step.output, dict) else ""
             if not text:
-                return False
+                return None
             fp = simhash64(text)
             near = sum(
                 1
@@ -121,8 +174,8 @@ class ProgressGuardDetector(Detector):
                 and s.output.get("text")
                 and hamming(simhash64(s.output["text"]), fp) <= self.simhash_threshold
             )
-            return near >= self.repeats
-        return False
+            return "output" if near >= self.repeats else None
+        return None
 
     def _progressed(self, trace_id: str) -> None:
         if self.reset_on_progress:
@@ -130,7 +183,7 @@ class ProgressGuardDetector(Detector):
             self._stalled_at.pop(trace_id, None)
 
     def _cause(self, step: BoundaryStep, view: LedgerView, trace_id: str) -> str | None:
-        """Why this step is a stall (``blocked`` / ``no_progress`` / ``repeated``), or None."""
+        """Why this step is a stall (``blocked`` / ``no_progress`` / ``tool`` / ``output`` / ``input``), or None."""
         if step.tags.get(BLOCKED_TAG) == "yes":
             return "blocked"
         progress = step.tags.get(PROGRESS_TAG)
@@ -145,8 +198,9 @@ class ProgressGuardDetector(Detector):
             self._no_progress[trace_id] = 0
             self._progressed(trace_id)
             return None
-        if not early and self._repeated(step, view, trace_id):
-            return "repeated"
+        kind = None if early else self._stalled(step, view, trace_id)
+        if kind is not None:
+            return kind  # "tool", "output" or "input"
         if self._stalled_at.get(trace_id) == step.boundary_id:
             self._progressed(trace_id)  # the boundary that stalled has moved on
         return None
@@ -161,12 +215,11 @@ class ProgressGuardDetector(Detector):
         sev = Severity.TRIP if corr > self.max_corrections else Severity.WARN
         if sev is Severity.TRIP and self.wrap_up and corr == self.max_corrections + 1:
             sev, cause = Severity.WARN, "wrap_up"  # one last message before the halt
-        what = {
-            "blocked": "the page is a bot check",
-            "no_progress": f"{self.progress_streak} steps in a row reported as not working",
-            "repeated": "repeated result",
-            "wrap_up": "still no progress after corrections, asking for the final answer",
-        }[cause]
+        what = (
+            f"{self.progress_streak} steps in a row reported as not working"
+            if cause == "no_progress"
+            else _WHAT[cause]
+        )
         return Signal(
             detector=self.name,
             severity=sev,
@@ -178,6 +231,7 @@ class ProgressGuardDetector(Detector):
                 "boundary_id": step.boundary_id,
                 "signature": step.signature,
                 "cause": cause,
+                "kind": cause,
             },
         )
 
@@ -202,10 +256,11 @@ class ProgressGuardPolicy(Policy):
                 trace_id=signal.trace_id,
                 reason=f"progress_guard: {signal.evidence['correction']} corrections, no progress, halting",
             )
-        message = _MESSAGES.get(
-            str(signal.evidence.get("cause", "repeated")),
-            f"NO PROGRESS DETECTED on '{signal.evidence['boundary_id']}': you are repeating "
-            f"the same action with the same result. Change approach or finalize with what you have.",
+        cause = str(signal.evidence.get("cause") or signal.evidence.get("kind") or "tool")
+        message = _MESSAGES.get(cause) or (
+            f"NO PROGRESS DETECTED on '{signal.evidence['boundary_id']}': "
+            f"{_NUDGE.get(cause, _NUDGE['tool'])} "
+            f"Change approach or finalize with what you have."
         )
         return Action(
             kind=ActionKind.INJECT,
@@ -225,6 +280,8 @@ def build(
     reset_on_progress: bool = True,
     wrap_up: bool = False,
     grace_steps: int = 0,
+    input_repeats: int = 0,
+    input_simhash_threshold: int = 0,
 ) -> tuple[Detector, Policy]:
     return (
         ProgressGuardDetector(
@@ -236,6 +293,8 @@ def build(
             reset_on_progress=reset_on_progress,
             wrap_up=wrap_up,
             grace_steps=grace_steps,
+            input_repeats=input_repeats,
+            input_simhash_threshold=input_simhash_threshold,
         ),
         ProgressGuardPolicy(),
     )

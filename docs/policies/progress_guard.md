@@ -22,17 +22,26 @@ approach" correction; only after **K corrections with no progress** does it **HA
 ```
 exact repeat:  count in recent(run,W) of (signature, result_hash) ≥ K     (tool)
 near-dup:      SimHash(output.text) within Hamming threshold of recent     (llm)
+same input:    last message sent to the model identical on ≥ input_repeats calls  (llm, opt-in)
 hang:          now − last step ts > T                                      (tick, future)
 ```
 **The discriminator:** an unchanged *result* (`signature` AND `result_hash` both equal), not
 merely a repeated *call*. A repeated call that returns something *new* is progress and does
 not trip — this is what stops false positives on legitimate retries.
 
+**`input_repeats` (default `0`, off).** Catches an agent that varies its actions and replies but is
+shown the same thing every time (a terminal stuck in a pager, a page that does not change). It compares
+the last message of each model call's `messages`, whitespace-collapsed (list-of-parts content is
+joined). Matching is exact by default; set `input_simhash_threshold` > 0 (e.g. 4) to match near-duplicates
+by SimHash instead, which tolerates a changing timestamp or counter. A step without `messages` is ignored. In exact mode a changing timestamp counts as a changing
+input. An agent that legitimately waits shows the same input too, so it is opt-in:
+`progress_guard: { window: 6, repeats: 2, input_repeats: 3 }`.
+
 ## Action it takes to govern — INJECT, then HALT after K corrections
 
 | Condition | Severity | Action |
 |---|---|---|
-| stalled, corrections `≤ max_corrections` | `WARN` | **INJECT** a factual "no progress; change approach or finalize" message |
+| stalled, corrections `≤ max_corrections` | `WARN` | **INJECT** a factual "no progress; change approach or finalize" message that names what stalled (tool result, model output or input) |
 | stalled, corrections `> max_corrections` | `TRIP` | **HALT** — corrections didn't help |
 
 A per-run **correction counter** (stateful detector) escalates WARN→TRIP. The injected
@@ -49,6 +58,7 @@ Not implemented; the in-path stop is Tier 1 only (deterministic, no model).
 |---|---|
 | same `signature`, **different** `result_hash` | `None` (progress) |
 | same `(signature, result_hash)` ×K, then more | `WARN→INJECT`, escalating to `TRIP→HALT` |
+| same last message sent ×`input_repeats` (opt-in), actions vary | `WARN` |
 | 3 near-identical llm `output.text` (SimHash) | `WARN` |
 
 ## Signals from the adapter (optional)
