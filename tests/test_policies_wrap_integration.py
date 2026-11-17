@@ -19,6 +19,7 @@ from tokenops.framework.engine import ApplyControls, Governor, Throttled
 from tokenops.framework.ledger import Budget, Ledger
 from tokenops.framework.models import HopAttribution
 from tokenops.framework.policies import (
+    budget_pace,
     concurrency_cap,
     context_compaction,
     cost_budget,
@@ -333,6 +334,28 @@ def test_it_progress_guard_injects_then_halts():
     # Prefer hard halt when corrections exhausted
     if any(a.kind is ActionKind.HALT for a in controls.event_log) or gov.ledger.is_halted("r-pg"):
         assert gov.ledger.is_halted("r-pg")
+
+
+def test_it_budget_pace_shows_the_trend_on_the_next_call():
+    controls = ApplyControls()
+    gov = Governor(Ledger(price=toy_price), controls)
+    gov.register(*budget_pace.build(3200))  # each mocked call costs 1600 micros
+    attr = _attr("r-bp")
+    gov.ledger.open_run("r-bp")
+    dispatch, calls = _dispatch()
+    governed = _governed(gov, attr, dispatch, trace_id="r-bp")
+
+    def run():
+        for _ in range(3):
+            governed("openai", "gpt-4o-mini", [{"role": "user", "content": "work"}])
+
+    _with_scope(gov, attr, "r-bp", run)
+    assert len(calls) == 3
+    assert not any("BUDGET PACE" in str(m) for m in calls[0]["messages"])
+    assert "soft budget 50% used" in calls[1]["messages"][-1]["content"]
+    last = calls[2]["messages"][-1]["content"]
+    assert "soft budget 100% used (t-1: 50%)" in last
+    assert not any(a.kind is ActionKind.HALT for a in controls.event_log)
 
 
 # --------------------------------------------------------------------------- #

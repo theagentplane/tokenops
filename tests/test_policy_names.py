@@ -96,7 +96,11 @@ def test_compose_tool_policy_keeps_its_parameters_under_the_canonical_key(filena
 def test_default_config_builds_every_configured_policy():
     governance = load_governance_yaml(DEFAULT_CONFIG)
     configured_ids = set(governance["policies"])
-    assert configured_ids == set(policy_template_ids()) - {"time_budget", "tool_output_prune"}
+    assert configured_ids == set(policy_template_ids()) - {
+        "time_budget",
+        "tool_output_prune",
+        "budget_pace",
+    }
     effective = {"governance": governance}
     assert set(build_governor(effective, toy_price)._policy_by_name) == configured_ids
 

@@ -18,6 +18,7 @@ cost_guard             plane: spend; in process: velocity from the step window
 concurrency_cap        plane: in-flight count of its segment (``precheck``)
 step_cap               in process: this process's step count for the trace
 progress_guard         in process: the recent step window
+budget_pace            in process: the run's spend after each of the last few calls
 context_compaction     in process: the recent step window
 output_runaway         the current call's output only
 tool_fix               the current call's tool request only
@@ -30,6 +31,7 @@ time_budget            the wall clock since the hop started
 """
 
 from tokenops.framework.policies import (
+    budget_pace,
     concurrency_cap,
     context_compaction,
     cost_budget,
@@ -45,6 +47,7 @@ from tokenops.framework.policies import (
 )
 
 __all__ = [
+    "budget_pace",
     "concurrency_cap",
     "context_compaction",
     "cost_budget",

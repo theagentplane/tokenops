@@ -7,8 +7,8 @@ lives under [`docs/policies/`](../policies/).
 
 ## Canonical policy IDs
 
-The [default seed](../../src/tokenops/config/default.yaml) contains ten of the eleven
-available policies below; `time_budget` is opt-in. Inclusion in the seed does not make
+The [default seed](../../src/tokenops/config/default.yaml) contains ten of the
+available policies below; `time_budget`, `tool_output_prune` and `budget_pace` are opt-in. Inclusion in the seed does not make
 a policy mandatory in custom configurations or change its documented enforcement limitations.
 
 | Policy ID | Display label | Availability | Doc |
@@ -22,6 +22,7 @@ a policy mandatory in custom configurations or change its documented enforcement
 | `tool_output_cap` | Tool output cap | In default seed | [tool_output_cap.md](../policies/tool_output_cap.md) |
 | `tool_output_prune` | Tool output prune | Opt-in | [tool_output_prune.md](../policies/tool_output_prune.md) |
 | `progress_guard` | Progress guard | In default seed | [progress_guard.md](../policies/progress_guard.md) |
+| `budget_pace` | Budget pace | Opt-in | [budget_pace.md](../policies/budget_pace.md) |
 | `cost_guard` | Cost guard | In default seed | [cost_guard.md](../policies/cost_guard.md) |
 | `context_compaction` | Context compaction | In default seed | [context_compaction.md](../policies/context_compaction.md) |
 | `output_runaway` | Output runaway | In default seed | [output_runaway.md](../policies/output_runaway.md) |
