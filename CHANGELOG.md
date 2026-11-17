@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `budget_pace` (opt-in): after each model call, injects the run's spend as a percentage of
+  `soft_limit_micros` with the two earlier calls (`50% used (t-1: 41%, t-2: 35%)`), and says the limit is
+  soft so the model changes strategy only where it expects no loss in quality. `points` sets how many calls
+  to show. It never halts.
+
 ## [2.3.0] - 2026-11-11
 
 ### Added

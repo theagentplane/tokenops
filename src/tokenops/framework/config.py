@@ -22,6 +22,7 @@ Config shape (dict, typically parsed from YAML)::
         cost_guard:         { budget: run_llm_cap, threshold: 0.8, mode: minimize }
         context_compaction: { ctx_max: 100000 }
         output_runaway:     { repeats: 4, max_retries: 2 }
+        budget_pace:        { soft_limit_micros: 1_000_000, points: 3 }
 
 Fail closed: an unknown policy key, a missing budget reference, or a missing required
 parameter raises at build time — never silently skipped.
@@ -40,6 +41,7 @@ from tokenops.framework.ledger import Budget, Ledger, PriceFn
 from tokenops.framework.ledger_backend import LedgerBackend, LedgerWriter
 from tokenops.framework.models import GovernanceMode
 from tokenops.framework.policies import (
+    budget_pace,
     concurrency_cap,
     context_compaction,
     cost_budget,
@@ -168,6 +170,13 @@ POLICY_TEMPLATES: Mapping[str, PolicyTemplate] = MappingProxyType(
                 input_simhash_threshold=p.get("input_simhash_threshold", 0),
             ),
             default_params={"window": 6, "repeats": 3, "max_corrections": 2},
+        ),
+        "budget_pace": PolicyTemplate(
+            display_name="Budget pace",
+            factory=lambda p, c: budget_pace.build(
+                p["soft_limit_micros"], points=p.get("points", 3)
+            ),
+            default_params={"soft_limit_micros": 1_000_000, "points": 3},
         ),
         "cost_guard": PolicyTemplate(
             display_name="Cost guard",
