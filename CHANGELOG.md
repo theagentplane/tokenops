@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-17
+
 ### Added
 
 - `budget_pace` (opt-in): after each model call, injects the run's spend as a percentage of
