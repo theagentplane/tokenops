@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code plugin (`integrations/claude-code`, ADR 0009): `/tokenops:doctor` answers "Why am I hitting
+  my limit?" from your local session logs: usage by cause (re-buying the cache after breaks, re-reading
+  context, output, new context) and what to change, including whether caveman or RTK can help your kind of
+  work. Install with `/plugin marketplace add theagentplane/tokenops`, then `/plugin install tokenops@tokenops`.
+
 ### Fixed
 
 - Claude prices in the default price book are now Anthropic's current list prices, with each model's
