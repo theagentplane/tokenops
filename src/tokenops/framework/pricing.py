@@ -32,13 +32,37 @@ class Rate:
     reasoning: int | None = None
 
 
-#: Approximate list prices (micros per 1M tokens). Swap for exact rates anytime.
+#: Anthropic charges prompt-cache writes as a multiple of the input rate: 1.25x for the
+#: 5-minute cache, 2x for the 1-hour cache. ``Usage`` has no cache-write bucket yet, so the
+#: governor does not apply these; readers of raw transcripts (the Claude Code plugin) do.
+CACHE_WRITE_5M = 1.25
+CACHE_WRITE_1H = 2.0
+
+#: List prices (micros per 1M tokens). Claude rates are Anthropic's first-party list prices from
+#: https://platform.claude.com/docs/en/about-claude/pricing (read 2026-11-26); ``cached`` is the
+#: cache-read rate. Haiku 5.5 prompts over 100K tokens cost 5x and are not modelled. OpenAI rows
+#: are approximate.
 DEFAULT_RATES: dict[str, Rate] = {
     "gpt-4o-mini": Rate(input=150_000, output=600_000),
     "gpt-4o": Rate(input=2_500_000, output=10_000_000),
-    "claude-sonnet-4-6": Rate(input=3_000_000, output=15_000_000),
-    "claude-haiku-4-5": Rate(input=800_000, output=4_000_000),
-    "claude-opus-4-8": Rate(input=15_000_000, output=75_000_000),
+    "claude-fable-5-2": Rate(input=8_000_000, output=40_000_000, cached=200_000),
+    "claude-mythos-5-2": Rate(input=8_000_000, output=40_000_000, cached=200_000),
+    "claude-fable-5-1": Rate(input=10_000_000, output=50_000_000, cached=250_000),
+    "claude-mythos-5-1": Rate(input=10_000_000, output=50_000_000, cached=250_000),
+    "claude-fable-5": Rate(input=10_000_000, output=50_000_000, cached=1_000_000),
+    "claude-mythos-5": Rate(input=10_000_000, output=50_000_000, cached=1_000_000),
+    "claude-opus-5-5": Rate(input=4_000_000, output=20_000_000, cached=200_000),
+    "claude-opus-5": Rate(input=5_000_000, output=25_000_000, cached=500_000),
+    "claude-opus-4-8": Rate(input=5_000_000, output=25_000_000, cached=500_000),
+    "claude-opus-4-7": Rate(input=5_000_000, output=25_000_000, cached=500_000),
+    "claude-opus-4-6": Rate(input=5_000_000, output=25_000_000, cached=500_000),
+    "claude-opus-4-5": Rate(input=5_000_000, output=25_000_000, cached=500_000),
+    "claude-sonnet-5-5": Rate(input=2_000_000, output=10_000_000, cached=100_000),
+    "claude-sonnet-5": Rate(input=2_000_000, output=10_000_000, cached=200_000),
+    "claude-sonnet-4-6": Rate(input=3_000_000, output=15_000_000, cached=300_000),
+    "claude-sonnet-4-5": Rate(input=3_000_000, output=15_000_000, cached=300_000),
+    "claude-haiku-5-5": Rate(input=100_000, output=500_000, cached=10_000),
+    "claude-haiku-4-5": Rate(input=1_000_000, output=5_000_000, cached=100_000),
 }
 
 
