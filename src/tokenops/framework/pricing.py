@@ -38,13 +38,16 @@ class Rate:
 CACHE_WRITE_5M = 1.25
 CACHE_WRITE_1H = 2.0
 
-#: List prices (micros per 1M tokens). Claude rates are Anthropic's first-party list prices,
-#: checked 2026-11-26; ``cached`` is the cache-read rate. OpenAI rows are approximate.
+#: List prices (micros per 1M tokens). Claude rates are Anthropic's first-party list prices from
+#: https://platform.claude.com/docs/en/about-claude/pricing (read 2026-11-26); ``cached`` is the
+#: cache-read rate. Haiku 5.5 prompts over 100K tokens cost 5x and are not modelled. OpenAI rows
+#: are approximate.
 DEFAULT_RATES: dict[str, Rate] = {
     "gpt-4o-mini": Rate(input=150_000, output=600_000),
     "gpt-4o": Rate(input=2_500_000, output=10_000_000),
     "claude-fable-5-2": Rate(input=8_000_000, output=40_000_000, cached=200_000),
-    "claude-fable-5-1": Rate(input=10_000_000, output=50_000_000, cached=1_000_000),
+    "claude-mythos-5-2": Rate(input=8_000_000, output=40_000_000, cached=200_000),
+    "claude-fable-5-1": Rate(input=10_000_000, output=50_000_000, cached=250_000),
     "claude-fable-5": Rate(input=10_000_000, output=50_000_000, cached=1_000_000),
     "claude-opus-5-5": Rate(input=4_000_000, output=20_000_000, cached=200_000),
     "claude-opus-5": Rate(input=5_000_000, output=25_000_000, cached=500_000),
