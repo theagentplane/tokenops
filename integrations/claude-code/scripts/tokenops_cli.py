@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from tokenops_cc import rtk, settings  # noqa: E402
+from tokenops_cc import ab, caveman, rtk, settings  # noqa: E402
 from tokenops_cc.doctor import diagnose, render  # noqa: E402
 
 
@@ -31,7 +31,8 @@ def autopilot(action: str) -> str:
         "TokenOps autopilot is on.\n"
         "  Resume guard: on (holds the first message after the cache expires, once)\n"
         f"  Smart RTK:    {rtk.status()}\n"
-        "Turn it off with /tokenops:autopilot off"
+        f"  caveman:      {caveman.status()}\n"
+        "Turn it off with /tokenops:autopilot off" + ab.render(ab.results())
     )
 
 
@@ -46,7 +47,7 @@ def main(argv: list[str] | None = None) -> None:
     if a.cmd == "autopilot":
         print(autopilot(a.action))
     else:
-        print(render(diagnose(projects_dir(), a.days, os.getcwd())))
+        print(render(diagnose(projects_dir(), a.days, os.getcwd())) + ab.render(ab.results()))
 
 
 if __name__ == "__main__":

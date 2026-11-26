@@ -52,3 +52,8 @@ def load_session(session_id: str) -> dict:
 
 def save_session(session_id: str, state: dict) -> None:
     _write(_session_path(session_id), state)
+
+
+def all_sessions() -> list[dict]:
+    folder = data_dir() / "sessions"
+    return [_read(p) for p in folder.glob("*.json")] if folder.exists() else []

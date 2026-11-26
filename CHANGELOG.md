@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through.
 - Claude Code autopilot: smart RTK. With RTK installed (and its own hook removed), shell commands are rewritten
   to their compact RTK form, except file reads, `git diff`/`git show` and a test run after a failing one.
+- Claude Code autopilot: saver A/B. Smart RTK and caveman are each switched on in a random half of sessions;
+  after 10 sessions per side, `/tokenops:doctor` shows the measured change in usage per prompt and the autopilot
+  keeps a saver only when it saves.
 
 ### Fixed
 

@@ -59,6 +59,20 @@ fails open.
   is installed, smart RTK stays off so nothing is rewritten twice: remove RTK's hook from your
   Claude Code settings to let TokenOps decide.
 
+- **Measured, not guessed.** Smart RTK and [caveman](https://github.com/JuliusBrussee/caveman) are
+  each switched on in a random half of your sessions. After 10 sessions on and 10 off, the doctor
+  shows what each one did to your usage per prompt, and the autopilot keeps it only if it saves:
+
+  ```
+  Measured on your sessions (autopilot A/B, usage per prompt)
+    Smart RTK  -6% usage per prompt (95% range -9% to -2%) -> kept on
+    caveman    +1% usage per prompt (95% range -3% to +5%) -> turned off
+    Usage only: hooks cannot see whether the work went as well.
+  ```
+
+  For caveman, set its own default to off (`"defaultMode": "off"` in caveman's config file, or
+  `CAVEMAN_DEFAULT_MODE=off`) so TokenOps decides per session.
+
 `/tokenops:autopilot status` shows what is on; `/tokenops:autopilot off` turns it all off.
 
 ## How it reads your usage
