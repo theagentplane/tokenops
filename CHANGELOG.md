@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-26
+
 ### Added
 
 - Claude Code plugin (`integrations/claude-code`, ADR 0009): `/tokenops:doctor` answers "Why am I hitting
@@ -21,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude Code saver mode: saver A/B. Smart RTK and caveman are each switched on in a random half of sessions;
   after 10 sessions per side, `/tokenops:doctor` shows the measured change in usage per prompt and the saver mode
   keeps a saver only when it saves.
+- Weekly check of the Claude rates in the price book against Anthropic's pricing page; it opens an issue when
+  they differ (`scripts/check-claude-prices.py`, `.github/workflows/claude-prices.yml`).
 
 ### Fixed
 
