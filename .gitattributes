@@ -1,3 +1,4 @@
 *.webm filter=lfs diff=lfs merge=lfs -text
 *.pptx filter=lfs diff=lfs merge=lfs -text
 integrations/claude-code/bin/* text eol=lf
+integrations/claude-code/** -filter -ident -working-tree-encoding
