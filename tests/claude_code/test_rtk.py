@@ -20,7 +20,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TOKENOPS_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))  # no RTK hook installed
     monkeypatch.setenv("TOKENOPS_RTK", f'"{sys.executable}" "{FAKE}"')
-    settings.save_config({"autopilot": True})
+    settings.save_config({"saver": True})
 
 
 def _bash(command, **extra):
@@ -48,12 +48,12 @@ def test_shows_the_next_test_run_in_full_after_a_failure():
     assert rtk.pre_tool_use(_bash("pytest -x")) is not None
 
 
-def test_stays_off_when_autopilot_is_off_rtk_is_missing_or_rtk_has_its_own_hook(
+def test_stays_off_when_saver_mode_is_off_rtk_is_missing_or_rtk_has_its_own_hook(
     tmp_path, monkeypatch
 ):
-    settings.save_config({"autopilot": False})
+    settings.save_config({"saver": False})
     assert rtk.pre_tool_use(_bash("git status")) is None
-    settings.save_config({"autopilot": True})
+    settings.save_config({"saver": True})
     monkeypatch.setenv("TOKENOPS_RTK", "")
     monkeypatch.setenv("PATH", "")
     assert rtk.pre_tool_use(_bash("git status")) is None

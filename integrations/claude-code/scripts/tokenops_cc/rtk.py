@@ -61,7 +61,7 @@ def rewrite(command: str, last_test_failed: bool) -> str | None:
 
 
 def _active() -> bool:
-    return bool(settings.load_config().get("autopilot")) and status().startswith("on")
+    return bool(settings.load_config().get("saver")) and status().startswith("on")
 
 
 def pre_tool_use(payload: dict) -> dict | None:

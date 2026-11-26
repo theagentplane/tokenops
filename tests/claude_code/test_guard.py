@@ -1,4 +1,4 @@
-"""Claude Code plugin: autopilot switch and the resume guard."""
+"""Claude Code plugin: saver mode switch and the resume guard."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from tokenops_cc import guard, settings  # noqa: E402
 @pytest.fixture(autouse=True)
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("TOKENOPS_DATA", str(tmp_path / "data"))
-    settings.save_config({"autopilot": True})
+    settings.save_config({"saver": True})
 
 
 def _transcript(tmp_path, ts="2026-11-26T10:00:00Z", context=200_000, five_min=False):
@@ -64,8 +64,8 @@ def test_five_minute_cache_expires_after_five_minutes(tmp_path):
     assert out and "10 min" in out["reason"]
 
 
-def test_does_nothing_when_autopilot_is_off(tmp_path):
-    settings.save_config({"autopilot": False})
+def test_does_nothing_when_saver_mode_is_off(tmp_path):
+    settings.save_config({"saver": False})
     assert guard.check(_transcript(tmp_path), now=T0 + 5 * 3600) is None
 
 

@@ -1,4 +1,4 @@
-# 0010. Claude Code autopilot: opt-in, acts through hooks, keeps a saver only if it measures a saving
+# 0010. Claude Code saver mode: opt-in, acts through hooks, keeps a saver only if it measures a saving
 
 | Field | Value |
 |---|---|
@@ -16,7 +16,7 @@ Users also install token savers (RTK, caveman) without knowing whether they help
 
 ## Options considered
 
-### Option A: an opt-in autopilot made of three hook-based parts
+### Option A: an opt-in saver mode made of three hook-based parts
 
 1. **Resume guard** (`UserPromptSubmit`): hold the first message to a session whose cache has
    expired, once, with its cost and cheaper ways on; sending it again goes through.
@@ -25,7 +25,7 @@ Users also install token savers (RTK, caveman) without knowing whether they help
 3. **Saver A/B** (`SessionStart`): turn RTK and caveman on in a random half of sessions, compare
    usage per prompt between the halves, and keep a saver only when it is measurably cheaper.
 
-- Good: each part is small and testable; nothing acts until the user runs `/tokenops:autopilot on`;
+- Good: each part is small and testable; nothing acts until the user runs `/tokenops:saver on`;
   RTK and caveman stay separate installs that TokenOps calls (RTK's engine is BSL 1.1, so it is
   never bundled).
 - Bad: hooks cannot see task quality, so the A/B judges usage only, and says so.
