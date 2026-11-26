@@ -26,7 +26,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TOKENOPS_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("CAVEMAN_DEFAULT_MODE", "off")
     monkeypatch.setenv("TOKENOPS_RTK", f'"{sys.executable}" "{FAKE}"')
-    settings.save_config({"autopilot": True})
+    settings.save_config({"saver": True})
     return tmp_path
 
 

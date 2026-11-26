@@ -30,7 +30,7 @@ def testable() -> dict[str, bool]:
 def session_start(payload: dict) -> dict | None:
     """Pick this session's arms (kept on resume and compaction); load caveman when it is on."""
     config = settings.load_config()
-    if not config.get("autopilot"):
+    if not config.get("saver"):
         return None
     sid = payload.get("session_id") or "unknown"
     state = settings.load_session(sid)
@@ -130,7 +130,7 @@ def results() -> dict[str, dict]:
 def render(rows: dict[str, dict]) -> str:
     if not rows:
         return ""
-    lines = ["", "Measured on your sessions (autopilot A/B, usage per prompt)"]
+    lines = ["", "Measured on your sessions (saver mode A/B, usage per prompt)"]
     for saver, r in rows.items():
         if "change" not in r:
             lines.append(

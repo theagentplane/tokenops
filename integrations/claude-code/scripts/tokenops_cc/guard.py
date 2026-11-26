@@ -59,7 +59,7 @@ def last_response(transcript_path: str) -> dict | None:
 
 def check(payload: dict, now: float | None = None) -> dict | None:
     """UserPromptSubmit handler. Returns a block decision, or None to let the prompt through."""
-    if not settings.load_config().get("autopilot"):
+    if not settings.load_config().get("saver"):
         return None
     last = last_response(payload.get("transcript_path") or "")
     now = time.time() if now is None else now

@@ -33,9 +33,9 @@ In Claude Code:
 Then run `/tokenops:doctor` (or `/tokenops:doctor 7` for the last 7 days). Needs Python 3.9+
 on your PATH; nothing to `pip install`.
 
-## Autopilot
+## Saver mode
 
-`/tokenops:autopilot on` lets TokenOps act on what the doctor finds. Off by default; every hook
+`/tokenops:saver on` lets TokenOps act on what the doctor finds. Off by default; every hook
 fails open.
 
 - **Resume guard.** After a break longer than the cache lifetime, your next message re-reads the
@@ -61,10 +61,10 @@ fails open.
 
 - **Measured, not guessed.** Smart RTK and [caveman](https://github.com/JuliusBrussee/caveman) are
   each switched on in a random half of your sessions. After 10 sessions on and 10 off, the doctor
-  shows what each one did to your usage per prompt, and the autopilot keeps it only if it saves:
+  shows what each one did to your usage per prompt, and the saver mode keeps it only if it saves:
 
   ```
-  Measured on your sessions (autopilot A/B, usage per prompt)
+  Measured on your sessions (saver mode A/B, usage per prompt)
     Smart RTK  -6% usage per prompt (95% range -9% to -2%) -> kept on
     caveman    +1% usage per prompt (95% range -3% to +5%) -> turned off
     Usage only: hooks cannot see whether the work went as well.
@@ -73,7 +73,7 @@ fails open.
   For caveman, set its own default to off (`"defaultMode": "off"` in caveman's config file, or
   `CAVEMAN_DEFAULT_MODE=off`) so TokenOps decides per session.
 
-`/tokenops:autopilot status` shows what is on; `/tokenops:autopilot off` turns it all off.
+`/tokenops:saver status` shows what is on; `/tokenops:saver off` turns it all off.
 
 ## How it reads your usage
 

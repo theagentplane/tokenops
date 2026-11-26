@@ -1,5 +1,5 @@
 {
-  "description": "TokenOps autopilot. Every hook fails open and does nothing until /tokenops:autopilot on.",
+  "description": "TokenOps saver mode. Every hook fails open and does nothing until /tokenops:saver on.",
   "hooks": {
     "SessionStart": [
       {

@@ -13,13 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   my limit?" from your local session logs: usage by cause (re-buying the cache after breaks, re-reading
   context, output, new context) and what to change, including whether caveman or RTK can help your kind of
   work. Install with `/plugin marketplace add theagentplane/tokenops`, then `/plugin install tokenops@tokenops`.
-- Claude Code autopilot (ADR 0010), off until `/tokenops:autopilot on`. Resume guard: holds the first message
+- Claude Code saver mode (ADR 0010), off until `/tokenops:saver on`. Resume guard: holds the first message
   to a session whose prompt cache has expired, once, with its cost and cheaper ways on; sending it again goes
   through.
-- Claude Code autopilot: smart RTK. With RTK installed (and its own hook removed), shell commands are rewritten
+- Claude Code saver mode: smart RTK. With RTK installed (and its own hook removed), shell commands are rewritten
   to their compact RTK form, except file reads, `git diff`/`git show` and a test run after a failing one.
-- Claude Code autopilot: saver A/B. Smart RTK and caveman are each switched on in a random half of sessions;
-  after 10 sessions per side, `/tokenops:doctor` shows the measured change in usage per prompt and the autopilot
+- Claude Code saver mode: saver A/B. Smart RTK and caveman are each switched on in a random half of sessions;
+  after 10 sessions per side, `/tokenops:doctor` shows the measured change in usage per prompt and the saver mode
   keeps a saver only when it saves.
 
 ### Fixed
