@@ -33,6 +33,27 @@ In Claude Code:
 Then run `/tokenops:doctor` (or `/tokenops:doctor 7` for the last 7 days). Needs Python 3.9+
 on your PATH; nothing to `pip install`.
 
+## Autopilot
+
+`/tokenops:autopilot on` lets TokenOps act on what the doctor finds. Off by default; every hook
+fails open.
+
+- **Resume guard.** After a break longer than the cache lifetime, your next message re-reads the
+  whole conversation at the cache-write price. The guard holds that message once:
+
+  ```
+  TokenOps: this session's cache expired (1.5 h since the last reply). Sending now re-reads
+  433k tokens at the cache-write price: about $3.47 API-equivalent, against $0.09 while the
+  cache was warm.
+    - Send the same message again to continue anyway.
+    - Or run /compact first: it keeps the gist in far fewer tokens.
+    - Or /clear and paste a 3-line summary of where you were (cheapest).
+  ```
+
+  It only acts when the context is at least 50k tokens (`TOKENOPS_GUARD_MIN_TOKENS`).
+
+`/tokenops:autopilot status` shows what is on; `/tokenops:autopilot off` turns it all off.
+
 ## How it reads your usage
 
 Claude Code writes every model response to `~/.claude/projects/*/*.jsonl`, often on several

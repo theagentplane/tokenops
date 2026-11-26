@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   my limit?" from your local session logs: usage by cause (re-buying the cache after breaks, re-reading
   context, output, new context) and what to change, including whether caveman or RTK can help your kind of
   work. Install with `/plugin marketplace add theagentplane/tokenops`, then `/plugin install tokenops@tokenops`.
+- Claude Code autopilot (ADR 0010), off until `/tokenops:autopilot on`. Resume guard: holds the first message
+  to a session whose prompt cache has expired, once, with its cost and cheaper ways on; sending it again goes
+  through.
 
 ### Fixed
 

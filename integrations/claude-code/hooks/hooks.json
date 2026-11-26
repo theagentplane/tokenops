@@ -1,0 +1,16 @@
+{
+  "description": "TokenOps autopilot. Every hook fails open and does nothing until /tokenops:autopilot on.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "P=$(command -v python3 || command -v python) || exit 0; \"$P\" \"${CLAUDE_PLUGIN_ROOT}/scripts/tokenops_hook.py\" UserPromptSubmit || exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -50,6 +50,7 @@ Do not write one for routine changes: a bug fix, a rename, a small refactor.
 | [0007](0007-progress-guard-input-repeat-detection.md) | Detect a stall from the unchanged input shown to the model, opt-in | Proposed |
 | [0008](0008-budget-pace-policy.md) | Show the model its soft-budget usage and trend, in a new opt-in policy | Proposed |
 | [0009](0009-claude-code-plugin.md) | Ship a Claude Code plugin from this repository, priced from the framework price book | Proposed |
+| [0010](0010-claude-code-autopilot.md) | Claude Code autopilot: opt-in, acts through hooks, keeps a saver only if it measures a saving | Proposed |
 
 Decisions taken in the suite for the 1.0 rework (trace as run, governance pulled from the
 database, halt as a trace attribute, no deduplication of ledger events, ledger counters) are
