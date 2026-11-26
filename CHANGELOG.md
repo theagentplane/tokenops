@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Claude prices in the default price book are now Anthropic's current list prices, with each model's
+  cache-read rate set explicitly (it defaulted to half the input rate, 5 to 20 times too high for Claude).
+  Adds Claude Opus 5.5, Opus 5, Sonnet 5.5, Sonnet 5, Haiku 5.5 and the Fable models; Opus 4.8 was priced
+  at 3x its list price. `CACHE_WRITE_5M` and `CACHE_WRITE_1H` give Anthropic's cache-write multipliers.
+
 ## [2.4.0] - 2026-11-17
 
 ### Added

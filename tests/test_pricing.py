@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tokenops.framework.core import Usage
-from tokenops.framework.pricing import Rate, build_price_book
+from tokenops.framework.pricing import DEFAULT_RATES, Rate, build_price_book
 
 
 def test_prices_known_model_in_micros():
@@ -33,3 +33,19 @@ def test_fails_closed_on_unknown_model():
 def test_custom_rate_table():
     price = build_price_book({"flat": Rate(input=1_000_000, output=1_000_000)})
     assert price("x", "flat", Usage(input=1, output=1)) == 2  # 2 tokens @ 1 micro each
+
+
+def test_claude_rates_match_anthropic_list_prices():
+    price = build_price_book()
+    assert price("anthropic", "claude-opus-5-5", Usage(input=1_000_000)) == 4_000_000
+    assert price("anthropic", "claude-opus-5-5", Usage(output=1_000_000)) == 20_000_000
+    assert price("anthropic", "claude-opus-5-5", Usage(cached=1_000_000)) == 200_000
+    assert price("anthropic", "claude-opus-4-8", Usage(input=1_000_000)) == 5_000_000
+
+
+def test_every_claude_rate_sets_its_cache_read_price():
+    # The input // 2 default fits OpenAI, not Anthropic (cache reads are 2.5% to 10% of input).
+    claude = {m: r for m, r in DEFAULT_RATES.items() if m.startswith("claude-")}
+    assert claude and all(
+        r.cached is not None and r.cached <= r.input // 10 for r in claude.values()
+    )
