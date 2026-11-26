@@ -71,6 +71,8 @@ def pre_tool_use(payload: dict) -> dict | None:
     sid = payload.get("session_id") or "unknown"
     if payload.get("tool_name") != "Bash" or not command or not _active():
         return None
+    if settings.load_session(sid).get("arms", {}).get("rtk") is False:
+        return None  # the A/B test has RTK off in this session
     new = rewrite(command, settings.load_session(sid).get("last_test_failed", False))
     if new is None:
         return None

@@ -14,9 +14,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def main() -> None:
     event = sys.argv[1] if len(sys.argv) > 1 else ""
     try:
-        from tokenops_cc import guard, rtk
+        from tokenops_cc import ab, guard, rtk
 
         handlers = {
+            "SessionStart": ab.session_start,
             "UserPromptSubmit": guard.check,
             "PreToolUse": rtk.pre_tool_use,
             "PostToolUse": rtk.post_tool_use,
