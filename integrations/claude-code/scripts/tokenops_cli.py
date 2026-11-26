@@ -20,17 +20,17 @@ def projects_dir() -> str:
     return os.path.join(home, "projects")
 
 
-def autopilot(action: str) -> str:
+def saver_mode(action: str) -> str:
     config = settings.load_config()
     if action in ("on", "off"):
-        config["autopilot"] = action == "on"
+        config["saver"] = action == "on"
         settings.save_config(config)
-    if not config.get("autopilot"):
-        return "TokenOps autopilot is off. Turn it on with /tokenops:autopilot on"
+    if not config.get("saver"):
+        return "Saver mode is off. Turn it on with /tokenops:saver on"
     return (
-        "TokenOps autopilot is on.\n"
+        "Saver mode is on.\n"
         "  Resume guard: on (holds the first message after the cache expires, once)\n"
-        "Turn it off with /tokenops:autopilot off"
+        "Turn it off with /tokenops:saver off"
     )
 
 
@@ -39,11 +39,11 @@ def main(argv: list[str] | None = None) -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     doctor = sub.add_parser("doctor", help="why am I hitting my limit?")
     doctor.add_argument("--days", type=int, default=30)
-    pilot = sub.add_parser("autopilot", help="on, off or status")
-    pilot.add_argument("action", nargs="?", default="status", choices=["on", "off", "status"])
+    saver = sub.add_parser("saver", help="on, off or status")
+    saver.add_argument("action", nargs="?", default="status", choices=["on", "off", "status"])
     a = ap.parse_args(argv)
-    if a.cmd == "autopilot":
-        print(autopilot(a.action))
+    if a.cmd == "saver":
+        print(saver_mode(a.action))
     else:
         print(render(diagnose(projects_dir(), a.days, os.getcwd())))
 

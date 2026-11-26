@@ -33,9 +33,9 @@ In Claude Code:
 Then run `/tokenops:doctor` (or `/tokenops:doctor 7` for the last 7 days). Needs Python 3.9+
 on your PATH; nothing to `pip install`.
 
-## Autopilot
+## Saver mode
 
-`/tokenops:autopilot on` lets TokenOps act on what the doctor finds. Off by default; every hook
+`/tokenops:saver on` lets TokenOps act on what the doctor finds. Off by default; every hook
 fails open.
 
 - **Resume guard.** After a break longer than the cache lifetime, your next message re-reads the
@@ -52,7 +52,7 @@ fails open.
 
   It only acts when the context is at least 50k tokens (`TOKENOPS_GUARD_MIN_TOKENS`).
 
-`/tokenops:autopilot status` shows what is on; `/tokenops:autopilot off` turns it all off.
+`/tokenops:saver status` shows what is on; `/tokenops:saver off` turns it all off.
 
 ## How it reads your usage
 
