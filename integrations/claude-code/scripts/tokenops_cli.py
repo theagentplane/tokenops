@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from tokenops_cc import settings  # noqa: E402
+from tokenops_cc import rtk, settings  # noqa: E402
 from tokenops_cc.doctor import diagnose, render  # noqa: E402
 
 
@@ -30,6 +30,7 @@ def autopilot(action: str) -> str:
     return (
         "TokenOps autopilot is on.\n"
         "  Resume guard: on (holds the first message after the cache expires, once)\n"
+        f"  Smart RTK:    {rtk.status()}\n"
         "Turn it off with /tokenops:autopilot off"
     )
 
