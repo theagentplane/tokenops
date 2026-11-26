@@ -1,6 +1,6 @@
 """Detect which token savers are active, so sessions can be compared with and without them.
 
-Read-only: looks at Claude Code settings files and the environment, never changes them.
+Read-only: looks at Claude Code settings files, never changes them.
 """
 
 from __future__ import annotations
@@ -49,9 +49,5 @@ def detect(cwd: str | None = None) -> list[str]:
         elif isinstance(enabled, list):
             blob += " ".join(map(str, enabled)) + " "
         blob += json.dumps(s.get("hooks") or {}) + " " + json.dumps(s.get("mcpServers") or {}) + " "
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
     blob = blob.lower()
-    found = sorted(name for name, needles in KNOWN.items() if any(n in blob for n in needles))
-    if base_url and "anthropic.com" not in base_url:
-        found.append("proxy:" + ("headroom" if "headroom" in base_url.lower() else "custom"))
-    return found
+    return sorted(name for name, needles in KNOWN.items() if any(n in blob for n in needles))
