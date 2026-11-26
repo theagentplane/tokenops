@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Claude Code plugin 0.1.1: adds an icon, lists "TokenOps" as the author, and no longer reads
+  `ANTHROPIC_BASE_URL` to detect a proxy (raised by Anthropic's plugin directory review).
+
 ## [2.5.0] - 2026-11-26
 
 ### Added
