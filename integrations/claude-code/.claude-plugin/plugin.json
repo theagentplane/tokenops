@@ -1,0 +1,10 @@
+{
+  "name": "tokenops",
+  "version": "0.1.0",
+  "description": "Why am I hitting my limit? See where your Claude Code usage goes and what to change. Local only.",
+  "author": {"name": "The Agent Plane", "url": "https://github.com/theagentplane"},
+  "homepage": "https://github.com/theagentplane/tokenops/tree/main/integrations/claude-code",
+  "repository": "https://github.com/theagentplane/tokenops",
+  "license": "MIT",
+  "keywords": ["claude-code", "usage", "limits", "cost", "tokens", "cache"]
+}
