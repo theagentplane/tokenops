@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude Code saver mode (ADR 0010), off until `/tokenops:saver on`. Resume guard: holds the first message
   to a session whose prompt cache has expired, once, with its cost and cheaper ways on; sending it again goes
   through.
+- Claude Code saver mode: smart RTK. With RTK installed (and its own hook removed), shell commands are rewritten
+  to their compact RTK form, except file reads, `git diff`/`git show` and a test run after a failing one.
 
 ### Fixed
 

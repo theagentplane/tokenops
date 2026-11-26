@@ -14,9 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def main() -> None:
     event = sys.argv[1] if len(sys.argv) > 1 else ""
     try:
-        from tokenops_cc import guard
+        from tokenops_cc import guard, rtk
 
-        handlers = {"UserPromptSubmit": guard.check}
+        handlers = {
+            "UserPromptSubmit": guard.check,
+            "PreToolUse": rtk.pre_tool_use,
+            "PostToolUse": rtk.post_tool_use,
+        }
         if event in handlers:
             out = handlers[event](json.load(sys.stdin))
             if out:

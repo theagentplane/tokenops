@@ -11,6 +11,30 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "P=$(command -v python3 || command -v python) || exit 0; \"$P\" \"${CLAUDE_PLUGIN_ROOT}/scripts/tokenops_hook.py\" PreToolUse || exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "P=$(command -v python3 || command -v python) || exit 0; \"$P\" \"${CLAUDE_PLUGIN_ROOT}/scripts/tokenops_hook.py\" PostToolUse || exit 0",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

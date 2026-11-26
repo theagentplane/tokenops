@@ -52,6 +52,13 @@ fails open.
 
   It only acts when the context is at least 50k tokens (`TOKENOPS_GUARD_MIN_TOKENS`).
 
+- **Smart RTK.** With [RTK](https://github.com/rtk-ai/rtk) installed, shell commands Claude runs
+  are rewritten to their compact RTK form (`git status` -> `rtk git status`), using RTK's own
+  `rtk rewrite`. File reads (`cat`, `head`, `sed -n`), `git diff`/`git show`, and the next test run
+  after a failing one stay verbatim, because Claude needs that output exactly. If RTK's own hook
+  is installed, smart RTK stays off so nothing is rewritten twice: remove RTK's hook from your
+  Claude Code settings to let TokenOps decide.
+
 `/tokenops:saver status` shows what is on; `/tokenops:saver off` turns it all off.
 
 ## How it reads your usage
