@@ -138,6 +138,23 @@ ControlPlaneClient`); the budget then lives in the plane and is shared across pr
 
 <sub><i>Same task, run twice: ungoverned it completes over budget, governed it halts within the cap, then the Dashboard attributes cost per agent. <a href="https://github.com/theagentplane/tokenops/raw/main/examples/demo-assets/videos/02_governance_on_budget_cap.webm">Full video</a>.</i></sub>
 
+## 🩺 Claude Code: why am I hitting my limit?
+
+Using Claude Code? One command shows where your usage goes and what to change, from your own
+session logs, on your machine:
+
+```
+/plugin marketplace add theagentplane/tokenops
+/plugin install tokenops@tokenops
+/tokenops:doctor
+```
+
+It splits your usage by cause (re-buying the cache after breaks, re-reading context, output) and
+tells you whether tools like caveman or RTK can help your kind of work. Then `/tokenops:saver on`
+makes your limit last longer, like Low Power Mode: it warns before an expensive message after a
+break, uses RTK only where it helps, and keeps caveman or RTK only if they measurably save you
+usage. [More](integrations/claude-code/README.md).
+
 ## 🐳 Quickdeploy
 
 > [!NOTE]

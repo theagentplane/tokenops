@@ -1,0 +1,52 @@
+name: claude-prices
+
+# Weekly: compare the Claude rates in src/tokenops/framework/pricing.py with Anthropic's pricing
+# page. On a difference, or when the page can no longer be read, open (or update) one issue.
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: claude-prices
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Claude price check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Compare with the pricing page
+        id: check
+        run: |
+          set +e
+          python scripts/check-claude-prices.py > report.md
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat report.md
+      - name: Open or update the price issue
+        if: steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          title="Claude prices differ from Anthropic's pricing page"
+          number=$(gh issue list --repo "$REPO" --state open --search "\"$title\" in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$REPO" --body-file report.md
+          else
+            gh issue create --repo "$REPO" --title "$title" --body-file report.md
+          fi
