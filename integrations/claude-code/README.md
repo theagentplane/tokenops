@@ -92,6 +92,20 @@ TokenOps' price book (`src/tokenops/framework/pricing.py`).
 On a Claude plan the dollar figures are API-equivalent: they show your share of usage, not a
 bill. Nothing leaves your machine.
 
+## What it runs, reads and stores
+
+- **Runs:** `python3` (or `python`) with the scripts in this folder, standard library only. With
+  Saver mode on and [RTK](https://github.com/rtk-ai/rtk) installed, it also runs `rtk rewrite
+  <command>` to ask RTK how it would compact a shell command. Nothing else.
+- **Reads:** your Claude Code session logs (`~/.claude/projects/*/*.jsonl`), your Claude Code
+  settings files (to see which token savers are installed), caveman's installed skill file and
+  config (only when caveman is installed), and this plugin's own `prices.json`.
+- **Stores:** a small settings file and one small JSON file per session in Claude Code's plugin
+  data folder (`$CLAUDE_PLUGIN_DATA`): whether Saver mode is on, the A/B choices and results.
+- **Sends:** nothing. It makes no network requests and keeps no copy of your prompts or code.
+- **Changes:** with Saver mode on, it can hold one message after a break (you send it again to
+  go on) and rewrite a shell command to its RTK form. With Saver mode off, it only reads.
+
 ## Development
 
 ```
