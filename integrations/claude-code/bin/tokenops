@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# TokenOps CLI launcher: finds Python 3 and runs the bundled CLI.
+ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+for p in python3 python py; do
+  if command -v "$p" >/dev/null 2>&1 && "$p" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+    exec "$p" "$ROOT/scripts/tokenops_cli.py" "$@"
+  fi
+done
+echo "TokenOps needs Python 3.9 or newer on PATH." >&2
+exit 0
